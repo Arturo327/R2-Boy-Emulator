@@ -103,6 +103,7 @@ Nowadays it passes the following blargg test ROMs:
 ---
 
 ## Project Structure
+```
 src/
 ├── bus/
 ├── cartucho/
@@ -113,5 +114,6 @@ src/
 ├── gb.c
 ├── gb.h
 └── main.c
+```
 
 ---
