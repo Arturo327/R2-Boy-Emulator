@@ -1,0 +1,259 @@
+#include "bus/bus.h"
+#include "gb.h"
+
+static uint8_t joypad_calc_lo (GB *gb) {
+	uint8_t sel = gb->joypad.joyp & 0x30;
+	uint8_t lo = 0x0F;
+
+	if (!(sel & 0x20)) lo &= ~((gb->joypad.buttons >> 4) & 0x0F);
+	if (!(sel & 0x10)) lo &= ~(gb->joypad.buttons & 0x0F);
+
+	return lo;
+}
+
+void joypad_update (GB *gb, uint8_t new_buttons) {
+	if (gb->joypad.buttons == new_buttons) return;
+
+	uint8_t old_lo = joypad_calc_lo(gb);
+	gb->joypad.buttons = new_buttons;
+	uint8_t new_lo = joypad_calc_lo(gb);
+
+	if ((old_lo & ~new_lo) & 0x0F) {
+		gb->interrupts.IF |= 0x10;
+	}
+}
+
+uint8_t bus_read8 (void *ctx, uint16_t addr) {
+	GB *gb = (GB *)ctx;
+
+	if (addr < 0x4000) {
+		if (addr < gb->memory.cart.rom_size)
+			return gb->memory.cart.rom[addr];
+		return 0xFF;
+	}
+
+	if (addr < 0x8000) {
+		uint32_t bank = gb->memory.cart.rom_bank;
+		if (bank == 0) bank = 1;
+		uint32_t offset = (bank << 14) + (addr - 0x4000);
+		if (offset < gb->memory.cart.rom_size)
+			return gb->memory.cart.rom[offset];
+		return 0xFF;
+	}
+
+	if (addr < 0xA000) {
+		return gb->memory.vram[addr - 0x8000];
+	}
+
+	if (addr < 0xC000) {
+		if (!gb->memory.cart.ram_enabled || !gb->memory.cart.ram)
+			return 0xFF;
+		uint32_t offset = (gb->memory.cart.ram_bank << 13) + (addr - 0xA000);
+		if (offset < gb->memory.cart.ram_size)
+			return gb->memory.cart.ram[offset];
+		return 0xFF;
+	}
+
+	if (addr < 0xE000) {
+		return gb->memory.wram[addr - 0xC000];
+	}
+
+	if (addr < 0xFE00) {
+		return gb->memory.wram[addr - 0xE000];
+	}
+
+	if (addr < 0xFEA0) {
+		return gb->memory.oam[addr - 0xFE00];
+	}
+
+	if (addr < 0xFF00) {
+		return 0xFF;
+	}
+
+	if (addr < 0xFF80) {
+		switch (addr) {
+			case 0xFF00: {
+				uint8_t sel = gb->joypad.joyp & 0x30;
+				uint8_t lo = 0x0F;
+
+				if (!(sel & 0x20)) {
+					lo &= ~((gb->joypad.buttons >> 4) & 0x0F);
+				}
+				if (!(sel & 0x10)) {
+					lo &= ~(gb->joypad.buttons & 0x0F);
+				}
+				return sel | lo | 0xC0;
+			}
+			case 0xFF01: return gb->joypad.SB;
+			case 0xFF02: return gb->joypad.SC & 0x7F;
+			case 0xFF04: return gb->timer.div;
+			case 0xFF05: return gb->timer.tima;
+			case 0xFF06: return gb->timer.tma;
+			case 0xFF07: return gb->timer.tac;
+
+			case 0xFF0F: return gb->interrupts.IF | 0xE0;
+
+			case 0xFF40: return gb->ppu.lcdc;
+			case 0xFF41: return gb->ppu.stat | 0x80;
+			case 0xFF42: return gb->ppu.scy;
+			case 0xFF43: return gb->ppu.scx;
+			case 0xFF44: return gb->ppu.ly;
+			case 0xFF45: return gb->ppu.lyc;
+			case 0xFF46: return gb->ppu.dma;
+			case 0xFF47: return gb->ppu.bgp;
+			case 0xFF48: return gb->ppu.obp0;
+			case 0xFF49: return gb->ppu.obp1;
+			case 0xFF4A: return gb->ppu.wy;
+			case 0xFF4B: return gb->ppu.wx;
+
+			default: return 0xFF;
+		}
+	}
+
+	if (addr < 0xFFFF) {
+		return gb->memory.hram[addr - 0xFF80];
+	}
+
+	return gb->interrupts.IE;
+}
+
+void bus_write8 (void *ctx, uint16_t addr, uint8_t val) {
+	GB *gb = (GB *)ctx;
+
+	if (addr < 0x8000) {
+		if (gb->memory.cart.mbc_type == 0)
+			return;
+		if (gb->memory.cart.mbc_type == 1) {
+			if (addr < 0x2000) {
+				gb->memory.cart.ram_enabled = ((val & 0x0F) == 0x0A);
+			}
+			else if (addr < 0x4000) {
+				uint8_t bank = val & 0x1F;
+				if (bank == 0) bank = 1;
+				gb->memory.cart.rom_bank = (gb->memory.cart.rom_bank & 0x60) | bank;
+			}
+			else if (addr < 0x6000) {
+				if (gb->memory.cart.mbc_mode == 0) {
+					gb->memory.cart.rom_bank = (gb->memory.cart.rom_bank & 0x1F) | ((val & 0x03) << 5);
+				} else {
+					gb->memory.cart.ram_bank = val & 0x03;
+				}
+			}
+			else {
+				gb->memory.cart.mbc_mode = val & 0x01;
+			}
+		}
+		return;
+	}
+
+	if (addr < 0xA000) {
+		gb->memory.vram[addr - 0x8000] = val;
+		return;
+	}
+
+	if (addr < 0xC000) {
+		if (gb->memory.cart.ram_enabled && gb->memory.cart.ram) {
+			uint32_t offset = (gb->memory.cart.ram_bank << 13) + (addr - 0xA000);
+			if (offset < gb->memory.cart.ram_size)
+				gb->memory.cart.ram[offset] = val;
+		}
+		return;
+	}
+
+	if (addr < 0xE000) {
+		gb->memory.wram[addr - 0xC000] = val;
+		return;
+	}
+
+	if (addr < 0xFE00) {
+		gb->memory.wram[addr - 0xE000] = val;
+		return;
+	}
+
+	if (addr < 0xFEA0) {
+		gb->memory.oam[addr - 0xFE00] = val;
+		return;
+	}
+
+	if (addr < 0xFF00) {
+		return;
+	}
+
+	if (addr < 0xFF80) {
+		switch (addr) {
+			case 0xFF00: {
+				uint8_t old_lo = joypad_calc_lo(gb);
+				gb->joypad.joyp = (gb->joypad.joyp & 0xCF) | (val & 0x30);
+				uint8_t new_lo = joypad_calc_lo(gb);
+
+				if ((old_lo & ~new_lo) & 0x0F) {
+					gb->interrupts.IF |= 0x10;
+				}
+				break;
+			}
+			case 0xFF01: gb->joypad.SB = val; break;
+			case 0xFF02: gb->joypad.SC = val; break;
+			case 0xFF04:
+				gb->timer.div = 0;
+				gb->timer.div_counter = 0;
+				gb->timer.tima_counter = 0;
+				break;
+			case 0xFF05: 
+				gb->timer.tima = val;
+				gb->timer.tima_counter = 0;
+				break;
+			case 0xFF06: gb->timer.tma = val; break;
+			case 0xFF07: gb->timer.tac = val; break;
+
+			case 0xFF0F: gb->interrupts.IF = (val & 0x1F) | 0xE0; break;
+
+			case 0xFF40: gb->ppu.lcdc = val; break;
+			case 0xFF41: {
+				gb->ppu.stat = (gb->ppu.stat & 0x07) | (val & 0x78);
+				break;
+			}
+			case 0xFF42: gb->ppu.scy = val; break;
+			case 0xFF43: gb->ppu.scx = val; break;
+			case 0xFF44: break;
+			case 0xFF45: gb->ppu.lyc = val; break;
+			case 0xFF46: {
+				gb->ppu.dma = val;
+				gb->dma_active = 1;
+				gb->dma_src = (uint16_t)val << 8;
+				gb->dma_index = 0;
+				break;
+			}
+			case 0xFF47: gb->ppu.bgp = val; break;
+			case 0xFF48: gb->ppu.obp0 = val; break;
+			case 0xFF49: gb->ppu.obp1 = val; break;
+			case 0xFF4A: gb->ppu.wy = val; break;
+			case 0xFF4B: gb->ppu.wx = val; break;
+
+			default: break;
+		}
+		return;
+	}
+
+	if (addr < 0xFFFF) {
+		gb->memory.hram[addr - 0xFF80] = val;
+		return;
+	}
+
+	if (addr == 0xFFFF) {
+		gb->interrupts.IE = val;
+	}
+}
+
+void init_bus (Bus *bus, GB *gb) {
+	gb->cpu.bus = bus;
+	gb->ppu.bus = bus;
+	gb->interrupts.IME = 0;
+	gb->interrupts.IE = 0;
+	gb->interrupts.IF = 0xE1;
+	gb->interrupts.ei_pending = 0;
+	bus->ctx = (void *) gb;
+	bus->read8 = bus_read8;
+	bus->write8 = bus_write8;
+	bus->opcodes = &gb->opcodes;
+	bus->interrupts = &gb->interrupts;
+}
