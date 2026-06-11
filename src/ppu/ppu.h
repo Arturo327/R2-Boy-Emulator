@@ -28,12 +28,12 @@ typedef struct PPU {
 	uint8_t sprite_waiting;
 	uint8_t sprite_step;
 
-	uint8_t sprite_line[10];
+	int pending_sprite;
 	uint8_t sp_done[10];
-	uint8_t num_sprite_line;
 
-	SpritePixel sp_buffer[8];
-	uint8_t num_sp_buffer;
+	SpritePixel sp_fifo[8];
+	uint8_t num_sp_fifo;
+	SpritePixel sp_buff[8];
 	uint16_t sp_addr;
 
 	uint8_t bg_fifo[16];

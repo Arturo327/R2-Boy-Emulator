@@ -32,10 +32,11 @@ void init_ppu (PPU *ppu) {
 	ppu->num_bg_fifo = 0;
 	ppu->window_line = 0;
 	ppu->window_active = 0;
-	ppu->num_sp_buffer = 0;
+	ppu->num_sp_fifo = 0;
 	ppu->sprite_active = 0;
 	ppu->sprite_step = 0;
-	ppu->num_sprite_line = 0;
+	ppu->sprite_waiting = 0;
+	ppu->pending_sprite = -1;
 	ppu->sel_sprite = 0;
 }
 
@@ -69,8 +70,8 @@ static void update_stat (PPU *ppu, int new_mode) {
 		ppu->sprite_active = 0;
 		ppu->sprite_waiting = 0;
 		ppu->sprite_step = 0;
-		ppu->num_sprite_line = 0;
-		ppu->num_sp_buffer = 0;
+		ppu->pending_sprite = -1;
+		ppu->num_sp_fifo = 0;
 		for (int i = 0; i < 10; i++) {
 			ppu->sp_done[i] = 0;
 		}
@@ -121,7 +122,7 @@ static void bg_fetch (PPU *ppu) {
 		uint8_t tile_x;
 		uint8_t tile_y;
 		uint16_t tile_map_base;
-		
+
 		if (ppu->window_active) {
 			tile_x = ppu->fetch_x >> 3;
 			tile_y = ppu->window_line >> 3;
@@ -186,15 +187,6 @@ static void bg_fetch (PPU *ppu) {
 	ppu->fetcher_t++;
 }
 
-static uint8_t sp_line_get (PPU *ppu) {
-	uint8_t r = ppu->sprite_line[0];
-	for (int i = 1; i < ppu->num_sprite_line; i++) {
-		ppu->sprite_line[i - 1] = ppu->sprite_line[i];
-	}
-	ppu->num_sprite_line--;
-	return r;
-}
-
 static void start_sprites (PPU *ppu) {
 	for (int i = ppu->num_sprites - 1; i >= 0; i--) {
 		if (ppu->sp_done[i]) continue;
@@ -202,22 +194,20 @@ static void start_sprites (PPU *ppu) {
 		int start_x = sp->x - 8;
 
 		if (ppu->x == start_x) {
-			ppu->sprite_line[ppu->num_sprite_line++] = i;
+			ppu->pending_sprite = i;
 			ppu->sp_done[i] = 1;
-			break;
+			ppu->sprite_waiting = 1;
+			return;
 		}
-	}
-	if (ppu->num_sprite_line > 0) {
-		ppu->sprite_waiting = 1;
 	}
 }
 
 static void sprite_fetch (PPU *ppu) {
 	GB *gb = (GB *)ppu->bus->ctx;
-	
+
 	if (ppu->sprite_step == 0) {
 
-		ppu->sel_sprite = sp_line_get(ppu);
+		ppu->sel_sprite = ppu->pending_sprite;
 
 		uint8_t line = ppu->ly - (ppu->sprites[ppu->sel_sprite].y - 16);
 		uint8_t sp_h = (ppu->lcdc & 0x04) ? 16 : 8;
@@ -233,10 +223,10 @@ static void sprite_fetch (PPU *ppu) {
 
 		uint8_t l = gb->memory.vram[ppu->sp_addr];
 		for (int i = 0; i < 8; i++) {
-			uint8_t bit = (ppu->sprites[ppu->sel_sprite].flags & 0x20) ? 
+			uint8_t bit = (ppu->sprites[ppu->sel_sprite].flags & 0x20) ?
 				i : 7 - i;
-			ppu->sp_buffer[i].color = (l >> bit) & 1;
-			ppu->sp_buffer[i].pal = (ppu->sprites[ppu->sel_sprite].flags & 0x10) ? 
+			ppu->sp_buff[i].color = (l >> bit) & 1;
+			ppu->sp_buff[i].pal = (ppu->sprites[ppu->sel_sprite].flags & 0x10) ?
 				ppu->obp1 : ppu->obp0;
 		}
 
@@ -244,16 +234,22 @@ static void sprite_fetch (PPU *ppu) {
 
 		uint8_t h = gb->memory.vram[ppu->sp_addr + 1];
 		for (int i = 0; i < 8; i++) {
-			uint8_t bit = (ppu->sprites[ppu->sel_sprite].flags & 0x20) ? 
+			uint8_t bit = (ppu->sprites[ppu->sel_sprite].flags & 0x20) ?
 				i : 7 - i;
-			ppu->sp_buffer[i].color |= ((h >> bit) & 1) << 1;
-			ppu->sp_buffer[i].bg_prio = ppu->sprites[ppu->sel_sprite].flags & 0x80;
+			ppu->sp_buff[i].color |= ((h >> bit) & 1) << 1;
+			ppu->sp_buff[i].bg_prio = ppu->sprites[ppu->sel_sprite].flags & 0x80;
 		}
 
 	} else if (ppu->sprite_step == 5) {
+
+		for (int i = 0; i < 8; i++) {
+			SpritePixel *sp = ppu->sp_buff + i;
+			ppu->sp_fifo[i] = *sp;
+		}
+
 		ppu->sprite_active = 0;
 		ppu->sprite_step = 0;
-		ppu->num_sp_buffer = 8;
+		ppu->num_sp_fifo = 8;
 		return;
 	}
 
@@ -261,11 +257,11 @@ static void sprite_fetch (PPU *ppu) {
 }
 
 static SpritePixel get_sp_pixel (PPU *ppu) {
-	SpritePixel sp = ppu->sp_buffer[0];
-	for (int i = 1; i < ppu->num_sp_buffer; i++) {
-		ppu->sp_buffer[i - 1] = ppu->sp_buffer[i];
+	SpritePixel sp = ppu->sp_fifo[0];
+	for (int i = 1; i < ppu->num_sp_fifo; i++) {
+		ppu->sp_fifo[i - 1] = ppu->sp_fifo[i];
 	}
-	ppu->num_sp_buffer--;
+	ppu->num_sp_fifo--;
 	return sp;
 }
 
@@ -274,7 +270,7 @@ static uint32_t solve_priority (PPU *ppu, SpritePixel sp, uint8_t bg) {
 	if (sp.bg_prio == 0) return decode_color(sp.color, sp.pal);
 	if (bg == 0) return decode_color(sp.color, sp.pal);
 	return decode_color(bg, ppu->bgp);
-} 
+}
 
 static int dot_line_step (PPU *ppu) {
 
@@ -290,7 +286,7 @@ static int dot_line_step (PPU *ppu) {
 		uint8_t bg = bg_fifo_pop(ppu);
 		uint32_t final_pixel;
 
-		if (ppu->num_sp_buffer > 0) {
+		if (ppu->num_sp_fifo > 0) {
 			SpritePixel sp = get_sp_pixel(ppu);
 			final_pixel = solve_priority(ppu, sp, bg);
 		} else {
@@ -324,11 +320,7 @@ static int dot_line_step (PPU *ppu) {
 		}
 	}
 
-	if (ppu->sprite_active) {
-		sprite_fetch(ppu);
-		ppu->mode3_cycles++;
-		return 0;
-	}
+	if (ppu->sprite_active) sprite_fetch(ppu);
 
 	ppu->mode3_cycles++;
 	return ppu->x == 160;
@@ -408,3 +400,4 @@ void ppu_step (PPU *ppu, int cycles) {
 		ppu->dots++;
 	}
 }
+
