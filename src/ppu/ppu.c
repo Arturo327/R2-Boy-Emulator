@@ -242,9 +242,12 @@ static void sprite_fetch (PPU *ppu) {
 
 	} else if (ppu->sprite_step == 5) {
 
+		for (int i = ppu->num_sp_fifo; i < 8; i++)
+			ppu->sp_fifo[i].color = 0;
+
 		for (int i = 0; i < 8; i++) {
-			SpritePixel *sp = ppu->sp_buff + i;
-			ppu->sp_fifo[i] = *sp;
+			if (!ppu->sp_buff[i].color) continue;
+			ppu->sp_fifo[i] = ppu->sp_buff[i];
 		}
 
 		ppu->sprite_active = 0;
@@ -282,7 +285,9 @@ static int dot_line_step (PPU *ppu) {
 		return 0;
 	}
 
-	if (ppu->num_bg_fifo > 0 && ppu->startup_tiles <= 0 && !ppu->sprite_active) {
+	if (ppu->num_bg_fifo > 0 && ppu->startup_tiles <= 0 
+			&& !ppu->sprite_active && !ppu->sprite_waiting) {
+
 		uint8_t bg = bg_fifo_pop(ppu);
 		uint32_t final_pixel;
 
@@ -320,7 +325,20 @@ static int dot_line_step (PPU *ppu) {
 		}
 	}
 
-	if (ppu->sprite_active) sprite_fetch(ppu);
+	if (ppu->sprite_active) {
+		sprite_fetch(ppu);
+
+		if (!ppu->sprite_active && !ppu->sprite_waiting && (ppu->lcdc & 0x02))
+			start_sprites(ppu);
+
+		if (ppu->sprite_waiting) {
+			ppu->sprite_active = 1;
+			ppu->sprite_waiting = 0;
+		}
+
+		ppu->mode3_cycles++;
+		return 0;
+	}
 
 	ppu->mode3_cycles++;
 	return ppu->x == 160;
