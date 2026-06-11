@@ -198,10 +198,7 @@ void bus_write8 (void *ctx, uint16_t addr, uint8_t val) {
 				gb->timer.div_counter = 0;
 				gb->timer.tima_counter = 0;
 				break;
-			case 0xFF05: 
-				gb->timer.tima = val;
-				gb->timer.tima_counter = 0;
-				break;
+			case 0xFF05: gb->timer.tima = val; break;
 			case 0xFF06: gb->timer.tma = val; break;
 			case 0xFF07: gb->timer.tac = val; break;
 

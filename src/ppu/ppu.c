@@ -67,6 +67,7 @@ static void update_stat (PPU *ppu, int new_mode) {
 		ppu->num_bg_fifo = 0;
 
 		ppu->sprite_active = 0;
+		ppu->sprite_waiting = 0;
 		ppu->sprite_step = 0;
 		ppu->num_sprite_line = 0;
 		ppu->num_sp_buffer = 0;
@@ -163,7 +164,7 @@ static void bg_fetch (PPU *ppu) {
 			ppu->fetcher_buffer[i] |= ((h >> bit) & 1) << 1;
 		}
 
-	} else if (ppu->fetcher_t >= 6) {
+	} else if (ppu->fetcher_t >= 5) {
 		if (ppu->startup_tiles > 0) {
 
 			ppu->startup_tiles--;
@@ -207,7 +208,7 @@ static void start_sprites (PPU *ppu) {
 		}
 	}
 	if (ppu->num_sprite_line > 0) {
-		ppu->sprite_active = 1;
+		ppu->sprite_waiting = 1;
 	}
 }
 
@@ -285,30 +286,7 @@ static int dot_line_step (PPU *ppu) {
 		return 0;
 	}
 
-	if (!ppu->sprite_active)
-		bg_fetch(ppu);
-	if (ppu->startup_tiles > 0) {
-		ppu->mode3_cycles++;
-		return 0;
-	}
-
-	if (!ppu->sprite_active && (ppu->lcdc & 0x02) && ppu->num_bg_fifo == 8)
-		start_sprites(ppu);
-
-	if (ppu->sprite_active) {
-		sprite_fetch(ppu);
-		ppu->mode3_cycles++;
-		return 0;
-	}
-
-	if (ppu->bg_discard > 0) {
-		ppu->bg_discard--;
-		(void)bg_fifo_pop(ppu);
-		ppu->mode3_cycles++;
-		return 0;
-	}
-
-	if (ppu->num_bg_fifo > 0) {
+	if (ppu->num_bg_fifo > 0 && ppu->startup_tiles <= 0 && !ppu->sprite_active) {
 		uint8_t bg = bg_fifo_pop(ppu);
 		uint32_t final_pixel;
 
@@ -321,6 +299,35 @@ static int dot_line_step (PPU *ppu) {
 
 		ppu->framebuffer[ppu->ly * 160 + ppu->x] = final_pixel;
 		ppu->x++;
+	}
+
+	if (!ppu->sprite_active) bg_fetch(ppu);
+
+	if (ppu->startup_tiles > 0) {
+		ppu->mode3_cycles++;
+		return 0;
+	}
+	if (ppu->bg_discard > 0) {
+		ppu->bg_discard--;
+		(void)bg_fifo_pop(ppu);
+		ppu->mode3_cycles++;
+		return 0;
+	}
+
+	if (!ppu->sprite_active && !ppu->sprite_waiting && (ppu->lcdc & 0x02))
+		start_sprites(ppu);
+
+	if (ppu->sprite_waiting) {
+		if (ppu->num_bg_fifo > 0 || ppu->fetcher_t == 5) {
+			ppu->sprite_active = 1;
+			ppu->sprite_waiting = 0;
+		}
+	}
+
+	if (ppu->sprite_active) {
+		sprite_fetch(ppu);
+		ppu->mode3_cycles++;
+		return 0;
 	}
 
 	ppu->mode3_cycles++;
@@ -401,13 +408,3 @@ void ppu_step (PPU *ppu, int cycles) {
 		ppu->dots++;
 	}
 }
-
-
-
-
-
-
-
-
-
-

@@ -66,15 +66,20 @@ int cpu_step (CPU *cpu) {
 	}
 	uint8_t main_opcode = opcode;
 
+	if (cpu->bus->interrupts->ei_pending) {
+		cpu->bus->interrupts->ei_pending = 0;
+		cpu->bus->interrupts->IME = 1;
+	}
+
 	if (opcode != 0xCB) {
 		r = cpu->bus->opcodes->main[opcode](gb);
 	} else {
 		opcode = cpu->bus->read8(cpu->bus->ctx, cpu->pc++);
 		r =  cpu->bus->opcodes->cb[opcode](gb);
 	}
-	if (cpu->bus->interrupts->ei_pending && main_opcode != 0xFB) {
-		cpu->bus->interrupts->ei_pending = 0;
-		cpu->bus->interrupts->IME = 1;
+
+	if (main_opcode == 0xFB) {
+		cpu->bus->interrupts->ei_pending = 1;
 	}
 	return r;
 }

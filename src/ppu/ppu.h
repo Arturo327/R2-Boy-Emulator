@@ -25,6 +25,7 @@ typedef struct PPU {
 
 	uint8_t sel_sprite;
 	uint8_t sprite_active;
+	uint8_t sprite_waiting;
 	uint8_t sprite_step;
 
 	uint8_t sprite_line[10];

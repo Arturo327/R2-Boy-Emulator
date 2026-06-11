@@ -22,7 +22,7 @@ int timer_step (Timer *timer, int cycles) {
 			timer->tima_counter -= a;
 			timer->tima++;
 			if (timer->tima == 0) {
-				timer->tma = 1;
+				timer->tima = timer->tma;
 				hay_interrupt = 1;
 			}
 		}
