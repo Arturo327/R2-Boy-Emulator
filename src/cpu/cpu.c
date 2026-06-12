@@ -12,7 +12,7 @@ void init_cpu (CPU *cpu) {
 	cpu->l = 0x4D;
 
 	cpu->sp = 0xFFFE;
-	cpu->pc = 0x0100;
+	cpu->pc = 0x100;
 	cpu->halted = 0;
 	cpu->halt_bug = 0;
 

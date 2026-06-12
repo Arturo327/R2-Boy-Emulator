@@ -65,6 +65,7 @@ typedef struct PPU {
 } PPU;
 
 void init_ppu (PPU *ppu);
+void init_ppu_reg (PPU *ppu);
 void ppu_step (PPU *ppu, int cycles);
 
 #endif

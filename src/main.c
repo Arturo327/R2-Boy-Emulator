@@ -4,7 +4,7 @@
 
 int main (int argc, char *argv[]) 
 {
-	char *romfile;
+	const char *romfile;
 
 	if (argc > 1) {
         	romfile = argv[1];
@@ -14,9 +14,11 @@ int main (int argc, char *argv[])
 		return 1;
 	}
 
+	const char biosfile[] = "roms/bios.bin";
+
 	GB gb = {0};
 
-	init(&gb, romfile);
+	init(&gb, romfile, biosfile);
 	if (!gb.running) {
 		cleanup(&gb);
 		return 1;

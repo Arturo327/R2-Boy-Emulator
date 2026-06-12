@@ -78,6 +78,24 @@ Run a Game Boy ROM:
 ./build/r2boy path/to/rom.gb
 ```
 
+## BIOS
+
+R2-Boy supports bios, just follow the following steps:
+
+- Create the roms directory:
+
+```bash
+mkdir roms
+```
+
+- Place your BIOS file there under the name "bios.bin":
+
+```bash
+mv /path/to/bios roms/bios.bin
+```
+
+If the emulator doesn't find the boot-rom, it will manually initialize the registers and directly run the game.
+
 ---
 
 ## Controls

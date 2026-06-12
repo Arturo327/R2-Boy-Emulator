@@ -4,18 +4,38 @@
 #include <string.h>
 #include <time.h>
 
-void init (GB *gb, char *romfile) {
+static int load_bios (GB *gb, const char *filename) {
+	FILE *f = fopen(filename, "rb");
+	if (!f) return 0;
+
+	size_t n = fread(gb->memory.bios, 1, 0x100, f);
+	fclose(f);
+
+	return n == 0x100;
+}
+
+void init (GB *gb, const char *romfile, const char *biosfile) {
 	memset(gb, 0, sizeof(GB));
 
-	init_cpu(&gb->cpu);
 	init_ppu(&gb->ppu);
-	init_bus(&gb->bus, gb);
 	init_opcodes(&gb->opcodes);
 
 	if (!init_screen(&gb->lcd)) {
 		gb->running = 0;
 		return;
 	}
+
+	if (!load_bios(gb, biosfile)) {
+
+		init_ppu_reg(&gb->ppu);
+		init_cpu(&gb->cpu);
+		gb->boot_rom_enabled = 0;
+
+	} else {
+		gb->boot_rom_enabled = 1;
+	}
+
+	init_bus(&gb->bus, gb);
 
 	if (!load_rom(&gb->memory.cart, romfile)) {
 		fprintf(stderr, "Failed to load ROM: %s\n", romfile);
@@ -29,22 +49,27 @@ void init (GB *gb, char *romfile) {
 }
 
 void cleanup (GB *gb) {
-    	cleanup_screen(&gb->lcd);
-    	(void) gb;
+	cleanup_screen(&gb->lcd);
+	(void) gb;
 }
 
 void gb_step (GB *gb) {
 	int cycles;
 
-    	if (gb->dma_active) {
-        	gb->memory.oam[gb->dma_index] = gb->bus.read8(gb->bus.ctx, gb->dma_src + gb->dma_index);
-        	gb->dma_index++;
-        	cycles = 4;
-        	if (gb->dma_index >= 0xA0)
-            		gb->dma_active = 0;
-    	} else {
-        	cycles = cpu_step(&gb->cpu);
-    	}
+	if (gb->boot_rom_disable_pending && gb->cpu.pc >= 0x0100) {
+		gb->boot_rom_enabled = 0;
+		gb->boot_rom_disable_pending = 0;
+	}
+
+	if (gb->dma_active) {
+		gb->memory.oam[gb->dma_index] = gb->bus.read8(gb->bus.ctx, gb->dma_src + gb->dma_index);
+		gb->dma_index++;
+		cycles = 4;
+		if (gb->dma_index >= 0xA0)
+			gb->dma_active = 0;
+	} else {
+		cycles = cpu_step(&gb->cpu);
+	}
 	
 	if (timer_step(&gb->timer, cycles)) {
 		gb->interrupts.IF |= 0x04;

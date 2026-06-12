@@ -14,21 +14,27 @@ static const uint32_t PALETA[4] = {
 	0xFF000000,  // negro
 };
 
-void init_ppu (PPU *ppu) {
+void init_ppu_reg (PPU *ppu) {
+
 	ppu->lcdc = 0x91;
 	ppu->stat = 0x86;
 	ppu->ly = 0x00;
 	ppu->bgp = 0xFC;
+	ppu->obp0 = 0xFF;
+	ppu->obp1 = 0xFF;
+	ppu->lyc = 0;
+
+}
+
+void init_ppu (PPU *ppu) {
+
 	ppu->mode = OAM_SCAN;
 	ppu->dots = 0;
 	ppu->ready = 0;
 	ppu->bus = NULL;
-	ppu->obp0 = 0xFF;
-	ppu->obp1 = 0xFF;
 	ppu->x = 0;
 	ppu->num_sprites = 0;
 	ppu->mode3_cycles = 0;
-	ppu->lyc = 0;
 	ppu->num_bg_fifo = 0;
 	ppu->window_line = 0;
 	ppu->window_active = 0;
@@ -285,8 +291,8 @@ static int dot_line_step (PPU *ppu) {
 		return 0;
 	}
 
-	if (ppu->num_bg_fifo > 0 && ppu->startup_tiles <= 0 
-			&& !ppu->sprite_active && !ppu->sprite_waiting) {
+	if (ppu->num_bg_fifo > 0 && ppu->startup_tiles == 0 && !ppu->sprite_active
+			&& !ppu->sprite_waiting && ppu->bg_discard == 0) {
 
 		uint8_t bg = bg_fifo_pop(ppu);
 		uint32_t final_pixel;
@@ -318,11 +324,9 @@ static int dot_line_step (PPU *ppu) {
 	if (!ppu->sprite_active && !ppu->sprite_waiting && (ppu->lcdc & 0x02))
 		start_sprites(ppu);
 
-	if (ppu->sprite_waiting) {
-		if (ppu->num_bg_fifo > 0 || ppu->fetcher_t == 5) {
-			ppu->sprite_active = 1;
-			ppu->sprite_waiting = 0;
-		}
+	if (ppu->sprite_waiting && ppu->num_bg_fifo > 0) {
+		ppu->sprite_active = 1;
+		ppu->sprite_waiting = 0;
 	}
 
 	if (ppu->sprite_active) {

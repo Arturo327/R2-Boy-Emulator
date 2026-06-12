@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int load_rom (Cartucho *cart, char *filename) {
+int load_rom (Cartucho *cart, const char *filename) {
 	cart->rom_bank = 1;
 	cart->ram_bank = 0;
 	cart->ram_enabled = 0;

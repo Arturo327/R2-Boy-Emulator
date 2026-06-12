@@ -19,6 +19,6 @@ typedef struct Cartucho {
 	int battery;
 } Cartucho;
 
-int load_rom (Cartucho *cart, char *filename);
+int load_rom (Cartucho *cart, const char *filename);
 
 #endif

@@ -26,6 +26,10 @@ void joypad_update (GB *gb, uint8_t new_buttons) {
 uint8_t bus_read8 (void *ctx, uint16_t addr) {
 	GB *gb = (GB *)ctx;
 
+	if (addr < 0x100 && gb->boot_rom_enabled) {
+		return gb->memory.bios[addr];
+	}
+
 	if (addr < 0x4000) {
 		if (addr < gb->memory.cart.rom_size)
 			return gb->memory.cart.rom[addr];
@@ -225,6 +229,8 @@ void bus_write8 (void *ctx, uint16_t addr, uint8_t val) {
 			case 0xFF49: gb->ppu.obp1 = val; break;
 			case 0xFF4A: gb->ppu.wy = val; break;
 			case 0xFF4B: gb->ppu.wx = val; break;
+
+			case 0xFF50: gb->boot_rom_disable_pending = 1; break;
 
 			default: break;
 		}

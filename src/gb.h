@@ -19,6 +19,7 @@ typedef struct Joypad {
 
 typedef struct Memory {
 	Cartucho cart;
+	uint8_t bios[0x100];
 	uint8_t vram[0x2000];
 	uint8_t wram[0x2000];
 	uint8_t oam[0xA0];
@@ -41,11 +42,16 @@ typedef struct GB {
 	uint8_t dma_active;
 	uint16_t dma_src;
 	uint8_t dma_index;
+
+	uint8_t boot_rom_enabled;
+	uint8_t boot_rom_disable_pending;
+
 	int clock;
 	int running;
 } GB;
 
-void init (GB *gb, char *romfile);
+void init (GB *gb, const char *romfile, const char *biosfile);
+
 void cleanup (GB *gb);
 void gb_step (GB *gb);
 
