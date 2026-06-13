@@ -1,6 +1,7 @@
 #include "ppu/ppu.h"
 #include "gb.h"
 #include <stdlib.h>
+#include <stdio.h>
 
 #define HBLANK 0
 #define VBLANK 1
@@ -47,6 +48,7 @@ void init_ppu (PPU *ppu) {
 	ppu->sprite_waiting = 0;
 	ppu->pending_sprite = -1;
 	ppu->sel_sprite = 0;
+	ppu->sp_delay = 0;
 
 	ppu->hblank_pending = 0;
 }
@@ -83,6 +85,7 @@ static void update_stat (PPU *ppu, int new_mode) {
 		ppu->sprite_step = 0;
 		ppu->pending_sprite = -1;
 		ppu->num_sp_fifo = 0;
+		ppu->sp_delay = 0;
 		for (int i = 0; i < 10; i++) {
 			ppu->sp_done[i] = 0;
 		}
@@ -299,7 +302,7 @@ static int dot_line_step (PPU *ppu) {
 	}
 
 	if (ppu->num_bg_fifo > 0 && ppu->startup_tiles == 0 && !ppu->sprite_active
-			&& !ppu->sprite_waiting && ppu->bg_discard == 0) {
+			&& !ppu->sprite_waiting && ppu->bg_discard == 0 && ppu->sp_delay == 0) {
 
 		uint8_t bg = bg_fifo_pop(ppu);
 		uint32_t final_pixel;
@@ -315,7 +318,7 @@ static int dot_line_step (PPU *ppu) {
 		ppu->x++;
 	}
 
-	if (!ppu->sprite_active) bg_fetch(ppu);
+	if (!ppu->sprite_active && ppu->sp_delay == 0) bg_fetch(ppu);
 
 	if (ppu->startup_tiles > 0) {
 		ppu->mode3_cycles++;
@@ -328,12 +331,23 @@ static int dot_line_step (PPU *ppu) {
 		return 0;
 	}
 
+	if (ppu->sp_delay > 0) {
+		ppu->sp_delay--;
+		if (ppu->sp_delay == 0) ppu->sprite_active = 1;
+		ppu->mode3_cycles++;
+		return 0;
+	}
+
 	if (!ppu->sprite_active && !ppu->sprite_waiting && (ppu->lcdc & 0x02))
 		start_sprites(ppu);
 
 	if (ppu->sprite_waiting && ppu->num_bg_fifo > 0) {
-		ppu->sprite_active = 1;
-		ppu->sprite_waiting = 0;
+		int d = 5 - (int)(ppu->x & 7);
+    		ppu->sp_delay = (d > 0) ? (uint8_t)d : 0;
+    		ppu->sprite_waiting = 0;
+    		if (ppu->sp_delay == 0) ppu->sprite_active = 1;
+    		ppu->mode3_cycles++;
+    		return 0;
 	}
 
 	if (ppu->sprite_active) {
@@ -343,8 +357,10 @@ static int dot_line_step (PPU *ppu) {
 			start_sprites(ppu);
 
 		if (ppu->sprite_waiting) {
-			ppu->sprite_active = 1;
-			ppu->sprite_waiting = 0;
+    			int d = 5 - (int)(ppu->x & 7);
+    			ppu->sp_delay = (d > 0) ? (uint8_t)d : 0;
+    			ppu->sprite_waiting = 0;
+    			if (ppu->sp_delay == 0) ppu->sprite_active = 1;
 		}
 
 		ppu->mode3_cycles++;
