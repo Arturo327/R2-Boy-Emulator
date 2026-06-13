@@ -39,9 +39,14 @@ uint8_t bus_read8 (void *ctx, uint16_t addr) {
 	if (addr < 0x8000) {
 		uint32_t bank = gb->memory.cart.rom_bank;
 		if (bank == 0) bank = 1;
+
+		if (gb->memory.cart.rom_banks)
+			bank &= (gb->memory.cart.rom_banks - 1);
+
 		uint32_t offset = (bank << 14) + (addr - 0x4000);
 		if (offset < gb->memory.cart.rom_size)
 			return gb->memory.cart.rom[offset];
+
 		return 0xFF;
 	}
 
@@ -150,6 +155,7 @@ void bus_write8 (void *ctx, uint16_t addr, uint8_t val) {
 			}
 		}
 		return;
+
 	}
 
 	if (addr < 0xA000) {

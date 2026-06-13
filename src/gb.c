@@ -32,10 +32,16 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile) {
 
 	init_bus(&gb->bus, gb);
 
+	strncpy(gb->rom_path, romfile, sizeof(gb->rom_path) - 1);
+	gb->rom_path[sizeof(gb->rom_path) - 1] = '\0';
+
 	if (!load_rom(&gb->memory.cart, romfile)) {
 		fprintf(stderr, "Failed to load ROM: %s\n", romfile);
 		return 1;
 	}
+
+	load_sram(&gb->memory.cart, romfile);
+
 	gb->joypad.joyp = 0xCF;
 
 	return 0;
@@ -67,6 +73,7 @@ void init_test (GB *gb, const char *romfile, const char *biosfile) {
 }
 
 void cleanup (GB *gb) {
+	save_sram(&gb->memory.cart, gb->rom_path);
 	cleanup_screen(&gb->lcd);
 	(void) gb;
 }
@@ -96,24 +103,3 @@ void gb_step (GB *gb) {
 	gb->clock += cycles;
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -48,6 +48,8 @@ typedef struct GB {
 
 	uint64_t clock;
 	int running;
+
+	char rom_path[512];
 } GB;
 
 void init (GB *gb, const char *romfile, const char *biosfile);
