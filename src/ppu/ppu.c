@@ -97,7 +97,7 @@ static void update_stat (PPU *ppu, int new_mode) {
 		ppu->bus->interrupts->IF |= 0x02;
 }
 
-static void check_lyc (PPU *ppu) {
+void check_lyc (PPU *ppu) {
 	if (ppu->ly == ppu->lyc) {
 		ppu->stat |= 0x04;
 		if (ppu->stat & 0x40)
@@ -215,6 +215,13 @@ static void start_sprites (PPU *ppu) {
 			ppu->sprite_waiting = 1;
 			return;
 		}
+
+		if (ppu->x == 0 && start_x < 0) {
+			ppu->pending_sprite = i;
+			ppu->sp_done[i] = 1;
+			ppu->sprite_waiting = 1;
+			return;
+		}
 	}
 }
 
@@ -225,7 +232,8 @@ static void sprite_fetch (PPU *ppu) {
 
 		ppu->sel_sprite = ppu->pending_sprite;
 
-		uint8_t line = ppu->ly - (ppu->sprites[ppu->sel_sprite].y - 16);
+		int line = (int)ppu->ly - ((int)ppu->sprites[ppu->sel_sprite].y - 16);
+
 		uint8_t sp_h = (ppu->lcdc & 0x04) ? 16 : 8;
 		uint8_t tile_line = (ppu->sprites[ppu->sel_sprite].flags & 0x40) ?
 			(sp_h - 1 - line) : line;
@@ -261,6 +269,14 @@ static void sprite_fetch (PPU *ppu) {
 		for (int i = ppu->num_sp_fifo; i < 8; i++)
 			ppu->sp_fifo[i].color = 0;
 
+		if (ppu->sprites[ppu->sel_sprite].x - 7 < 0) {
+			int shift = -ppu->sprites[ppu->sel_sprite].x;
+			for (int i = shift; i < 8; i++) {
+				ppu->sp_buff[i - shift] = ppu->sp_buff[i];
+			}
+			for (int i = 8 - shift; i < 8; i++) ppu->sp_buff[i].color = 0;
+		}
+
 		for (int i = 0; i < 8; i++) {
 			if (!ppu->sp_buff[i].color) continue;
 			ppu->sp_fifo[i] = ppu->sp_buff[i];
@@ -293,18 +309,11 @@ static uint32_t solve_priority (PPU *ppu, SpritePixel sp, uint8_t bg) {
 
 static int dot_line_step (PPU *ppu) {
 
-	if (!(ppu->lcdc & 0x01)) {
-		ppu->framebuffer[ppu->ly * 160 + ppu->x] = PALETA[0];
-		ppu->x++;
-		ppu->mode3_cycles++;
-		if (ppu->x == 160) return 1;
-		return 0;
-	}
-
 	if (ppu->num_bg_fifo > 0 && ppu->startup_tiles == 0 && !ppu->sprite_active
 			&& !ppu->sprite_waiting && ppu->bg_discard == 0 && ppu->sp_delay == 0) {
 
 		uint8_t bg = bg_fifo_pop(ppu);
+		if (!(ppu->lcdc & 1)) bg = 0;
 		uint32_t final_pixel;
 
 		if (ppu->num_sp_fifo > 0) {
@@ -343,11 +352,11 @@ static int dot_line_step (PPU *ppu) {
 
 	if (ppu->sprite_waiting && ppu->num_bg_fifo > 0) {
 		int d = 5 - (int)(ppu->x & 7);
-    		ppu->sp_delay = (d > 0) ? (uint8_t)d : 0;
-    		ppu->sprite_waiting = 0;
-    		if (ppu->sp_delay == 0) ppu->sprite_active = 1;
-    		ppu->mode3_cycles++;
-    		return 0;
+		ppu->sp_delay = (d > 0) ? (uint8_t)d : 0;
+		ppu->sprite_waiting = 0;
+		if (ppu->sp_delay == 0) ppu->sprite_active = 1;
+		ppu->mode3_cycles++;
+		return 0;
 	}
 
 	if (ppu->sprite_active) {
@@ -357,10 +366,10 @@ static int dot_line_step (PPU *ppu) {
 			start_sprites(ppu);
 
 		if (ppu->sprite_waiting) {
-    			int d = 5 - (int)(ppu->x & 7);
-    			ppu->sp_delay = (d > 0) ? (uint8_t)d : 0;
-    			ppu->sprite_waiting = 0;
-    			if (ppu->sp_delay == 0) ppu->sprite_active = 1;
+			int d = 5 - (int)(ppu->x & 7);
+			ppu->sp_delay = (d > 0) ? (uint8_t)d : 0;
+			ppu->sprite_waiting = 0;
+			if (ppu->sp_delay == 0) ppu->sprite_active = 1;
 		}
 
 		ppu->mode3_cycles++;
@@ -377,14 +386,24 @@ static void scan_oam (PPU *ppu, int x) {
 	GB *gb = (GB *)ppu->bus->ctx;
 	Sprite *sp = (Sprite *)(gb->memory.oam + (x << 2));
 
-	uint8_t sprite_h = (ppu->lcdc & 0x04) ? 16 : 8;
-	if (ppu->ly >= sp->y - 16 && ppu->ly < sp->y - 16 + sprite_h) {
+	int sprite_y = (int)sp->y - 16;
+	int sprite_h = (ppu->lcdc & 0x04) ? 16 : 8;
+	if ((int)ppu->ly >= sprite_y && (int)ppu->ly < sprite_y + sprite_h) {
 		ppu->sprites[ppu->num_sprites++] = *sp;
 	}
 }
 
 void ppu_step (PPU *ppu, int cycles) {
-	if (!(ppu->lcdc & 0x80)) return;
+	if (!(ppu->lcdc & 0x80)) {
+		ppu->ly = 0;
+		ppu->window_line = 0;
+		ppu->dots = 0;
+		ppu->mode = HBLANK;
+		ppu->stat = (ppu->stat & 0xFC) | HBLANK;
+		ppu->hblank_pending = 0;
+		ppu->x = 0;
+		return;
+	}
 	ppu->ready = 0;
 	int time_dots = cycles;
 
@@ -397,9 +416,8 @@ void ppu_step (PPU *ppu, int cycles) {
 				continue;
 			}
 			if (!(ppu->dots & 1)) scan_oam(ppu, ppu->x++);
-		}
 
-		else if (ppu->mode == DRAWING) {
+		} else if (ppu->mode == DRAWING) {
 
 			if (ppu->hblank_pending) {
 				if (ppu->window_active) ppu->window_line++;
@@ -411,10 +429,6 @@ void ppu_step (PPU *ppu, int cycles) {
 
 			if (dot_line_step(ppu)) {
 				ppu->hblank_pending = 1;
-				if (ppu->window_active) ppu->window_line++;
-				update_stat(ppu, HBLANK);
-				ppu->dots = 0;
-				continue;
 			}
 
 		} else if (ppu->mode == HBLANK) {

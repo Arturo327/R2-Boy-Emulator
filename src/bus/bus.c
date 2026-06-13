@@ -1,5 +1,6 @@
 #include "bus/bus.h"
 #include "gb.h"
+#include "ppu/ppu.h"
 
 static uint8_t joypad_calc_lo (GB *gb) {
 	uint8_t sel = gb->joypad.joyp & 0x30;
@@ -224,7 +225,10 @@ void bus_write8 (void *ctx, uint16_t addr, uint8_t val) {
 			case 0xFF42: gb->ppu.scy = val; break;
 			case 0xFF43: gb->ppu.scx = val; break;
 			case 0xFF44: break;
-			case 0xFF45: gb->ppu.lyc = val; break;
+			case 0xFF45:
+				gb->ppu.lyc = val;
+				check_lyc(&gb->ppu);
+				break;
 			case 0xFF46: {
 				gb->ppu.dma = val;
 				gb->dma_active = 1;
