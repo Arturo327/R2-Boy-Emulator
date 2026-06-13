@@ -46,11 +46,12 @@ typedef struct GB {
 	uint8_t boot_rom_enabled;
 	uint8_t boot_rom_disable_pending;
 
-	int clock;
+	uint64_t clock;
 	int running;
 } GB;
 
 void init (GB *gb, const char *romfile, const char *biosfile);
+void init_test (GB *gb, const char *romfile, const char *biosfile);
 
 void cleanup (GB *gb);
 void gb_step (GB *gb);

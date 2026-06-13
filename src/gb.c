@@ -14,16 +14,11 @@ static int load_bios (GB *gb, const char *filename) {
 	return n == 0x100;
 }
 
-void init (GB *gb, const char *romfile, const char *biosfile) {
+static int init_core (GB *gb, const char *romfile, const char *biosfile) {
 	memset(gb, 0, sizeof(GB));
 
 	init_ppu(&gb->ppu);
 	init_opcodes(&gb->opcodes);
-
-	if (!init_screen(&gb->lcd)) {
-		gb->running = 0;
-		return;
-	}
 
 	if (!load_bios(gb, biosfile)) {
 
@@ -39,11 +34,34 @@ void init (GB *gb, const char *romfile, const char *biosfile) {
 
 	if (!load_rom(&gb->memory.cart, romfile)) {
 		fprintf(stderr, "Failed to load ROM: %s\n", romfile);
+		return 1;
+	}
+	gb->joypad.joyp = 0xCF;
+
+	return 0;
+}
+
+void init (GB *gb, const char *romfile, const char *biosfile) {
+
+	if (init_core(gb, romfile, biosfile)) {
 		gb->running = 0;
 		return;
 	}
 
-	gb->joypad.joyp = 0xCF;
+	if (!init_screen(&gb->lcd)) {
+		gb->running = 0;
+		return;
+	}
+
+	gb->running = 1;
+}
+
+void init_test (GB *gb, const char *romfile, const char *biosfile) {
+
+	if (init_core(gb, romfile, biosfile)) {
+		gb->running = 0;
+		return;
+	}
 
 	gb->running = 1;
 }

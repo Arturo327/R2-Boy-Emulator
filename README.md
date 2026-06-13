@@ -1,6 +1,6 @@
 # R2-Boy - DMG Emulator
 
-A Nintendo Game Boy emulator written in C for educational purposes focusing on learning how the original hardware works.
+A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focusing on learning how the original hardware works.
 
 ---
 
@@ -14,6 +14,7 @@ A Nintendo Game Boy emulator written in C for educational purposes focusing on l
 - PPU (Pixel Processing Unit) emulation
 - SDL-based graphics output
 - Keyboard input support
+- Testing support
 
 ---
 
@@ -30,7 +31,7 @@ Implemented:
 - Basic input handling
 
 Planned:
-- Try to pass the Blargg tests
+- Try to pass all the Blargg and Mooneye tests
 - Audio emulation
 - Save game support
 - Additional hardware accuracy improvements
@@ -75,26 +76,35 @@ build/r2boy
 Run a Game Boy ROM:
 
 ```bash
-./build/r2boy path/to/rom.gb
+./build/r2boy [-d/--debug] [-b/--bios bios_file] rom.gb
 ```
+
+---
 
 ## BIOS
 
-R2-Boy supports bios, just follow the following steps:
-
-- Create the roms directory:
+R2-Boy supports the Game Boy boot ROM, just use the option:
 
 ```bash
-mkdir roms
+./build/r2boy --bios [biosfile] game.gb
 ```
 
-- Place your BIOS file there under the name "bios.bin":
+If you don't use the option, it will use the default path "roms/bios.bin".
+
+If the emulator cannot find a boot ROM, it will manually initialize the registers and directly run the game.
+
+---
+
+## Debug Mode
+
+For running tests like mooneye, use the option:
 
 ```bash
-mv /path/to/bios roms/bios.bin
+./build/r2boy -d test.gb
 ```
 
-If the emulator doesn't find the boot-rom, it will manually initialize the registers and directly run the game.
+In debug mode, video output is disabled and the emulator automatically checks
+the register values used by Mooneye test ROMs to determine whether the test passed.
 
 ---
 
@@ -113,10 +123,18 @@ If the emulator doesn't find the boot-rom, it will manually initialize the regis
 ## Accuracy
 
 The emulator aims to emulate the Game Boy hardware at the cycle level whenever possible.
-Nowadays it passes the following blargg test ROMs:
+
+Currently passes the following Blargg test ROMs:
+
 - halt_bug
 - instr_timing
-- cpu_instr
+- cpu_instrs
+
+---
+
+## License
+
+MIT
 
 ---
 

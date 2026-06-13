@@ -110,6 +110,8 @@ uint8_t bus_read8 (void *ctx, uint16_t addr) {
 			case 0xFF4A: return gb->ppu.wy;
 			case 0xFF4B: return gb->ppu.wx;
 
+			case 0xFF50: return 0xFF;
+
 			default: return 0xFF;
 		}
 	}
