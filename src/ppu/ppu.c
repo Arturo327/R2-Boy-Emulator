@@ -31,19 +31,24 @@ void init_ppu (PPU *ppu) {
 	ppu->mode = OAM_SCAN;
 	ppu->dots = 0;
 	ppu->ready = 0;
+
 	ppu->bus = NULL;
 	ppu->x = 0;
 	ppu->num_sprites = 0;
 	ppu->mode3_cycles = 0;
+
 	ppu->num_bg_fifo = 0;
 	ppu->window_line = 0;
 	ppu->window_active = 0;
+
 	ppu->num_sp_fifo = 0;
 	ppu->sprite_active = 0;
 	ppu->sprite_step = 0;
 	ppu->sprite_waiting = 0;
 	ppu->pending_sprite = -1;
 	ppu->sel_sprite = 0;
+
+	ppu->hblank_pending = 0;
 }
 
 static void update_stat (PPU *ppu, int new_mode) {
@@ -81,6 +86,8 @@ static void update_stat (PPU *ppu, int new_mode) {
 		for (int i = 0; i < 10; i++) {
 			ppu->sp_done[i] = 0;
 		}
+
+		ppu->hblank_pending = 0;
 	}
 
 	if (stat_irq)
@@ -378,7 +385,16 @@ void ppu_step (PPU *ppu, int cycles) {
 
 		else if (ppu->mode == DRAWING) {
 
+			if (ppu->hblank_pending) {
+				if (ppu->window_active) ppu->window_line++;
+				update_stat(ppu, HBLANK);
+				ppu->hblank_pending = 0;
+				ppu->dots = 0;
+				continue;
+			}
+
 			if (dot_line_step(ppu)) {
+				ppu->hblank_pending = 1;
 				if (ppu->window_active) ppu->window_line++;
 				update_stat(ppu, HBLANK);
 				ppu->dots = 0;

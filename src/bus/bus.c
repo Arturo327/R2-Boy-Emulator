@@ -252,10 +252,12 @@ void bus_write8 (void *ctx, uint16_t addr, uint8_t val) {
 void init_bus (Bus *bus, GB *gb) {
 	gb->cpu.bus = bus;
 	gb->ppu.bus = bus;
+
 	gb->interrupts.IME = 0;
 	gb->interrupts.IE = 0;
 	gb->interrupts.IF = 0xE1;
 	gb->interrupts.ei_pending = 0;
+
 	bus->ctx = (void *) gb;
 	bus->read8 = bus_read8;
 	bus->write8 = bus_write8;

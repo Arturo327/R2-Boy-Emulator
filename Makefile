@@ -13,8 +13,13 @@ build/%.o: src/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-run: build/r2boy
-	./build/r2boy
+test: build/r2boy
+	@for rom in tests/mooneye/*; do \
+		if [ -f "$$rom" ]; then \
+			echo "=== Ejecutando: $$rom ==="; \
+			./build/r2boy -d "$$rom"; \
+		fi \
+	done
 
 clean:
 	rm -f $(OBJ) build/r2boy

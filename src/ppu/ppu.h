@@ -42,6 +42,7 @@ typedef struct PPU {
 	uint8_t bg_discard;
 	uint8_t startup_tiles;
 
+	uint8_t hblank_pending;
 	int mode;
 	int dots;
 	int ready;
