@@ -204,19 +204,32 @@ static void bg_fetch (PPU *ppu) {
 }
 
 static void start_sprites (PPU *ppu) {
+
+	if (ppu->x == 0) {
+		int lower_x = 0;
+		int best_sprite = -1;
+		for (int i = ppu->num_sprites - 1; i >= 0; i--) {
+			if (ppu->sp_done[i]) continue;
+			Sprite *sp = ppu->sprites + i;
+			int start_x = sp->x - 8;
+			if (lower_x < start_x) continue;
+			lower_x = start_x;
+			best_sprite = i;
+		}
+		if (best_sprite != -1) {
+			ppu->pending_sprite = best_sprite;
+			ppu->sp_done[best_sprite] = 1;
+			ppu->sprite_waiting = 1;
+			return;
+		}
+	}
+
 	for (int i = ppu->num_sprites - 1; i >= 0; i--) {
 		if (ppu->sp_done[i]) continue;
 		Sprite *sp = ppu->sprites + i;
 		int start_x = sp->x - 8;
 
-		if (ppu->x == start_x) {
-			ppu->pending_sprite = i;
-			ppu->sp_done[i] = 1;
-			ppu->sprite_waiting = 1;
-			return;
-		}
-
-		if (ppu->x == 0 && start_x < 0) {
+		if (ppu->x == start_x && start_x < 160) {
 			ppu->pending_sprite = i;
 			ppu->sp_done[i] = 1;
 			ppu->sprite_waiting = 1;
@@ -269,8 +282,8 @@ static void sprite_fetch (PPU *ppu) {
 		for (int i = ppu->num_sp_fifo; i < 8; i++)
 			ppu->sp_fifo[i].color = 0;
 
-		if (ppu->sprites[ppu->sel_sprite].x - 7 < 0) {
-			int shift = -ppu->sprites[ppu->sel_sprite].x;
+		if (ppu->sprites[ppu->sel_sprite].x < 8) {
+			int shift = 8 - ppu->sprites[ppu->sel_sprite].x;
 			for (int i = shift; i < 8; i++) {
 				ppu->sp_buff[i - shift] = ppu->sp_buff[i];
 			}
@@ -313,14 +326,15 @@ static int dot_line_step (PPU *ppu) {
 			&& !ppu->sprite_waiting && ppu->bg_discard == 0 && ppu->sp_delay == 0) {
 
 		uint8_t bg = bg_fifo_pop(ppu);
-		if (!(ppu->lcdc & 1)) bg = 0;
 		uint32_t final_pixel;
 
 		if (ppu->num_sp_fifo > 0) {
 			SpritePixel sp = get_sp_pixel(ppu);
+			if (!(ppu->lcdc & 1)) bg = 0;
 			final_pixel = solve_priority(ppu, sp, bg);
 		} else {
-			final_pixel = decode_color(bg, ppu->bgp);
+			if (!(ppu->lcdc & 1)) final_pixel = PALETA[0];
+			else final_pixel = decode_color(bg, ppu->bgp);
 		}
 
 		ppu->framebuffer[ppu->ly * 160 + ppu->x] = final_pixel;
@@ -351,7 +365,7 @@ static int dot_line_step (PPU *ppu) {
 		start_sprites(ppu);
 
 	if (ppu->sprite_waiting && ppu->num_bg_fifo > 0) {
-		int d = 5 - (int)(ppu->x & 7);
+		int d = 5 - (int)((ppu->x + ppu->scx) & 7);
 		ppu->sp_delay = (d > 0) ? (uint8_t)d : 0;
 		ppu->sprite_waiting = 0;
 		if (ppu->sp_delay == 0) ppu->sprite_active = 1;
@@ -366,7 +380,7 @@ static int dot_line_step (PPU *ppu) {
 			start_sprites(ppu);
 
 		if (ppu->sprite_waiting) {
-			int d = 5 - (int)(ppu->x & 7);
+			int d = 5 - (int)((ppu->x + ppu->scx) & 7);
 			ppu->sp_delay = (d > 0) ? (uint8_t)d : 0;
 			ppu->sprite_waiting = 0;
 			if (ppu->sp_delay == 0) ppu->sprite_active = 1;
