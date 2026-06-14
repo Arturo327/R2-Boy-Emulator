@@ -206,14 +206,15 @@ static void bg_fetch (PPU *ppu) {
 static void start_sprites (PPU *ppu) {
 
 	if (ppu->x == 0) {
-		int lower_x = 0;
+		int upper_x = -9;
 		int best_sprite = -1;
 		for (int i = ppu->num_sprites - 1; i >= 0; i--) {
 			if (ppu->sp_done[i]) continue;
 			Sprite *sp = ppu->sprites + i;
 			int start_x = sp->x - 8;
-			if (lower_x < start_x) continue;
-			lower_x = start_x;
+			if (start_x >= 0) continue;
+			if (start_x <= upper_x) continue;
+			upper_x = start_x;
 			best_sprite = i;
 		}
 		if (best_sprite != -1) {
@@ -279,6 +280,8 @@ static void sprite_fetch (PPU *ppu) {
 
 	} else if (ppu->sprite_step == 5) {
 
+		int start_x = (int)ppu->sprites[ppu->sel_sprite].x - 8;
+
 		for (int i = ppu->num_sp_fifo; i < 8; i++)
 			ppu->sp_fifo[i].color = 0;
 
@@ -292,6 +295,8 @@ static void sprite_fetch (PPU *ppu) {
 
 		for (int i = 0; i < 8; i++) {
 			if (!ppu->sp_buff[i].color) continue;
+			if (ppu->sp_fifo[i].color != 0 && ppu->sp_fifo[i].src_x < start_x) continue;
+			ppu->sp_buff[i].src_x = start_x;
 			ppu->sp_fifo[i] = ppu->sp_buff[i];
 		}
 

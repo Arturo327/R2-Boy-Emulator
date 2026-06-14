@@ -130,6 +130,8 @@ Currently passes the following Blargg test ROMs:
 - instr_timing
 - cpu_instrs
 
+It also passes de dmg_acid2 test.
+
 ---
 
 ## License

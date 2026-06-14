@@ -15,6 +15,7 @@ typedef struct SpritePixel {
 	uint8_t color;
 	uint8_t pal;
 	uint8_t bg_prio;
+	int16_t src_x;
 } SpritePixel;
 
 typedef struct PPU {
