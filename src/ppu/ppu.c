@@ -49,6 +49,7 @@ void init_ppu (PPU *ppu) {
 	ppu->pending_sprite = -1;
 	ppu->sel_sprite = 0;
 	ppu->sp_delay = 0;
+	ppu->lcd_was_off = 0;
 
 	ppu->hblank_pending = 0;
 }
@@ -207,6 +208,7 @@ static void scan_oam (PPU *ppu, int x) {
 }
 
 void ppu_step (PPU *ppu, int cycles) {
+
 	if (!(ppu->lcdc & 0x80)) {
 		ppu->ly = 0;
 		ppu->window_line = 0;
@@ -214,9 +216,17 @@ void ppu_step (PPU *ppu, int cycles) {
 		ppu->mode = HBLANK;
 		ppu->stat = (ppu->stat & 0xFC) | HBLANK;
 		ppu->hblank_pending = 0;
+		ppu->lcd_was_off = 1;
 		ppu->x = 0;
 		return;
 	}
+
+	if (ppu->lcd_was_off) {
+		ppu->lcd_was_off = 0;
+		ppu->dots = 0;
+		update_stat(ppu, OAM_SCAN);
+	}
+
 	ppu->ready = 0;
 	int time_dots = cycles;
 

@@ -47,6 +47,7 @@ typedef struct PPU {
 	int mode;
 	int dots;
 	int ready;
+	uint8_t lcd_was_off;
 
 	int x;
 	uint8_t fetch_x;
