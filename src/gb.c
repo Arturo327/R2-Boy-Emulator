@@ -25,8 +25,11 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile) {
 		init_ppu_reg(&gb->ppu);
 		init_cpu(&gb->cpu);
 		gb->boot_rom_enabled = 0;
+		printf("Could not load BOOT ROM %s. Running whithout BIOS\n", biosfile);
 
 	} else {
+
+		printf("Using BOOT ROM %s\n", biosfile);
 		gb->boot_rom_enabled = 1;
 	}
 

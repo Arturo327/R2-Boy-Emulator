@@ -79,6 +79,7 @@ int load_rom (Cartucho *cart, const char *filename) {
 		}
 	}
 
+	printf("ROM: %s\n", filename);
 	return 1;
 }
 

@@ -88,12 +88,14 @@ int ld_demem_a (GB *gb) {			// 0x12
 }
 
 int ld_hlimem_a (GB *gb) {			// 0x22
-	write8(gb, gb->cpu.hl++, gb->cpu.a);
+	gb->cpu.bus->write8(gb->cpu.bus->ctx, gb->cpu.hl, gb->cpu.a);
+	gb->cpu.hl++;
 	return 8;
 }
 
 int ld_hldmem_a (GB *gb) {			// 0x32
-	write8(gb, gb->cpu.hl--, gb->cpu.a);
+	gb->cpu.bus->write8(gb->cpu.bus->ctx, gb->cpu.hl, gb->cpu.a);
+	gb->cpu.hl--;
 	return 8;
 }
 
@@ -110,12 +112,14 @@ int ld_a_demem (GB *gb) {			// 0x1A
 }
 
 int ld_a_hlimem (GB *gb) {			// 0x2A
-	gb->cpu.a = read8(gb, gb->cpu.hl++);
+	gb->cpu.a = gb->cpu.bus->read8(gb->cpu.bus->ctx, gb->cpu.hl);
+	gb->cpu.hl++;
 	return 8;
 }
 
 int ld_a_hldmem (GB *gb) {			// 0x3A
-	gb->cpu.a = read8(gb, gb->cpu.hl--);
+	gb->cpu.a = gb->cpu.bus->read8(gb->cpu.bus->ctx, gb->cpu.hl);
+	gb->cpu.hl--;
 	return 8;
 }
 
@@ -131,10 +135,10 @@ int ld_imm16_sp (GB *gb) {			// 0x08
 
 // ---------------------------------- inc r16 ----------------------------------
 
-#define DEF_INC(name)	\
-int inc16_##name (GB *gb) {		\
-	gb->cpu.name++;			\
-	return 8;			\
+#define DEF_INC(name)					\
+int inc16_##name (GB *gb) {				\
+	gb->cpu.name++;					\
+	return 8;					\
 }
 
 DEF_INC(bc)		// 0x03
@@ -146,10 +150,10 @@ DEF_INC(sp)		// 0x33
 
 // ------------------------------- dec r16 -------------------------------
 
-#define DEF_DEC16(name)			\
-int dec16_##name (GB *gb) {		\
-	gb->cpu.name--;			\
-	return 8;			\
+#define DEF_DEC16(name)					\
+int dec16_##name (GB *gb) {				\
+	gb->cpu.name--;					\
+	return 8;					\
 }
 
 DEF_DEC16(bc)		// 0x0B
@@ -443,11 +447,11 @@ int ccf (GB *gb) {			// 0x3F
 
 int halt (GB *gb) {				// 0x76
 	uint8_t fired = gb->interrupts.IE & gb->interrupts.IF & 0x1F;
-    	if (!gb->interrupts.IME && fired) {
-        	gb->cpu.halt_bug = 1;
-        	return 4;
-    	}
-    	gb->cpu.halted = 1;
+	if (!gb->interrupts.IME && fired) {
+		gb->cpu.halt_bug = 1;
+		return 4;
+	}
+	gb->cpu.halted = 1;
 	return 4;
 }
 
@@ -928,9 +932,8 @@ int cp_a_imm8 (GB *gb) {			// 0xFE
 // ------------------ RET ------------------------
 
 int ret (GB *gb) {				// 0xC9
-	gb->cpu.pc = read8(gb, gb->cpu.sp);
-	gb->cpu.pc |= read8(gb, gb->cpu.sp + 1) << 8;
-	gb->cpu.sp += 2;
+	gb->cpu.pc = read8(gb, gb->cpu.sp++);
+	gb->cpu.pc |= read8(gb, gb->cpu.sp++) << 8;
 	return 16;
 }
 
@@ -938,9 +941,8 @@ int ret (GB *gb) {				// 0xC9
 
 int ret_z (GB *gb) {				// 0xC8
 	if (gb->cpu.f & FLAG_Z) {
-		gb->cpu.pc = read8(gb, gb->cpu.sp);
-		gb->cpu.pc |= read8(gb, gb->cpu.sp + 1) << 8;
-		gb->cpu.sp += 2;
+		gb->cpu.pc = read8(gb, gb->cpu.sp++);
+		gb->cpu.pc |= read8(gb, gb->cpu.sp++) << 8;
 		return 20;
 	}
 	return 8;
@@ -948,9 +950,8 @@ int ret_z (GB *gb) {				// 0xC8
 
 int ret_c (GB *gb) {				// 0xD8
 	if (gb->cpu.f & FLAG_C) {
-		gb->cpu.pc = read8(gb, gb->cpu.sp);
-		gb->cpu.pc |= read8(gb, gb->cpu.sp + 1) << 8;
-		gb->cpu.sp += 2;
+		gb->cpu.pc = read8(gb, gb->cpu.sp++);
+		gb->cpu.pc |= read8(gb, gb->cpu.sp++) << 8;
 		return 20;
 	}
 	return 8;
@@ -958,9 +959,8 @@ int ret_c (GB *gb) {				// 0xD8
 
 int ret_nz (GB *gb) {				// 0xC0
 	if (!(gb->cpu.f & FLAG_Z)) {
-		gb->cpu.pc = read8(gb, gb->cpu.sp);
-		gb->cpu.pc |= read8(gb, gb->cpu.sp + 1) << 8;
-		gb->cpu.sp += 2;
+		gb->cpu.pc = read8(gb, gb->cpu.sp++);
+		gb->cpu.pc |= read8(gb, gb->cpu.sp++) << 8;
 		return 20;
 	}
 	return 8;
@@ -968,9 +968,8 @@ int ret_nz (GB *gb) {				// 0xC0
 
 int ret_nc (GB *gb) {				// 0xD0
 	if (!(gb->cpu.f & FLAG_C)) {
-		gb->cpu.pc = read8(gb, gb->cpu.sp);
-		gb->cpu.pc |= read8(gb, gb->cpu.sp + 1) << 8;
-		gb->cpu.sp += 2;
+		gb->cpu.pc = read8(gb, gb->cpu.sp++);
+		gb->cpu.pc |= read8(gb, gb->cpu.sp++) << 8;
 		return 20;
 	}
 	return 8;
@@ -979,9 +978,8 @@ int ret_nc (GB *gb) {				// 0xD0
 // ------------------ RETI ------------------------
 
 int reti (GB *gb) {				// 0xD9
-	gb->cpu.pc = read8(gb, gb->cpu.sp);
-	gb->cpu.pc |= read8(gb, gb->cpu.sp + 1) << 8;
-	gb->cpu.sp += 2;
+	gb->cpu.pc = read8(gb, gb->cpu.sp++);
+	gb->cpu.pc |= read8(gb, gb->cpu.sp++) << 8;
 	gb->cpu.bus->interrupts->IME = 1;
 	return 16;
 }
@@ -1053,9 +1051,8 @@ int jp_hl (GB *gb) {				// 0xE9
 int call_imm16 (GB *gb) {			// 0xCD
 	uint16_t addr = read8(gb, gb->cpu.pc++);
 	addr |= read8(gb, gb->cpu.pc++) << 8;
-	gb->cpu.sp -= 2;
-	write8(gb, gb->cpu.sp, (uint8_t)gb->cpu.pc);
-	write8(gb, gb->cpu.sp + 1, (uint8_t)(gb->cpu.pc >> 8));
+	write8(gb, --gb->cpu.sp, (uint8_t)(gb->cpu.pc >> 8));
+	write8(gb, --gb->cpu.sp, (uint8_t)gb->cpu.pc);
 	gb->cpu.pc = addr;
 	return 24;
 }
@@ -1066,9 +1063,8 @@ int call_z_imm16 (GB *gb) {			// 0xCC
 	if (gb->cpu.f & FLAG_Z) {
 		uint16_t addr = read8(gb, gb->cpu.pc++);
 		addr |= read8(gb, gb->cpu.pc++) << 8;
-		gb->cpu.sp -= 2;
-		write8(gb, gb->cpu.sp, (uint8_t)gb->cpu.pc);
-		write8(gb, gb->cpu.sp + 1, (uint8_t)(gb->cpu.pc >> 8));
+		write8(gb, --gb->cpu.sp, (uint8_t)(gb->cpu.pc >> 8));
+		write8(gb, --gb->cpu.sp, (uint8_t)gb->cpu.pc);
 		gb->cpu.pc = addr;
 		return 24;
 	}
@@ -1080,9 +1076,8 @@ int call_c_imm16 (GB *gb) {			// 0xDC
 	if (gb->cpu.f & FLAG_C) {
 		uint16_t addr = read8(gb, gb->cpu.pc++);
 		addr |= read8(gb, gb->cpu.pc++) << 8;
-		gb->cpu.sp -= 2;
-		write8(gb, gb->cpu.sp, (uint8_t)gb->cpu.pc);
-		write8(gb, gb->cpu.sp + 1, (uint8_t)(gb->cpu.pc >> 8));
+		write8(gb, --gb->cpu.sp, (uint8_t)(gb->cpu.pc >> 8));
+		write8(gb, --gb->cpu.sp, (uint8_t)gb->cpu.pc);
 		gb->cpu.pc = addr;
 		return 24;
 	}
@@ -1094,9 +1089,8 @@ int call_nz_imm16 (GB *gb) {			// 0xC4
 	if (!(gb->cpu.f & FLAG_Z)) {
 		uint16_t addr = read8(gb, gb->cpu.pc++);
 		addr |= read8(gb, gb->cpu.pc++) << 8;
-		gb->cpu.sp -= 2;
-		write8(gb, gb->cpu.sp, (uint8_t)gb->cpu.pc);
-		write8(gb, gb->cpu.sp + 1, (uint8_t)(gb->cpu.pc >> 8));
+		write8(gb, --gb->cpu.sp, (uint8_t)(gb->cpu.pc >> 8));
+		write8(gb, --gb->cpu.sp, (uint8_t)gb->cpu.pc);
 		gb->cpu.pc = addr;
 		return 24;
 	}
@@ -1108,9 +1102,8 @@ int call_nc_imm16 (GB *gb) {			// 0xD4
 	if (!(gb->cpu.f & FLAG_C)) {
 		uint16_t addr = read8(gb, gb->cpu.pc++);
 		addr |= read8(gb, gb->cpu.pc++) << 8;
-		gb->cpu.sp -= 2;
-		write8(gb, gb->cpu.sp, (uint8_t)gb->cpu.pc);
-		write8(gb, gb->cpu.sp + 1, (uint8_t)(gb->cpu.pc >> 8));
+		write8(gb, --gb->cpu.sp, (uint8_t)(gb->cpu.pc >> 8));
+		write8(gb, --gb->cpu.sp, (uint8_t)gb->cpu.pc);
 		gb->cpu.pc = addr;
 		return 24;
 	}
@@ -1122,9 +1115,8 @@ int call_nc_imm16 (GB *gb) {			// 0xD4
 
 #define DEF_RST(num)						\
 int rst_##num (GB *gb) {					\
-	gb->cpu.sp -= 2;					\
-	write8(gb, gb->cpu.sp, (uint8_t)gb->cpu.pc);		\
-	write8(gb, gb->cpu.sp + 1, (uint8_t)(gb->cpu.pc >> 8));	\
+	write8(gb, --gb->cpu.sp, (uint8_t)(gb->cpu.pc >> 8));	\
+	write8(gb, --gb->cpu.sp, (uint8_t)gb->cpu.pc);		\
 	gb->cpu.pc = num << 3;					\
 	return 16;						\
 }
@@ -1142,11 +1134,14 @@ DEF_RST(7)	// 0xFF
 
 // --------------------- POP r16 -----------------------
 
-#define DEF_POP(name)					\
-int pop_##name (GB *gb) {				\
-	gb->cpu.name = read8(gb, gb->cpu.sp++);		\
-	gb->cpu.name |= read8(gb, gb->cpu.sp++) << 8;	\
-	return 12;					\
+#define DEF_POP(name)								\
+int pop_##name (GB *gb) {							\
+	CPU *cpu = &gb->cpu;							\
+	cpu->name = (uint16_t)gb->cpu.bus->read8(gb->cpu.bus->ctx, gb->cpu.sp);	\
+	gb->cpu.sp++;								\
+	cpu->name |= gb->cpu.bus->read8(gb->cpu.bus->ctx, gb->cpu.sp) << 8;	\
+	gb->cpu.sp++;								\
+	return 12;								\
 }
 
 DEF_POP(bc)	// 0xC1
@@ -1154,8 +1149,14 @@ DEF_POP(de)	// 0xD1
 DEF_POP(hl)	// 0xE1
 
 int pop_af (GB *gb) {		// 0xF1
-	gb->cpu.f = read8(gb, gb->cpu.sp++) & 0xF0;
-	gb->cpu.a = read8(gb, gb->cpu.sp++);
+	CPU *cpu = &gb->cpu;
+
+	cpu->f = gb->cpu.bus->read8(gb->cpu.bus->ctx, gb->cpu.sp) & 0xF0;
+	gb->cpu.sp++;
+
+	gb->cpu.a = gb->cpu.bus->read8(gb->cpu.bus->ctx, gb->cpu.sp);
+	gb->cpu.sp++;
+
 	return 12;
 }
  
@@ -1163,12 +1164,14 @@ int pop_af (GB *gb) {		// 0xF1
 
 // --------------------- PUSH r16 -----------------------
 
-#define DEF_PUSH(name)							\
-int push_##name (GB *gb) {						\
-	gb->cpu.sp -= 2;						\
-	write8(gb, gb->cpu.sp, (uint8_t)gb->cpu.name);			\
-	write8(gb, gb->cpu.sp + 1, (uint8_t)(gb->cpu.name >> 8));	\
-	return 16;							\
+#define DEF_PUSH(name)									\
+int push_##name (GB *gb) {								\
+	CPU *cpu = &gb->cpu;								\
+	gb->cpu.sp--;									\
+	gb->cpu.bus->write8(gb->cpu.bus->ctx, gb->cpu.sp, (uint8_t)(cpu->name >> 8));	\
+	gb->cpu.sp--;									\
+	gb->cpu.bus->write8(gb->cpu.bus->ctx, gb->cpu.sp, (uint8_t)(cpu->name));	\
+	return 16;									\
 }
 
 DEF_PUSH(bc)	// 0xC5
@@ -1248,8 +1251,8 @@ int ld_hl_spimm8 (GB *gb) {		// 0xF8
 	set_z(gb, 0);
 	set_n(gb, 0);
 	uint8_t vu = (uint8_t) v;
-        set_h(gb, ((gb->cpu.sp & 0xF) + (vu & 0xF)) & 0x10);
-        set_c(gb, ((gb->cpu.sp & 0xFF) + vu) & 0x100);
+	set_h(gb, ((gb->cpu.sp & 0xF) + (vu & 0xF)) & 0x10);
+	set_c(gb, ((gb->cpu.sp & 0xFF) + vu) & 0x100);
 	return 12;
 }
 
