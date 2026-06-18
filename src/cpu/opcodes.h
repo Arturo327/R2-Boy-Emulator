@@ -5,13 +5,14 @@
 
 typedef struct GB GB;
 
-typedef int (*opcode_fn) (GB *gb);
+typedef void (*opcode_fn) (GB *gb);
 
 typedef struct {
-    	opcode_fn main[256];
-    	opcode_fn cb[256];
+	opcode_fn main[256];
+	opcode_fn cb[256];
 } OpcodeTable;
 
+void decode_instr (GB *gb, uint8_t opcode);
 void init_opcodes (OpcodeTable *t);
 
 #endif

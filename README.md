@@ -15,6 +15,8 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 - SDL-based graphics output
 - Keyboard input support
 - Testing support
+- Save game support
+- M-Cycle accurate
 
 ---
 
@@ -22,18 +24,9 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 
 This project is under active development.
 
-Implemented:
-- CPU instruction set
-- Memory bus
-- Cartridge support
-- Timers
-- LCD controller and rendering
-- Basic input handling
-
 Planned:
 - Try to pass all the Blargg and Mooneye tests
 - Audio emulation
-- Save game support
 - Additional hardware accuracy improvements
 
 ---
@@ -124,13 +117,17 @@ the register values used by Mooneye test ROMs to determine whether the test pass
 
 The emulator aims to emulate the Game Boy hardware at the cycle level whenever possible.
 
-Currently passes the following Blargg test ROMs:
+Currently passes the following test ROMs:
+
+Blargg:
 
 - halt_bug
 - instr_timing
 - cpu_instrs
+- mem_timing
+- mem_timing-2
 
-It also passes de dmg_acid2 test.
+- dmg_acid2
 
 ---
 

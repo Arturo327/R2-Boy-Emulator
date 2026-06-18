@@ -51,35 +51,34 @@ static int handle_interrupts (CPU *cpu) {
 
 int cpu_step (CPU *cpu) {
 
-	if (handle_interrupts(cpu)) return 20;
-	if (cpu->halted) return 4;
-
 	GB *gb = (GB *) cpu->bus->ctx;
 
-	int r = 0;
-	uint8_t opcode;
-	if (cpu->halt_bug) {
-		opcode = cpu->bus->read8(cpu->bus->ctx, cpu->pc);
-		cpu->halt_bug = 0;
-	} else {
-		opcode = cpu->bus->read8(cpu->bus->ctx, cpu->pc++);
-	}
-	uint8_t main_opcode = opcode;
+	if (cpu->instr_head >= cpu->instr_tail) {
+		if (handle_interrupts(cpu)) return 20;
+		if (cpu->halted) return 4;
 
-	if (cpu->bus->interrupts->ei_pending) {
-		cpu->bus->interrupts->ei_pending = 0;
-		cpu->bus->interrupts->IME = 1;
+		cpu->instr_tail = cpu->instr_head = 0;
+
+		if (cpu->bus->interrupts->ei_pending) {
+			cpu->bus->interrupts->ei_pending = 0;
+			cpu->bus->interrupts->IME = 1;
+		}
+
+		uint8_t opcode;
+		if (cpu->halt_bug) {
+			opcode = cpu->bus->read8(cpu->bus->ctx, cpu->pc);
+			cpu->halt_bug = 0;
+		} else {
+			opcode = cpu->bus->read8(cpu->bus->ctx, cpu->pc++);
+		}
+
+		if (opcode == 0xFB) cpu->bus->interrupts->ei_pending = 1;
+
+		decode_instr(gb, opcode);
+
+		return 4;
 	}
 
-	if (opcode != 0xCB) {
-		r = cpu->bus->opcodes->main[opcode](gb);
-	} else {
-		opcode = cpu->bus->read8(cpu->bus->ctx, cpu->pc++);
-		r =  cpu->bus->opcodes->cb[opcode](gb);
-	}
-
-	if (main_opcode == 0xFB) {
-		cpu->bus->interrupts->ei_pending = 1;
-	}
-	return r;
+	cpu->instr_stack[cpu->instr_head++](gb);
+	return 4;
 }

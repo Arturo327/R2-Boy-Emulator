@@ -40,8 +40,20 @@ typedef struct CPU {
 	uint16_t sp;
 	uint16_t pc;
 
+	union {
+		uint16_t buff16;
+		struct {
+			uint8_t buff;
+			uint8_t buff_h;
+		};
+	};
+
 	uint8_t halted;
 	uint8_t halt_bug;
+
+	int8_t instr_head;
+	int8_t instr_tail;
+	opcode_fn instr_stack[6];
 
 	Bus *bus;
 } CPU;
