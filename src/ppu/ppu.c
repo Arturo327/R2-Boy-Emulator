@@ -49,7 +49,10 @@ void init_ppu (PPU *ppu) {
 	ppu->pending_sprite = -1;
 	ppu->sel_sprite = 0;
 	ppu->sp_delay = 0;
+
 	ppu->lcd_was_off = 0;
+	ppu->oam_startup = 0;
+	ppu->short_line = 0;
 
 	ppu->hblank_pending = 0;
 }
@@ -61,6 +64,10 @@ static void update_stat (PPU *ppu, int new_mode) {
 	int stat_irq = 0;
 	if (new_mode == HBLANK) {
 		ppu->mode0_cycles = 376 - ppu->mode3_cycles;
+		if (ppu->short_line) {
+			ppu->mode0_cycles -= 4;
+			ppu->short_line = 0;
+		}
 		if (ppu->mode0_cycles < 0) ppu->mode0_cycles = 0;
 		if (ppu->stat & 0x08) stat_irq = 1;
 	}
@@ -224,8 +231,10 @@ void ppu_step (PPU *ppu) {
 	if (ppu->lcd_was_off) {
 		ppu->lcd_was_off = 0;
 		ppu->dots = 0;
-		update_stat(ppu, OAM_SCAN);
-		return;
+		update_stat(ppu, HBLANK);
+		check_lyc(ppu);
+		ppu->oam_startup = 1;
+		ppu->short_line  = 1;
 	}
 
 	ppu->ready = 0;
@@ -256,8 +265,15 @@ void ppu_step (PPU *ppu) {
 			}
 
 		} else if (ppu->mode == HBLANK) {
-
-			if (ppu->dots >= ppu->mode0_cycles) {
+			
+			if (ppu->oam_startup) {
+				if (ppu->dots == 80) {
+					ppu->dots = 0;
+					ppu->oam_startup = 0;
+					update_stat(ppu, DRAWING);
+					continue;
+				}
+			} else if (ppu->dots >= ppu->mode0_cycles) {
 				ppu->dots -= ppu->mode0_cycles;
 				ppu->ly++;
 				check_lyc(ppu);

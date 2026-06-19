@@ -51,6 +51,8 @@ typedef struct PPU {
 
 	int x;
 	uint8_t fetch_x;
+	uint8_t oam_startup;
+	uint8_t short_line;
 
 	uint8_t fetcher_t;
 	uint8_t fetcher_tile_id;
