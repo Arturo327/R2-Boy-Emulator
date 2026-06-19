@@ -207,7 +207,7 @@ static void scan_oam (PPU *ppu, int x) {
 	}
 }
 
-void ppu_step (PPU *ppu, int cycles) {
+void ppu_step (PPU *ppu) {
 
 	if (!(ppu->lcdc & 0x80)) {
 		ppu->ly = 0;
@@ -228,7 +228,7 @@ void ppu_step (PPU *ppu, int cycles) {
 	}
 
 	ppu->ready = 0;
-	int time_dots = cycles;
+	int time_dots = 4;
 
 	while (time_dots > 0) {
 		if (ppu->mode == OAM_SCAN) {

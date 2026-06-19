@@ -58,7 +58,7 @@ typedef struct CPU {
 	Bus *bus;
 } CPU;
 
-int cpu_step (CPU *cpu);
+void cpu_step (CPU *cpu);
 void init_cpu (CPU *cpu);
 
 #endif

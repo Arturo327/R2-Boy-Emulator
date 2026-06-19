@@ -19,14 +19,6 @@ void init_cpu (CPU *cpu) {
 	cpu->bus = NULL;
 }
 
-static void service (CPU *cpu, uint16_t addr, uint8_t flag_bit) {
-	cpu->bus->interrupts->IF &= ~flag_bit;
-	cpu->sp -= 2;
-	cpu->bus->write8(cpu->bus->ctx, cpu->sp, cpu->pc & 0xFF);
-	cpu->bus->write8(cpu->bus->ctx, cpu->sp + 1, cpu->pc >> 8);
-	cpu->pc = addr;
-}
-
 static int handle_interrupts (CPU *cpu) {
 
 	Bus *bus = cpu->bus;
@@ -45,19 +37,19 @@ static int handle_interrupts (CPU *cpu) {
 	else if (fired & 0x04) service(cpu, 0x50, 0x04);
 	else if (fired & 0x08) service(cpu, 0x58, 0x08);
 	else if (fired & 0x10) service(cpu, 0x60, 0x10);
-
 	return 1;
 }
 
-int cpu_step (CPU *cpu) {
+void cpu_step (CPU *cpu) {
 
 	GB *gb = (GB *) cpu->bus->ctx;
 
 	if (cpu->instr_head >= cpu->instr_tail) {
-		if (handle_interrupts(cpu)) return 20;
-		if (cpu->halted) return 4;
 
 		cpu->instr_tail = cpu->instr_head = 0;
+
+		if (handle_interrupts(cpu)) return;
+		if (cpu->halted) return;
 
 		if (cpu->bus->interrupts->ei_pending) {
 			cpu->bus->interrupts->ei_pending = 0;
@@ -76,9 +68,8 @@ int cpu_step (CPU *cpu) {
 
 		decode_instr(gb, opcode);
 
-		return 4;
+		return;
 	}
 
 	cpu->instr_stack[cpu->instr_head++](gb);
-	return 4;
 }

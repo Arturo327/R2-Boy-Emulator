@@ -15,10 +15,12 @@ void decode_##fn (GB *gb) {	\
 }
 
 static inline uint8_t read8 (GB *gb, uint16_t addr) {
+	oam_bug(gb, addr, 0);
 	return gb->bus.read8(gb->bus.ctx, addr);
 }
 
 static inline void write8 (GB *gb, uint16_t addr, uint8_t val) {
+	oam_bug(gb, addr, 1);
 	gb->bus.write8(gb->bus.ctx, addr, val);
 }
 
@@ -104,32 +106,24 @@ void stop (GB *gb) {				// 0x10
 void ld_bcmem_a (GB *gb) {			// 0x02
 	write8(gb, gb->cpu.bc, gb->cpu.a);
 }
-void decode_ld_bcmem_a (GB *gb) {
-	push_mcycle(gb, ld_bcmem_a);
-}
+DECODE8(ld_bcmem_a)
 
 void ld_demem_a (GB *gb) {			// 0x12
 	write8(gb, gb->cpu.de, gb->cpu.a);
 }
-void decode_ld_demem_a (GB *gb) {
-	push_mcycle(gb, ld_demem_a);
-}
+DECODE8(ld_demem_a)
 
 void ld_hlimem_a (GB *gb) {			// 0x22
 	write8(gb, gb->cpu.hl, gb->cpu.a);
 	gb->cpu.hl++;
 }
-void decode_ld_hlimem_a (GB *gb) {
-	push_mcycle(gb, ld_hlimem_a);
-}
+DECODE8(ld_hlimem_a)
 
 void ld_hldmem_a (GB *gb) {			// 0x32
 	write8(gb, gb->cpu.hl, gb->cpu.a);
 	gb->cpu.hl--;
 }
-void decode_ld_hldmem_a (GB *gb) {
-	push_mcycle(gb, ld_hldmem_a);
-}
+DECODE8(ld_hldmem_a)
 
 // ------------------- ld [imm16], sp ------------------
 
@@ -202,38 +196,33 @@ void decode_ld_sp_imm16 (GB *gb) {
 void ld_a_bcmem (GB *gb) {			// 0x0A
 	gb->cpu.a = read8(gb, gb->cpu.bc);
 }
-void decode_ld_a_bcmem (GB *gb) {
-	push_mcycle(gb, ld_a_bcmem);
-}
+DECODE8(ld_a_bcmem)
 
 void ld_a_demem (GB *gb) {			// 0x1A
 	gb->cpu.a = read8(gb, gb->cpu.de);
 }
-void decode_ld_a_demem (GB *gb) {
-	push_mcycle(gb, ld_a_demem);
-}
+DECODE8(ld_a_demem)
 
 void ld_a_hlimem (GB *gb) {			// 0x2A
 	gb->cpu.a = gb->cpu.bus->read8(gb->cpu.bus->ctx, gb->cpu.hl);
 	gb->cpu.hl++;
+	oam_bug(gb, gb->cpu.hl, 2);
 }
-void decode_ld_a_hlimem (GB *gb) {
-	push_mcycle(gb, ld_a_hlimem);
-}
+DECODE8(ld_a_hlimem)
 
 void ld_a_hldmem (GB *gb) {			// 0x3A
 	gb->cpu.a = gb->cpu.bus->read8(gb->cpu.bus->ctx, gb->cpu.hl);
 	gb->cpu.hl--;
+	oam_bug(gb, gb->cpu.hl, 2);
 }
-void decode_ld_a_hldmem (GB *gb) {
-	push_mcycle(gb, ld_a_hldmem);
-}
+DECODE8(ld_a_hldmem)
 
 // ---------------------------------- inc r16 ----------------------------------
 
-#define DEF_INC(name)		\
-void inc16_##name (GB *gb) {	\
-	gb->cpu.name++;		\
+#define DEF_INC(name)			\
+void inc16_##name (GB *gb) {		\
+	gb->cpu.name++;			\
+	oam_bug(gb, gb->cpu.name, 1);	\
 }
 
 DEF_INC(bc)		// 0x03
@@ -245,7 +234,7 @@ DEF_INC(sp)		// 0x33
 
 #define DEF_DECODE_INC(name)		\
 void decode_inc16_##name (GB *gb) {	\
-	push_mcycle(gb, inc16_##name);\
+	push_mcycle(gb, inc16_##name);	\
 }
 
 DEF_DECODE_INC(bc)
@@ -257,9 +246,10 @@ DEF_DECODE_INC(sp)
 
 // ------------------------------- dec r16 -------------------------------
 
-#define DEF_DEC16(name)		\
-void dec16_##name (GB *gb) {	\
-	gb->cpu.name--;		\
+#define DEF_DEC16(name)			\
+void dec16_##name (GB *gb) {		\
+	gb->cpu.name--;			\
+	oam_bug(gb, gb->cpu.name, 1);	\
 }
 
 DEF_DEC16(bc)		// 0x0B
@@ -269,8 +259,8 @@ DEF_DEC16(sp)		// 0x3B
 
 #undef DEF_DEC16
 
-#define DEF_DECODE_DEC(name)			\
-void decode_dec16_##name (GB *gb) {		\
+#define DEF_DECODE_DEC(name)		\
+void decode_dec16_##name (GB *gb) {	\
 	push_mcycle(gb, dec16_##name);	\
 }
 
@@ -729,10 +719,7 @@ void add_a_hl (GB *gb) {	// 0x86
 	set_h(gb, (old & 0x0F) > (gb->cpu.a & 0x0F));
 	set_c(gb, old > gb->cpu.a);
 }
-
-void decode_add_a_hl (GB *gb) {
-	push_mcycle(gb, add_a_hl);
-}
+DECODE8(add_a_hl)
 
 #undef DEF_ADD
 
@@ -770,10 +757,7 @@ void adc_a_hl (GB *gb) {		// 0x8E
 	set_h(gb, (old ^ v ^ r) & 0x10);
 	set_c(gb, r > 0xFF);
 }
-
-void decode_adc_a_hl (GB *gb) {
-	push_mcycle(gb, adc_a_hl);
-}
+DECODE8(adc_a_hl)
 
 #undef DEF_ADC
 
@@ -807,10 +791,7 @@ void sub_a_hl (GB *gb) {		// 0x96
 	set_h(gb, (old & 0x0F) < (v & 0x0F));
 	set_c(gb, old < v);
 }
-
-void decode_sub_a_hl (GB *gb) {
-	push_mcycle(gb, sub_a_hl);
-}
+DECODE8(sub_a_hl)
 
 #undef DEF_SUB
 
@@ -846,10 +827,7 @@ void sbc_a_hl (GB *gb) {
 	set_h(gb, (old & 0x0F) < (v & 0x0F) + c);
 	set_c(gb, (uint16_t)old < (uint16_t)v + c);
 }
-
-void decode_sbc_a_hl (GB *gb) {
-	push_mcycle(gb, sbc_a_hl);
-}
+DECODE8(sbc_a_hl)
 
 #undef DEF_SBC
 
@@ -879,7 +857,6 @@ void and_a_hl (GB *gb) {		// 0xA6
 	set_h(gb, 1);
 	set_c(gb, 0);
 }
-
 DECODE8(and_a_hl)
 
 #undef DEF_AND
@@ -910,7 +887,6 @@ void xor_a_hl (GB *gb) {		// 0xAE
 	set_h(gb, 0);
 	set_c(gb, 0);
 }
-
 DECODE8(xor_a_hl)
 
 #undef DEF_XOR
@@ -1080,14 +1056,15 @@ DECODE8(cp_a_imm8)
 // -------------------- HELPERS -------------------
 
 void pop_l_buff (GB *gb) {
-	gb->cpu.buff = read8(gb, gb->cpu.sp);
+	gb->cpu.buff = read8(gb, gb->cpu.sp++);
+	oam_bug(gb, gb->cpu.sp, 2);
 }
 void pop_h_buff (GB *gb) {
-	gb->cpu.buff_h = read8(gb, gb->cpu.sp + 1);
+	gb->cpu.buff_h = read8(gb, gb->cpu.sp++);
+	oam_bug(gb, gb->cpu.sp, 0);
 }
 void ret (GB *gb) {
 	gb->cpu.pc = gb->cpu.buff16;
-	gb->cpu.sp += 2;
 }
 
 void check_ret_z (GB *gb) {
@@ -1118,13 +1095,6 @@ void check_jp_nz (GB *gb) {
 void check_jp_nc (GB *gb) {
 	gb->cpu.buff_h = read8(gb, gb->cpu.pc++);
 	if (gb->cpu.f & FLAG_C) clear_instrs(gb);
-}
-
-void push_pc_h (GB *gb) {
-	write8(gb, --gb->cpu.sp, (uint8_t)(gb->cpu.pc >> 8));
-}
-void push_pc_l (GB *gb) {
-	write8(gb, --gb->cpu.sp, (uint8_t)gb->cpu.pc);
 }
 
 void jump (GB *gb) {
@@ -1173,7 +1143,6 @@ void decode_ret_nc (GB *gb) {			// 0xD0
 
 void reti (GB *gb) {				// 0xD9
 	gb->cpu.pc = gb->cpu.buff16;
-	gb->cpu.sp += 2;
 	gb->cpu.bus->interrupts->IME = 1;
 }
 void decode_reti (GB *gb) {
@@ -1224,12 +1193,37 @@ void jp_hl (GB *gb) {				// 0xE9
 
 // --------------------- CALL imm16 ------------------
 
+void push_pc_h (GB *gb) {
+	write8(gb, --gb->cpu.sp, (uint8_t)(gb->cpu.pc >> 8));
+	oam_bug(gb, gb->cpu.sp, 1);
+}
+void push_pc_l (GB *gb) {
+	write8(gb, gb->cpu.sp, (uint8_t)gb->cpu.pc);
+	oam_bug(gb, gb->cpu.sp, 1);
+}
+
+void call_buff (GB *gb) {
+	push_pc_l(gb);
+	jump(gb);
+}
+
 void decode_call_imm16 (GB *gb) {		// 0xCD
 	push_mcycle(gb, ld_buff_imm8);
 	push_mcycle(gb, ld_buff_h_imm8);
 	push_mcycle(gb, push_pc_h);
-	push_mcycle(gb, push_pc_l);
-	push_mcycle(gb, jump);
+	push_mcycle(gb, dec16_sp);
+	push_mcycle(gb, call_buff);
+}
+
+void service (CPU *cpu, uint16_t addr, uint8_t flag_bit) {
+	cpu->bus->interrupts->IF &= ~flag_bit;
+	GB *gb = (GB *)cpu->bus->ctx;
+	gb->cpu.buff16 = addr;
+	push_mcycle(gb, nop);
+	push_mcycle(gb, nop);
+	push_mcycle(gb, push_pc_h);
+	push_mcycle(gb, dec16_sp);
+	push_mcycle(gb, call_buff);
 }
 
 // --------------------- CALL cond, imm16 ------------------
@@ -1238,38 +1232,39 @@ void decode_call_z_imm16 (GB *gb) {		// 0xCC
 	push_mcycle(gb, ld_buff_imm8);
 	push_mcycle(gb, check_jp_z);
 	push_mcycle(gb, push_pc_h);
-	push_mcycle(gb, push_pc_l);
-	push_mcycle(gb, jump);
+	push_mcycle(gb, dec16_sp);
+	push_mcycle(gb, call_buff);
 }
 
 void decode_call_c_imm16 (GB *gb) {		// 0xDC
 	push_mcycle(gb, ld_buff_imm8);
 	push_mcycle(gb, check_jp_c);
 	push_mcycle(gb, push_pc_h);
-	push_mcycle(gb, push_pc_l);
-	push_mcycle(gb, jump);
+	push_mcycle(gb, dec16_sp);
+	push_mcycle(gb, call_buff);
 }
 
 void decode_call_nz_imm16 (GB *gb) {		// 0xC4
 	push_mcycle(gb, ld_buff_imm8);
 	push_mcycle(gb, check_jp_nz);
 	push_mcycle(gb, push_pc_h);
-	push_mcycle(gb, push_pc_l);
-	push_mcycle(gb, jump);
+	push_mcycle(gb, dec16_sp);
+	push_mcycle(gb, call_buff);
 }
 
 void decode_call_nc_imm16 (GB *gb) {		// 0xD4
 	push_mcycle(gb, ld_buff_imm8);
 	push_mcycle(gb, check_jp_nc);
 	push_mcycle(gb, push_pc_h);
-	push_mcycle(gb, push_pc_l);
-	push_mcycle(gb, jump);
+	push_mcycle(gb, dec16_sp);
+	push_mcycle(gb, call_buff);
 }
 
 // -------------------- RST tgt3 -------------------------
 
 #define DEF_RST(num)		\
 void rst_##num (GB *gb) {	\
+	push_pc_l(gb);		\
 	gb->cpu.pc = num << 3;	\
 }
 
@@ -1284,11 +1279,11 @@ DEF_RST(7)	// 0xFF
 
 #undef DEF_RST
 
-#define DEF_RST(num)				\
-void decode_rst_##num (GB *gb) {		\
-	push_mcycle(gb, push_pc_h);		\
-	push_mcycle(gb, push_pc_l);		\
-	push_mcycle(gb, rst_##num);		\
+#define DEF_RST(num)			\
+void decode_rst_##num (GB *gb) {	\
+	push_mcycle(gb, push_pc_h);	\
+	push_mcycle(gb, dec16_sp);	\
+	push_mcycle(gb, rst_##num);	\
 }
 
 DEF_RST(0)	// 0xC7
@@ -1306,28 +1301,36 @@ DEF_RST(7)	// 0xFF
 
 void pop_bc_l (GB *gb) {
 	gb->cpu.c = read8(gb, gb->cpu.sp++);
+	oam_bug(gb, gb->cpu.sp, 2);
 }
 void pop_de_l (GB *gb) {
 	gb->cpu.e = read8(gb, gb->cpu.sp++);
+	oam_bug(gb, gb->cpu.sp, 2);
 }
 void pop_hl_l (GB *gb) {
 	gb->cpu.l = read8(gb, gb->cpu.sp++);
+	oam_bug(gb, gb->cpu.sp, 2);
 }
 void pop_af_l (GB *gb) {
 	gb->cpu.f = read8(gb, gb->cpu.sp++) & 0xF0;
+	oam_bug(gb, gb->cpu.sp, 2);
 }
 
 void pop_bc_h (GB *gb) {
 	gb->cpu.b = read8(gb, gb->cpu.sp++);
+	oam_bug(gb, gb->cpu.sp, 0);
 }
 void pop_de_h (GB *gb) {
 	gb->cpu.d = read8(gb, gb->cpu.sp++);
+	oam_bug(gb, gb->cpu.sp, 0);
 }
 void pop_hl_h (GB *gb) {
 	gb->cpu.h = read8(gb, gb->cpu.sp++);
+	oam_bug(gb, gb->cpu.sp, 0);
 }
 void pop_af_h (GB *gb) {
 	gb->cpu.a = read8(gb, gb->cpu.sp++);
+	oam_bug(gb, gb->cpu.sp, 0);
 }
 
 #define DEF_POP(name)				\
@@ -1346,35 +1349,43 @@ DEF_POP(af)	// 0xF1
 // --------------------- PUSH r16 -----------------------
 
 void push_bc_l (GB *gb) {
-	write8(gb, --gb->cpu.sp, gb->cpu.c);
+	write8(gb, gb->cpu.sp, gb->cpu.c);
+	oam_bug(gb, gb->cpu.sp, 1);
 }
 void push_de_l (GB *gb) {
-	write8(gb, --gb->cpu.sp, gb->cpu.e);
+	write8(gb, gb->cpu.sp, gb->cpu.e);
+	oam_bug(gb, gb->cpu.sp, 1);
 }
 void push_hl_l (GB *gb) {
-	write8(gb, --gb->cpu.sp, gb->cpu.l);
+	write8(gb, gb->cpu.sp, gb->cpu.l);
+	oam_bug(gb, gb->cpu.sp, 1);
 }
 void push_af_l (GB *gb) {
-	write8(gb, --gb->cpu.sp, gb->cpu.f);
+	write8(gb, gb->cpu.sp, gb->cpu.f);
+	oam_bug(gb, gb->cpu.sp, 1);
 }
 
 void push_bc_h (GB *gb) {
 	write8(gb, --gb->cpu.sp, gb->cpu.b);
+	oam_bug(gb, gb->cpu.sp, 2);
 }
 void push_de_h (GB *gb) {
 	write8(gb, --gb->cpu.sp, gb->cpu.d);
+	oam_bug(gb, gb->cpu.sp, 2);
 }
 void push_hl_h (GB *gb) {
 	write8(gb, --gb->cpu.sp, gb->cpu.h);
+	oam_bug(gb, gb->cpu.sp, 2);
 }
 void push_af_h (GB *gb) {
 	write8(gb, --gb->cpu.sp, gb->cpu.a);
+	oam_bug(gb, gb->cpu.sp, 2);
 }
 
 #define DEF_PUSH(name)				\
 void decode_push_##name (GB *gb) {		\
-	push_mcycle(gb, nop);			\
 	push_mcycle(gb, push_##name##_h);	\
+	push_mcycle(gb, dec16_sp);		\
 	push_mcycle(gb, push_##name##_l);	\
 }
 

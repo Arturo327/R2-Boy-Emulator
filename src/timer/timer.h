@@ -13,6 +13,6 @@ typedef struct Timer {
     	uint16_t tima_counter;
 } Timer;
 
-int timer_step (Timer *timer, int cycles);
+int timer_step (Timer *timer);
 
 #endif

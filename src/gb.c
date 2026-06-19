@@ -82,7 +82,6 @@ void cleanup (GB *gb) {
 }
 
 void gb_step (GB *gb) {
-	int cycles;
 
 	if (gb->boot_rom_disable_pending && gb->cpu.pc >= 0x0100) {
 		gb->boot_rom_enabled = 0;
@@ -92,17 +91,15 @@ void gb_step (GB *gb) {
 	if (gb->dma_active) {
 		gb->memory.oam[gb->dma_index] = gb->bus.read8(gb->bus.ctx, gb->dma_src + gb->dma_index);
 		gb->dma_index++;
-		cycles = 4;
 		if (gb->dma_index >= 0xA0)
 			gb->dma_active = 0;
 	} else {
-		cycles = cpu_step(&gb->cpu);
+		cpu_step(&gb->cpu);
 	}
 	
-	if (timer_step(&gb->timer, cycles)) {
+	if (timer_step(&gb->timer)) {
 		gb->interrupts.IF |= 0x04;
 	}
-	ppu_step(&gb->ppu, cycles);
-	gb->clock += cycles;
-
+	ppu_step(&gb->ppu);
+	gb->clock += 4;
 }

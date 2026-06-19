@@ -11,6 +11,6 @@ void init_ppu (PPU *ppu);
 void init_ppu_reg (PPU *ppu);
 
 void check_lyc (PPU *ppu);
-void ppu_step (PPU *ppu, int cycles);
+void ppu_step (PPU *ppu);
 
 #endif

@@ -1,9 +1,9 @@
 #include "timer/timer.h"
 
-int timer_step (Timer *timer, int cycles) {
+int timer_step (Timer *timer) {
 	int hay_interrupt = 0;
 
-	timer->div_counter += cycles;
+	timer->div_counter += 4;
 	if (timer->div_counter >= 256) {
 		timer->div_counter -= 256;
 		timer->div++;
@@ -17,7 +17,7 @@ int timer_step (Timer *timer, int cycles) {
 			case 2: a = 64; break;
 			case 3: a = 256; break;
 		}
-		timer->tima_counter += cycles;
+		timer->tima_counter += 4;
 		while (timer->tima_counter >= a) {
 			timer->tima_counter -= a;
 			timer->tima++;

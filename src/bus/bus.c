@@ -24,6 +24,64 @@ void joypad_update (GB *gb, uint8_t new_buttons) {
 	}
 }
 
+static void oam_bug_rw (GB *gb) {
+
+	int row = gb->ppu.dots >> 2;
+	if (row < 4 || row == 19) return;
+
+	uint8_t *oam = gb->memory.oam;
+	int curr = row << 3;
+	int prev = (row - 1) << 3;
+	int prev2 = (row - 2) << 3;
+
+	uint16_t a = oam[prev2] | (oam[prev2 + 1] << 8);
+	uint16_t b = oam[prev] | (oam[prev + 1] << 8);
+	uint16_t c = oam[curr] | (oam[curr + 1] << 8);
+	uint16_t d = oam[prev + 4] | (oam[prev + 5] << 8);
+
+	uint16_t w = (b & (a | c | d)) | (a & c & d);
+
+	oam[prev] = w & 0xFF;
+	oam[prev + 1] = w >> 8;
+	for (int i = 2; i < 8; i++) {
+		uint8_t a = oam[prev + i];
+		oam[curr + i] = a;
+		oam[prev2 + i] = a;
+	}
+}
+
+void oam_bug (GB *gb, uint16_t val, int is_write) {
+
+	if ((val & 0xFF00) != 0xFE00) return;
+	if (gb->ppu.mode != 2) return;
+	if (gb->ppu.dots >= 80) return;
+
+	if (is_write == 2) {
+		oam_bug_rw(gb);
+		is_write = 0;
+	}
+
+	int row = gb->ppu.dots >> 2;
+	if (row == 0) return;
+
+	uint8_t *oam = gb->memory.oam;
+	int curr = row << 3;
+	int prev = (row - 1) << 3;
+
+	uint16_t a = oam[curr] | (oam[curr + 1] << 8);
+	uint16_t b = oam[prev] | (oam[prev + 1] << 8);
+	uint16_t c = oam[prev + 4] | (oam[prev + 5] << 8);
+
+	uint16_t w = is_write
+		? ((a ^ c) & (b ^ c)) ^ c
+		: b | (a & c);
+
+	oam[curr] = w & 0xFF;
+	oam[curr + 1] = w >> 8;
+	for (int i = 2; i < 8; i++)
+		oam[curr + i] = oam[prev + i];
+}
+
 uint8_t bus_read8 (void *ctx, uint16_t addr) {
 	GB *gb = (GB *)ctx;
 
