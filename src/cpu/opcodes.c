@@ -205,15 +205,15 @@ DECODE8(ld_a_demem)
 
 void ld_a_hlimem (GB *gb) {			// 0x2A
 	gb->cpu.a = gb->cpu.bus->read8(gb->cpu.bus->ctx, gb->cpu.hl);
-	gb->cpu.hl++;
 	oam_bug(gb, gb->cpu.hl, 2);
+	gb->cpu.hl++;
 }
 DECODE8(ld_a_hlimem)
 
 void ld_a_hldmem (GB *gb) {			// 0x3A
 	gb->cpu.a = gb->cpu.bus->read8(gb->cpu.bus->ctx, gb->cpu.hl);
-	gb->cpu.hl--;
 	oam_bug(gb, gb->cpu.hl, 2);
+	gb->cpu.hl--;
 }
 DECODE8(ld_a_hldmem)
 
@@ -221,8 +221,8 @@ DECODE8(ld_a_hldmem)
 
 #define DEF_INC(name)			\
 void inc16_##name (GB *gb) {		\
-	gb->cpu.name++;			\
 	oam_bug(gb, gb->cpu.name, 1);	\
+	gb->cpu.name++;			\
 }
 
 DEF_INC(bc)		// 0x03
@@ -248,8 +248,8 @@ DEF_DECODE_INC(sp)
 
 #define DEF_DEC16(name)			\
 void dec16_##name (GB *gb) {		\
-	gb->cpu.name--;			\
 	oam_bug(gb, gb->cpu.name, 1);	\
+	gb->cpu.name--;			\
 }
 
 DEF_DEC16(bc)		// 0x0B
@@ -1056,12 +1056,11 @@ DECODE8(cp_a_imm8)
 // -------------------- HELPERS -------------------
 
 void pop_l_buff (GB *gb) {
-	gb->cpu.buff = read8(gb, gb->cpu.sp++);
 	oam_bug(gb, gb->cpu.sp, 2);
+	gb->cpu.buff = gb->cpu.bus->read8(gb->bus.ctx, gb->cpu.sp++);
 }
 void pop_h_buff (GB *gb) {
 	gb->cpu.buff_h = read8(gb, gb->cpu.sp++);
-	oam_bug(gb, gb->cpu.sp, 0);
 }
 void ret (GB *gb) {
 	gb->cpu.pc = gb->cpu.buff16;
@@ -1194,12 +1193,11 @@ void jp_hl (GB *gb) {				// 0xE9
 // --------------------- CALL imm16 ------------------
 
 void push_pc_h (GB *gb) {
-	write8(gb, --gb->cpu.sp, (uint8_t)(gb->cpu.pc >> 8));
-	oam_bug(gb, gb->cpu.sp, 1);
+	write8(gb, gb->cpu.sp, (uint8_t)(gb->cpu.pc >> 8));
 }
 void push_pc_l (GB *gb) {
-	write8(gb, gb->cpu.sp, (uint8_t)gb->cpu.pc);
 	oam_bug(gb, gb->cpu.sp, 1);
+	gb->bus.write8(gb->bus.ctx, --gb->cpu.sp, (uint8_t)gb->cpu.pc);
 }
 
 void call_buff (GB *gb) {
@@ -1210,8 +1208,8 @@ void call_buff (GB *gb) {
 void decode_call_imm16 (GB *gb) {		// 0xCD
 	push_mcycle(gb, ld_buff_imm8);
 	push_mcycle(gb, ld_buff_h_imm8);
-	push_mcycle(gb, push_pc_h);
 	push_mcycle(gb, dec16_sp);
+	push_mcycle(gb, push_pc_h);
 	push_mcycle(gb, call_buff);
 }
 
@@ -1221,8 +1219,8 @@ void service (CPU *cpu, uint16_t addr, uint8_t flag_bit) {
 	gb->cpu.buff16 = addr;
 	push_mcycle(gb, nop);
 	push_mcycle(gb, nop);
-	push_mcycle(gb, push_pc_h);
 	push_mcycle(gb, dec16_sp);
+	push_mcycle(gb, push_pc_h);
 	push_mcycle(gb, call_buff);
 }
 
@@ -1231,32 +1229,32 @@ void service (CPU *cpu, uint16_t addr, uint8_t flag_bit) {
 void decode_call_z_imm16 (GB *gb) {		// 0xCC
 	push_mcycle(gb, ld_buff_imm8);
 	push_mcycle(gb, check_jp_z);
-	push_mcycle(gb, push_pc_h);
 	push_mcycle(gb, dec16_sp);
+	push_mcycle(gb, push_pc_h);
 	push_mcycle(gb, call_buff);
 }
 
 void decode_call_c_imm16 (GB *gb) {		// 0xDC
 	push_mcycle(gb, ld_buff_imm8);
 	push_mcycle(gb, check_jp_c);
-	push_mcycle(gb, push_pc_h);
 	push_mcycle(gb, dec16_sp);
+	push_mcycle(gb, push_pc_h);
 	push_mcycle(gb, call_buff);
 }
 
 void decode_call_nz_imm16 (GB *gb) {		// 0xC4
 	push_mcycle(gb, ld_buff_imm8);
 	push_mcycle(gb, check_jp_nz);
-	push_mcycle(gb, push_pc_h);
 	push_mcycle(gb, dec16_sp);
+	push_mcycle(gb, push_pc_h);
 	push_mcycle(gb, call_buff);
 }
 
 void decode_call_nc_imm16 (GB *gb) {		// 0xD4
 	push_mcycle(gb, ld_buff_imm8);
 	push_mcycle(gb, check_jp_nc);
-	push_mcycle(gb, push_pc_h);
 	push_mcycle(gb, dec16_sp);
+	push_mcycle(gb, push_pc_h);
 	push_mcycle(gb, call_buff);
 }
 
@@ -1281,8 +1279,8 @@ DEF_RST(7)	// 0xFF
 
 #define DEF_RST(num)			\
 void decode_rst_##num (GB *gb) {	\
-	push_mcycle(gb, push_pc_h);	\
 	push_mcycle(gb, dec16_sp);	\
+	push_mcycle(gb, push_pc_h);	\
 	push_mcycle(gb, rst_##num);	\
 }
 
@@ -1300,37 +1298,33 @@ DEF_RST(7)	// 0xFF
 // --------------------- POP r16 -----------------------
 
 void pop_bc_l (GB *gb) {
-	gb->cpu.c = read8(gb, gb->cpu.sp++);
+	gb->cpu.c = gb->cpu.bus->read8(gb->bus.ctx, gb->cpu.sp++);
 	oam_bug(gb, gb->cpu.sp, 2);
 }
 void pop_de_l (GB *gb) {
-	gb->cpu.e = read8(gb, gb->cpu.sp++);
+	gb->cpu.e = gb->cpu.bus->read8(gb->bus.ctx, gb->cpu.sp++);
 	oam_bug(gb, gb->cpu.sp, 2);
 }
 void pop_hl_l (GB *gb) {
-	gb->cpu.l = read8(gb, gb->cpu.sp++);
+	gb->cpu.l = gb->cpu.bus->read8(gb->bus.ctx, gb->cpu.sp++);
 	oam_bug(gb, gb->cpu.sp, 2);
 }
 void pop_af_l (GB *gb) {
-	gb->cpu.f = read8(gb, gb->cpu.sp++) & 0xF0;
+	gb->cpu.f = gb->cpu.bus->read8(gb->bus.ctx, gb->cpu.sp++) & 0xF0;
 	oam_bug(gb, gb->cpu.sp, 2);
 }
 
 void pop_bc_h (GB *gb) {
 	gb->cpu.b = read8(gb, gb->cpu.sp++);
-	oam_bug(gb, gb->cpu.sp, 0);
 }
 void pop_de_h (GB *gb) {
 	gb->cpu.d = read8(gb, gb->cpu.sp++);
-	oam_bug(gb, gb->cpu.sp, 0);
 }
 void pop_hl_h (GB *gb) {
 	gb->cpu.h = read8(gb, gb->cpu.sp++);
-	oam_bug(gb, gb->cpu.sp, 0);
 }
 void pop_af_h (GB *gb) {
 	gb->cpu.a = read8(gb, gb->cpu.sp++);
-	oam_bug(gb, gb->cpu.sp, 0);
 }
 
 #define DEF_POP(name)				\
@@ -1349,43 +1343,39 @@ DEF_POP(af)	// 0xF1
 // --------------------- PUSH r16 -----------------------
 
 void push_bc_l (GB *gb) {
-	write8(gb, gb->cpu.sp, gb->cpu.c);
 	oam_bug(gb, gb->cpu.sp, 1);
+	gb->bus.write8(gb->bus.ctx, --gb->cpu.sp, gb->cpu.c);
 }
 void push_de_l (GB *gb) {
-	write8(gb, gb->cpu.sp, gb->cpu.e);
 	oam_bug(gb, gb->cpu.sp, 1);
+	gb->bus.write8(gb->bus.ctx, --gb->cpu.sp, gb->cpu.e);
 }
 void push_hl_l (GB *gb) {
-	write8(gb, gb->cpu.sp, gb->cpu.l);
 	oam_bug(gb, gb->cpu.sp, 1);
+	gb->bus.write8(gb->bus.ctx, --gb->cpu.sp, gb->cpu.l);
 }
 void push_af_l (GB *gb) {
-	write8(gb, gb->cpu.sp, gb->cpu.f);
 	oam_bug(gb, gb->cpu.sp, 1);
+	gb->bus.write8(gb->bus.ctx, --gb->cpu.sp, gb->cpu.f);
 }
 
 void push_bc_h (GB *gb) {
-	write8(gb, --gb->cpu.sp, gb->cpu.b);
-	oam_bug(gb, gb->cpu.sp, 2);
+	write8(gb, gb->cpu.sp, gb->cpu.b);
 }
 void push_de_h (GB *gb) {
-	write8(gb, --gb->cpu.sp, gb->cpu.d);
-	oam_bug(gb, gb->cpu.sp, 2);
+	write8(gb, gb->cpu.sp, gb->cpu.d);
 }
 void push_hl_h (GB *gb) {
-	write8(gb, --gb->cpu.sp, gb->cpu.h);
-	oam_bug(gb, gb->cpu.sp, 2);
+	write8(gb, gb->cpu.sp, gb->cpu.h);
 }
 void push_af_h (GB *gb) {
-	write8(gb, --gb->cpu.sp, gb->cpu.a);
-	oam_bug(gb, gb->cpu.sp, 2);
+	write8(gb, gb->cpu.sp, gb->cpu.a);
 }
 
 #define DEF_PUSH(name)				\
 void decode_push_##name (GB *gb) {		\
-	push_mcycle(gb, push_##name##_h);	\
 	push_mcycle(gb, dec16_sp);		\
+	push_mcycle(gb, push_##name##_h);	\
 	push_mcycle(gb, push_##name##_l);	\
 }
 

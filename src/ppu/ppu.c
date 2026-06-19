@@ -225,6 +225,7 @@ void ppu_step (PPU *ppu) {
 		ppu->lcd_was_off = 0;
 		ppu->dots = 0;
 		update_stat(ppu, OAM_SCAN);
+		return;
 	}
 
 	ppu->ready = 0;

@@ -43,7 +43,7 @@ static void oam_bug_rw (GB *gb) {
 
 	oam[prev] = w & 0xFF;
 	oam[prev + 1] = w >> 8;
-	for (int i = 2; i < 8; i++) {
+	for (int i = 0; i < 8; i++) {
 		uint8_t a = oam[prev + i];
 		oam[curr + i] = a;
 		oam[prev2 + i] = a;
