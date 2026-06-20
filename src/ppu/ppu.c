@@ -58,6 +58,7 @@ void init_ppu (PPU *ppu) {
 }
 
 static void update_stat (PPU *ppu, int new_mode) {
+	if (ppu->mode == new_mode) return;
 	ppu->mode = new_mode;
 	ppu->stat = (ppu->stat & 0xFC) | new_mode;
 
@@ -231,7 +232,8 @@ void ppu_step (PPU *ppu) {
 	if (ppu->lcd_was_off) {
 		ppu->lcd_was_off = 0;
 		ppu->dots = 0;
-		update_stat(ppu, HBLANK);
+		ppu->mode = HBLANK;
+		ppu->stat = (ppu->stat & 0xFC) | HBLANK;
 		check_lyc(ppu);
 		ppu->oam_startup = 1;
 		ppu->short_line  = 1;
