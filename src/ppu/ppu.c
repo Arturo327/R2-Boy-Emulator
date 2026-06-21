@@ -8,6 +8,8 @@
 #define OAM_SCAN 2
 #define DRAWING 3
 
+#define LINE0_SHORTEN 6
+
 static const uint32_t PALETA[4] = {
 	0xFFFFFFFF,  // blanco
 	0xFFAAAAAA,  // gris claro
@@ -65,10 +67,6 @@ static void update_stat (PPU *ppu, int new_mode) {
 	int stat_irq = 0;
 	if (new_mode == HBLANK) {
 		ppu->mode0_cycles = 376 - ppu->mode3_cycles;
-		if (ppu->short_line) {
-			ppu->mode0_cycles -= 4;
-			ppu->short_line = 0;
-		}
 		if (ppu->mode0_cycles < 0) ppu->mode0_cycles = 0;
 		if (ppu->stat & 0x08) stat_irq = 1;
 	}
@@ -236,7 +234,7 @@ void ppu_step (PPU *ppu) {
 		ppu->stat = (ppu->stat & 0xFC) | HBLANK;
 		check_lyc(ppu);
 		ppu->oam_startup = 1;
-		ppu->short_line  = 1;
+		ppu->short_line = 1;
 	}
 
 	ppu->ready = 0;
@@ -267,15 +265,32 @@ void ppu_step (PPU *ppu) {
 			}
 
 		} else if (ppu->mode == HBLANK) {
-			
+
 			if (ppu->oam_startup) {
-				if (ppu->dots == 80) {
+
+				if (ppu->dots == 0) {
 					ppu->dots = 0;
 					ppu->oam_startup = 0;
-					update_stat(ppu, DRAWING);
+					ppu->mode = OAM_SCAN;
+					ppu->stat = (ppu->stat & 0xFC) | OAM_SCAN;
+					ppu->x = 0;
+					ppu->num_sprites = 0;
 					continue;
 				}
+
+			} else if (ppu->short_line) {
+
+				if (ppu->dots == ppu->mode0_cycles - LINE0_SHORTEN) {
+					ppu->short_line = 0;
+					ppu->ly++;
+					check_lyc(ppu);
+					ppu->dots = 0;
+					update_stat(ppu, OAM_SCAN);
+					continue;
+				}
+
 			} else if (ppu->dots >= ppu->mode0_cycles) {
+
 				ppu->dots -= ppu->mode0_cycles;
 				ppu->ly++;
 				check_lyc(ppu);

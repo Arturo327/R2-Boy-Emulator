@@ -25,9 +25,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 This project is under active development.
 
 Planned:
-- Try to pass all the Blargg and Mooneye tests
 - Audio emulation
-- Additional hardware accuracy improvements
 
 ---
 
@@ -126,6 +124,7 @@ Blargg:
 - cpu_instrs
 - mem_timing
 - mem_timing-2
+- oam_bug
 
 - dmg_acid2
 
