@@ -1,5 +1,6 @@
 #include "frontend/frontend.h"
 #include "gb.h"
+#include <stdio.h>
 
 #define JOYPAD_RIGHT 0x01
 #define JOYPAD_LEFT 0x02
@@ -12,7 +13,7 @@
 
 int init_screen (LCD *lcd) {
 
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) < 0) {
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO) < 0) {
 		fprintf(stderr, "SDL_Init error: %s\n", SDL_GetError());
 		return 0;
 	}
@@ -114,4 +115,41 @@ int handle_events (GB *gb) {
 		}
 	}
 	return 1;
+}
+
+int init_audio (Audio *audio) {
+
+	SDL_AudioSpec want = {0}, have;
+	want.freq = 44100;
+	want.format = AUDIO_S16SYS;
+	want.channels = 2;
+	want.samples = 1024;
+
+	audio->dev = SDL_OpenAudioDevice(NULL, 0, &want, &have,
+		SDL_AUDIO_ALLOW_FREQUENCY_CHANGE | SDL_AUDIO_ALLOW_SAMPLES_CHANGE);
+
+	if (!audio->dev) {
+		fprintf(stderr, "SDL_OpenAudioDevice error: %s\n", SDL_GetError());
+		return 0;
+	}
+
+	audio->sample_rate = have.freq;
+	SDL_PauseAudioDevice(audio->dev, 0);
+
+	return 1;
+}
+
+void cleanup_audio (Audio *audio) {
+	if (audio->dev) {
+		SDL_CloseAudioDevice(audio->dev);
+		audio->dev = 0;
+	}
+}
+
+void queue_audio (GB *gb) {
+	if (!gb->audio.dev) return;
+	if (gb->apu.buffer_pos == 0) return;
+
+	SDL_QueueAudio(gb->audio.dev, gb->apu.buffer, gb->apu.buffer_pos * sizeof(int16_t));
+	gb->apu.buffer_pos = 0;
 }

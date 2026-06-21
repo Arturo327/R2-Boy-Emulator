@@ -18,11 +18,13 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile) {
 	memset(gb, 0, sizeof(GB));
 
 	init_ppu(&gb->ppu);
+	init_apu(&gb->apu);
 	init_opcodes(&gb->opcodes);
 
 	if (!load_bios(gb, biosfile)) {
 
 		init_ppu_reg(&gb->ppu);
+		init_apu_reg(&gb->apu);
 		init_cpu(&gb->cpu);
 		gb->boot_rom_enabled = 0;
 		printf("Could not load BOOT ROM %s. Running whithout BIOS\n", biosfile);
@@ -62,6 +64,12 @@ void init (GB *gb, const char *romfile, const char *biosfile) {
 		return;
 	}
 
+	if (!init_audio(&gb->audio)) {
+		gb->running = 0;
+		return;
+	}
+	gb->apu.sample_rate = gb->audio.sample_rate;
+
 	gb->running = 1;
 }
 
@@ -77,8 +85,8 @@ void init_test (GB *gb, const char *romfile, const char *biosfile) {
 
 void cleanup (GB *gb) {
 	save_sram(&gb->memory.cart, gb->rom_path);
+	cleanup_audio(&gb->audio);
 	cleanup_screen(&gb->lcd);
-	(void) gb;
 }
 
 void gb_step (GB *gb) {
@@ -101,5 +109,6 @@ void gb_step (GB *gb) {
 		gb->interrupts.IF |= 0x04;
 	}
 	ppu_step(&gb->ppu);
+	apu_step(&gb->apu);
 	gb->clock += 4;
 }

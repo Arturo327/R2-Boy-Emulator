@@ -95,25 +95,27 @@ int main (int argc, char *argv[])
 		return 1;
 	}
 
-	const double FRAME_MS = 70224.0 * 1000.0 / 4194304.0;
+	double frames_per_sec = 4194304.0 / 70224.0;
+	uint32_t bytes_per_video_frame = (uint32_t)(gb.audio.sample_rate / frames_per_sec) * 2 * sizeof(int16_t);
+	uint32_t target_queued_bytes = bytes_per_video_frame * 3;
+
 	while (gb.running) {
 		if (!handle_events(&gb)) {
 			gb.running = 0;
 			break;
 		}
 
-		uint64_t start = SDL_GetPerformanceCounter();
-
 		while (gb.clock < 70224) {
 			gb_step(&gb);
 		}
 		update_screen(&gb.lcd, gb.ppu.framebuffer);
+		queue_audio(&gb);
 		gb.clock -= 70224;
 
-		uint64_t end = SDL_GetPerformanceCounter();
-		double elapsed = (end - start) * 1000.0 / SDL_GetPerformanceFrequency();
-		double delay = FRAME_MS - elapsed;
-		if (delay > 0) SDL_Delay((uint32_t)delay);
+		while (SDL_GetQueuedAudioSize(gb.audio.dev) > target_queued_bytes) {
+			SDL_Delay(1);
+		}
+
 	}
 
 	cleanup(&gb);

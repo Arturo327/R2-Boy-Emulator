@@ -5,6 +5,7 @@
 #include "cpu/cpu.h"
 #include "bus/bus.h"
 #include "ppu/ppu.h"
+#include "apu/apu.h"
 #include "timer/timer.h"
 #include "cartucho/cartucho.h"
 #include "cpu/opcodes.h"
@@ -33,8 +34,10 @@ typedef struct GB {
 	Bus bus;
 
 	LCD lcd;
+	Audio audio;
 	Memory memory;
 	PPU ppu;
+	APU apu;
 	Interrupts interrupts;
 	Timer timer;
 	Joypad joypad;
