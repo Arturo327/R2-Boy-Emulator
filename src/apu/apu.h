@@ -33,6 +33,11 @@ typedef struct CH1 {
 	uint8_t sweep_enabled;
 } CH1;
 
+typedef struct CH4 {
+	CH ch;
+	uint16_t lfsr;
+} CH4;
+
 typedef struct APU {
 
 	uint8_t enabled;
@@ -45,6 +50,7 @@ typedef struct APU {
 
 	CH1 ch1;
 	CH ch2;
+	CH4 ch4;
 
 	int32_t right_capacitor;
 	int32_t left_capacitor;
@@ -64,6 +70,7 @@ typedef struct APU {
 
 void apu_trigger_ch1 (APU *apu);
 void apu_trigger_ch2 (APU *apu);
+void apu_trigger_ch4 (APU *apu);
 
 void init_apu (APU *apu);
 void init_apu_reg (APU *apu);

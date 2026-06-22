@@ -5,6 +5,7 @@
 #define MASTER_GAIN 32
 
 static const uint8_t DUTY_TABLE[4] = { 0x01, 0x81, 0x87, 0x7E };
+static const uint16_t NOISE_DIVISOR[8] = {8,16,32,48,64,80,96,112};
  
 void init_apu (APU *apu) {
 	memset(apu, 0, sizeof(APU));
@@ -98,16 +99,37 @@ static void clock_sweep (APU *apu) {
 	}
 }
 
-static void trigger_pulse_common (CH *ch, uint8_t nr_x1, uint8_t nr_x2,
-		uint8_t nr_x3, uint8_t nr_x4) {
+static void step_noise (CH4 *ch4, uint8_t nr43) {
+	if (ch4->ch.freq_timer <= 4) {
+		uint8_t shift = nr43 >> 4;
+		uint8_t code = nr43 & 0x07;
+		ch4->ch.freq_timer += (uint16_t)(NOISE_DIVISOR[code] << shift);
+
+		uint16_t lfsr = ch4->lfsr;
+		uint8_t xor_bit = (lfsr ^ (lfsr >> 1)) & 1;
+		lfsr >>= 1;
+		lfsr |= xor_bit << 14;
+		if (nr43 & 0x08)
+			lfsr = (lfsr & ~(1 << 6)) | (xor_bit << 6);
+		
+		ch4->lfsr = lfsr;
+	}
+	ch4->ch.freq_timer -= 4;
+}
+
+static void trigger_common (CH *ch, uint8_t nr_x1, uint8_t nr_x2) {
 	ch->enabled = (nr_x2 & 0xF8) != 0;
 	if (ch->length_counter == 0)
 		ch->length_counter = 64 - (nr_x1 & 0x3F);
-
-	uint16_t freq = nr_x3 | ((nr_x4 & 0x07) << 8);
-	ch->freq_timer = (2048 - freq) << 2;
 	ch->envelope_timer = (nr_x2 & 0x07) ? (nr_x2 & 0x07) : 8;
 	ch->volume = nr_x2 >> 4;
+}
+
+static void trigger_pulse_common (CH *ch, uint8_t nr_x1, uint8_t nr_x2,
+		uint8_t nr_x3, uint8_t nr_x4) {
+	trigger_common (ch, nr_x1, nr_x2);
+	uint16_t freq = nr_x3 | ((nr_x4 & 0x07) << 8);
+	ch->freq_timer = (2048 - freq) << 2;
 }
 
 void apu_trigger_ch1 (APU *apu) {
@@ -130,6 +152,15 @@ void apu_trigger_ch2 (APU *apu) {
 	trigger_pulse_common(&apu->ch2, apu->nr21, apu->nr22, apu->nr23, apu->nr24);
 }
 
+void apu_trigger_ch4 (APU *apu) {
+	trigger_common(&apu->ch4.ch, apu->nr41, apu->nr42);
+	apu->ch4.lfsr = 0x7FFF;
+
+	uint8_t shift = apu->nr43 >> 4;
+	uint8_t code = apu->nr43 & 0x07;
+	apu->ch4.ch.freq_timer = NOISE_DIVISOR[code] << shift;
+}
+
 static int16_t dac (CH *ch, uint8_t nr_x1) {
 	if (!ch->enabled) return 0;
 	uint8_t bit = (DUTY_TABLE[nr_x1 >> 6] >> ch->duty_step) & 1;
@@ -149,7 +180,10 @@ static int16_t dac_ch3 (APU *apu) {
 }
 
 static int16_t dac_ch4 (APU *apu) {
-	return 0;
+	CH *ch = &apu->ch4.ch;
+	if (!ch->enabled) return 0;
+	uint8_t bit = ~(apu->ch4.lfsr) & 1;
+	return bit ? (int16_t)ch->volume : -(int16_t)ch->volume;
 }
 
 static Sample mixer (APU *apu, AnalogChannels chs) {
@@ -203,6 +237,7 @@ void apu_step (APU *apu) {
 
 	step_freq(&apu->ch1.ch, apu->nr13, apu->nr14);
 	step_freq(&apu->ch2, apu->nr23, apu->nr24);
+	step_noise(&apu->ch4, apu->nr43);
  
 	apu->frame_seq_counter += 4;
 	if (apu->frame_seq_counter >= 8192) {
@@ -212,11 +247,13 @@ void apu_step (APU *apu) {
 		if ((apu->frame_seq_step & 1) == 0) {
 			clock_length(&apu->ch1.ch, apu->nr14);
 			clock_length(&apu->ch2, apu->nr24);
+			clock_length(&apu->ch4.ch, apu->nr44);
 		}
 		if (apu->frame_seq_step == 2 || apu->frame_seq_step == 6) clock_sweep(apu);
 		if (apu->frame_seq_step == 7) {
 			clock_envelope(&apu->ch1.ch, apu->nr12);
 			clock_envelope(&apu->ch2, apu->nr22);
+			clock_envelope(&apu->ch4.ch, apu->nr42);
 		}
 	}
  
