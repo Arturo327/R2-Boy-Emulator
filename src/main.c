@@ -80,7 +80,7 @@ int main (int argc, char *argv[])
 	}
 
 	if (optind >= argc) {
-		fprintf(stderr, "No ROM founded\n");
+		fprintf(stderr, "No ROM found\n");
 		return 1;
 	}
 	romfile = argv[optind];

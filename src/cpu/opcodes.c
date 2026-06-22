@@ -92,7 +92,10 @@ void ld_buffmem_sp_high (GB *gb) {
 
 // ---------------------- NOP --------------------------
 
-void nop (GB *gb) { return; }
+void nop (GB *gb) {
+	(void)gb;
+	return;
+}
 
 // --------------------- STOP ------------------------
 

@@ -373,12 +373,20 @@ void bus_write8 (void *ctx, uint16_t addr, uint8_t val) {
 			case 0xFF11: gb->apu.nr11 = val; break;
 			case 0xFF12: gb->apu.nr12 = val; break;
 			case 0xFF13: gb->apu.nr13 = val; break;
-			case 0xFF14: gb->apu.nr14 = val; break;
+			case 0xFF14: {
+				gb->apu.nr14 = val;
+				if (val & 0x80) apu_trigger_ch1(&gb->apu);
+				break;
+			}
 
 			case 0xFF16: gb->apu.nr21 = val; break;
 			case 0xFF17: gb->apu.nr22 = val; break;
 			case 0xFF18: gb->apu.nr23 = val; break;
-			case 0xFF19: gb->apu.nr24 = val; break;
+			case 0xFF19: {
+				gb->apu.nr24 = val;
+				if (val & 0x80) apu_trigger_ch2(&gb->apu);
+				break;
+			}
 
 			case 0xFF1A: gb->apu.nr30 = val; break;
 			case 0xFF1B: gb->apu.nr31 = val; break;

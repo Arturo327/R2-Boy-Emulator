@@ -5,6 +5,34 @@
 
 #define APU_BUFFER_LEN 4096
 
+typedef struct AnalogChannels {
+	int16_t ch1;
+	int16_t ch2;
+	int16_t ch3;
+	int16_t ch4;
+} AnalogChannels;
+
+typedef struct Sample {
+	int16_t right;
+	int16_t left;
+} Sample;
+
+typedef struct CH {
+	uint16_t freq_timer;
+	uint8_t duty_step;
+	uint8_t length_counter;
+	uint8_t envelope_timer;
+	uint8_t volume;
+	uint8_t enabled;
+} CH;
+
+typedef struct CH1 {
+	CH ch;
+	uint16_t shadow_freq;
+	uint8_t sweep_timer;
+	uint8_t sweep_enabled;
+} CH1;
+
 typedef struct APU {
 
 	uint8_t enabled;
@@ -14,6 +42,12 @@ typedef struct APU {
 	uint8_t nr30, nr31, nr32, nr33, nr34;
 	uint8_t nr41, nr42, nr43, nr44;
 	uint8_t nr50, nr51;
+
+	CH1 ch1;
+	CH ch2;
+
+	int32_t right_capacitor;
+	int32_t left_capacitor;
 
 	uint8_t wave_ram[16];
 
@@ -27,6 +61,9 @@ typedef struct APU {
 	int buffer_pos;
 
 } APU;
+
+void apu_trigger_ch1 (APU *apu);
+void apu_trigger_ch2 (APU *apu);
 
 void init_apu (APU *apu);
 void init_apu_reg (APU *apu);
