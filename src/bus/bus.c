@@ -152,10 +152,10 @@ uint8_t bus_read8 (void *ctx, uint16_t addr) {
 		return 0xFF;
 	}
 
-	if (addr >= 0xFF30 && addr <= 0xFF3F)
-		return gb->apu.wave_ram[addr - 0xFF30];
-
 	if (addr < 0xFF80) {
+		if ((addr >= 0xFF10 && addr <= 0xFF26) || (addr >= 0xFF30 && addr <= 0xFF3F))
+			return apu_read_reg(&gb->apu, addr);
+
 		switch (addr) {
 
 			// Joypad
@@ -196,33 +196,6 @@ uint8_t bus_read8 (void *ctx, uint16_t addr) {
 			case 0xFF49: return gb->ppu.obp1;
 			case 0xFF4A: return gb->ppu.wy;
 			case 0xFF4B: return gb->ppu.wx;
-
-			// APU
-			case 0xFF10: return gb->apu.nr10 | 0x80;
-			case 0xFF11: return gb->apu.nr11 | 0x3F;
-			case 0xFF12: return gb->apu.nr12;
-			case 0xFF13: return 0xFF;
-			case 0xFF14: return gb->apu.nr14 | 0xBF;
- 
-			case 0xFF16: return gb->apu.nr21 | 0x3F;
-			case 0xFF17: return gb->apu.nr22;
-			case 0xFF18: return 0xFF;
-			case 0xFF19: return gb->apu.nr24 | 0xBF;
- 
-			case 0xFF1A: return gb->apu.nr30 | 0x7F;
-			case 0xFF1B: return 0xFF;
-			case 0xFF1C: return gb->apu.nr32 | 0x9F;
-			case 0xFF1D: return 0xFF;
-			case 0xFF1E: return gb->apu.nr34 | 0xBF;
- 
-			case 0xFF20: return 0xFF;
-			case 0xFF21: return gb->apu.nr42;
-			case 0xFF22: return gb->apu.nr43;
-			case 0xFF23: return gb->apu.nr44 | 0xBF;
- 
-			case 0xFF24: return gb->apu.nr50;
-			case 0xFF25: return gb->apu.nr51;
-			case 0xFF26: return (gb->apu.enabled ? 0x80 : 0x00) | 0x70;
 
 			case 0xFF50: return 0xFF;
 
@@ -307,12 +280,13 @@ void bus_write8 (void *ctx, uint16_t addr, uint8_t val) {
 		return;
 	}
 
-	if (addr >= 0xFF30 && addr <= 0xFF3F) {
-		gb->apu.wave_ram[addr - 0xFF30] = val;
-		return;
-	}
-
 	if (addr < 0xFF80) {
+
+		if ((addr >= 0xFF10 && addr <= 0xFF26) || (addr >= 0xFF30 && addr <= 0xFF3F)) {
+			apu_write_reg(&gb->apu, addr, val);
+			return;
+		}
+
 		switch (addr) {
 
 			// Joypad
@@ -367,45 +341,6 @@ void bus_write8 (void *ctx, uint16_t addr, uint8_t val) {
 			case 0xFF49: gb->ppu.obp1 = val; break;
 			case 0xFF4A: gb->ppu.wy = val; break;
 			case 0xFF4B: gb->ppu.wx = val; break;
-
-			// APU
-			case 0xFF10: gb->apu.nr10 = val; break;
-			case 0xFF11: gb->apu.nr11 = val; break;
-			case 0xFF12: gb->apu.nr12 = val; break;
-			case 0xFF13: gb->apu.nr13 = val; break;
-			case 0xFF14: {
-				gb->apu.nr14 = val;
-				if (val & 0x80) apu_trigger_ch1(&gb->apu);
-				break;
-			}
-
-			case 0xFF16: gb->apu.nr21 = val; break;
-			case 0xFF17: gb->apu.nr22 = val; break;
-			case 0xFF18: gb->apu.nr23 = val; break;
-			case 0xFF19: {
-				gb->apu.nr24 = val;
-				if (val & 0x80) apu_trigger_ch2(&gb->apu);
-				break;
-			}
-
-			case 0xFF1A: gb->apu.nr30 = val; break;
-			case 0xFF1B: gb->apu.nr31 = val; break;
-			case 0xFF1C: gb->apu.nr32 = val; break;
-			case 0xFF1D: gb->apu.nr33 = val; break;
-			case 0xFF1E: gb->apu.nr34 = val; break;
-
-			case 0xFF20: gb->apu.nr41 = val; break;
-			case 0xFF21: gb->apu.nr42 = val; break;
-			case 0xFF22: gb->apu.nr43 = val; break;
-			case 0xFF23: {
-				gb->apu.nr44 = val;
-				if (val & 0x80) apu_trigger_ch4(&gb->apu);
-				break;
-			}
-
-			case 0xFF24: gb->apu.nr50 = val; break;
-			case 0xFF25: gb->apu.nr51 = val; break;
-			case 0xFF26: gb->apu.enabled = (val & 0x80) ? 1 : 0; break;
 
 			case 0xFF50: gb->boot_rom_disable_pending = 1; break;
 

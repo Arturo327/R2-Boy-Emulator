@@ -40,6 +40,16 @@ void init_apu_reg (APU *apu) {
  
 	apu->enabled = 1;
 }
+
+static void apu_power_off (APU *apu) {
+	apu->nr10 = apu->nr11 = apu->nr12 = apu->nr13 = apu->nr14 = 0;
+	apu->nr21 = apu->nr22 = apu->nr23 = apu->nr24 = 0;
+	apu->nr30 = apu->nr31 = apu->nr32 = apu->nr33 = apu->nr34 = 0;
+	apu->nr41 = apu->nr42 = apu->nr43 = apu->nr44 = 0;
+	apu->nr50 = apu->nr51 = 0;
+	apu->ch1.ch.enabled = apu->ch2.enabled = apu->ch4.ch.enabled = 0;
+	apu->enabled = 0;
+}
  
 static void push_sample (APU *apu, Sample s) {
 	if (apu->buffer_pos + 2 > APU_BUFFER_LEN) return;
@@ -126,14 +136,18 @@ static void trigger_common (CH *ch, uint8_t nr_x1, uint8_t nr_x2) {
 }
 
 static void trigger_pulse_common (CH *ch, uint8_t nr_x1, uint8_t nr_x2,
-		uint8_t nr_x3, uint8_t nr_x4) {
+		uint8_t nr_x3, uint8_t nr_x4)
+{
 	trigger_common (ch, nr_x1, nr_x2);
 	uint16_t freq = nr_x3 | ((nr_x4 & 0x07) << 8);
 	ch->freq_timer = (2048 - freq) << 2;
 }
 
-void apu_trigger_ch1 (APU *apu) {
+void apu_trigger_ch1 (APU *apu)
+{
 	trigger_pulse_common(&apu->ch1.ch, apu->nr11, apu->nr12, apu->nr13, apu->nr14);
+	if ((apu->nr14 & 0x40) && (apu->frame_seq_step & 1))
+		clock_length(&apu->ch1.ch, apu->nr14);
 
 	uint16_t freq = apu->nr13 | ((apu->nr14 & 0x07) << 8);
 	apu->ch1.shadow_freq  = freq;
@@ -150,10 +164,15 @@ void apu_trigger_ch1 (APU *apu) {
 
 void apu_trigger_ch2 (APU *apu) {
 	trigger_pulse_common(&apu->ch2, apu->nr21, apu->nr22, apu->nr23, apu->nr24);
+	if ((apu->nr24 & 0x40) && (apu->frame_seq_step & 1))
+		clock_length(&apu->ch2, apu->nr24);
 }
 
-void apu_trigger_ch4 (APU *apu) {
+void apu_trigger_ch4 (APU *apu)
+{
 	trigger_common(&apu->ch4.ch, apu->nr41, apu->nr42);
+	if ((apu->nr44 & 0x40) && (apu->frame_seq_step & 1))
+		clock_length(&apu->ch4.ch, apu->nr44);
 	apu->ch4.lfsr = 0x7FFF;
 
 	uint8_t shift = apu->nr43 >> 4;
@@ -161,12 +180,14 @@ void apu_trigger_ch4 (APU *apu) {
 	apu->ch4.ch.freq_timer = NOISE_DIVISOR[code] << shift;
 }
 
-static int16_t dac (CH *ch, uint8_t nr_x1) {
+static int16_t dac (CH *ch, uint8_t nr_x1)
+{
 	if (!ch->enabled) return 0;
 	uint8_t bit = (DUTY_TABLE[nr_x1 >> 6] >> ch->duty_step) & 1;
 	return bit ? (int16_t)ch->volume : -(int16_t)ch->volume;
 }
-static void step_freq (CH *ch, uint8_t nr_x3, uint8_t nr_x4) {
+static void step_freq (CH *ch, uint8_t nr_x3, uint8_t nr_x4)
+{
 	if (ch->freq_timer <= 4) {
 		uint16_t freq = nr_x3 | ((nr_x4 & 0x07) << 8);
 		ch->freq_timer += (2048 - freq) * 4;
@@ -179,7 +200,8 @@ static int16_t dac_ch3 (APU *apu) {
 	return 0;
 }
 
-static int16_t dac_ch4 (APU *apu) {
+static int16_t dac_ch4 (APU *apu)
+{
 	CH *ch = &apu->ch4.ch;
 	if (!ch->enabled) return 0;
 	uint8_t bit = ~(apu->ch4.lfsr) & 1;
@@ -233,8 +255,8 @@ static Sample mix_channels (APU *apu) {
 	return s;
 }
  
-void apu_step (APU *apu) {
-
+void apu_step (APU *apu) 
+{
 	step_freq(&apu->ch1.ch, apu->nr13, apu->nr14);
 	step_freq(&apu->ch2, apu->nr23, apu->nr24);
 	step_noise(&apu->ch4, apu->nr43);
@@ -265,6 +287,112 @@ void apu_step (APU *apu) {
 	}
 }
 
+uint8_t apu_read_reg (APU *apu, uint16_t addr) {
+
+	if (addr >= 0xFF30 && addr <= 0xFF3F)
+		return apu->wave_ram[addr - 0xFF30];
+
+	switch (addr) {
+		case 0xFF10: return apu->nr10 | 0x80;
+		case 0xFF11: return apu->nr11 | 0x3F;
+		case 0xFF12: return apu->nr12;
+		case 0xFF13: return 0xFF;
+		case 0xFF14: return apu->nr14 | 0xBF;
+
+		case 0xFF16: return apu->nr21 | 0x3F;
+		case 0xFF17: return apu->nr22;
+		case 0xFF18: return 0xFF;
+		case 0xFF19: return apu->nr24 | 0xBF;
+
+		case 0xFF1A: return apu->nr30 | 0x7F;
+		case 0xFF1B: return 0xFF;
+		case 0xFF1C: return apu->nr32 | 0x9F;
+		case 0xFF1D: return 0xFF;
+		case 0xFF1E: return apu->nr34 | 0xBF;
+
+		case 0xFF20: return 0xFF;
+		case 0xFF21: return apu->nr42;
+		case 0xFF22: return apu->nr43;
+		case 0xFF23: return apu->nr44 | 0xBF;
+
+		case 0xFF24: return apu->nr50;
+		case 0xFF25: return apu->nr51;
+		case 0xFF26: return (apu->enabled ? 0x80 : 0x00) | 0x70;
+
+		default: return 0xFF;
+	}
+}
+
+void apu_write_reg (APU *apu, uint16_t addr, uint8_t val) {
+
+	if (addr >= 0xFF30 && addr <= 0xFF3F) {
+		apu->wave_ram[addr - 0xFF30] = val;
+		return;
+	}
+
+	switch (addr) {
+		case 0xFF10: apu->nr10 = val; break;
+		case 0xFF11: apu->nr11 = val; break;
+		case 0xFF12: apu->nr12 = val; break;
+		case 0xFF13: apu->nr13 = val; break;
+		case 0xFF14: {
+			uint8_t prev = apu->nr14;
+			apu->nr14 = val & 0xC7;
+			
+			if (!(prev & 0x40) && (val & 0x40) && !(val & 0x80) && (apu->frame_seq_step & 1))
+				clock_length(&apu->ch1.ch, apu->nr14);
+
+			if (val & 0x80) apu_trigger_ch1(apu);
+			break;
+		}
+
+		case 0xFF16: apu->nr21 = val; break;
+		case 0xFF17: apu->nr22 = val; break;
+		case 0xFF18: apu->nr23 = val; break;
+		case 0xFF19: {
+			uint8_t prev = apu->nr24;
+			apu->nr24 = val & 0xC7;
+			
+			if (!(prev & 0x40) && (val & 0x40) && !(val & 0x80) && (apu->frame_seq_step & 1))
+				clock_length(&apu->ch2, apu->nr24);
+
+			if (val & 0x80) apu_trigger_ch2(apu);
+			break;
+		}
+
+		case 0xFF1A: apu->nr30 = val; break;
+		case 0xFF1B: apu->nr31 = val; break;
+		case 0xFF1C: apu->nr32 = val; break;
+		case 0xFF1D: apu->nr33 = val; break;
+		case 0xFF1E: apu->nr34 = val; break;
+
+		case 0xFF20: apu->nr41 = val; break;
+		case 0xFF21: apu->nr42 = val; break;
+		case 0xFF22: apu->nr43 = val; break;
+		case 0xFF23: {
+			uint8_t prev = apu->nr44;
+			apu->nr44 = val & 0xC7;
+			
+			if (!(prev & 0x40) && (val & 0x40) && !(val & 0x80) && (apu->frame_seq_step & 1))
+				clock_length(&apu->ch4.ch, apu->nr44);
+
+			if (val & 0x80) apu_trigger_ch4(apu);
+			break;
+		}
+
+		case 0xFF24: apu->nr50 = val; break;
+		case 0xFF25: apu->nr51 = val; break;
+		case 0xFF26: {
+			if (!(val & 0x80)) {
+				apu_power_off(apu);
+			} else {
+				apu->enabled = 1;
+			}
+			break;
+		}
+		
+	}
+}
 
 
 

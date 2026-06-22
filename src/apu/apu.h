@@ -77,4 +77,7 @@ void init_apu_reg (APU *apu);
 
 void apu_step (APU *apu);
 
+uint8_t apu_read_reg (APU *apu, uint16_t addr);
+void apu_write_reg (APU *apu, uint16_t addr, uint8_t val);
+
 #endif
