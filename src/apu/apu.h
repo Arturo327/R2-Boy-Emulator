@@ -31,6 +31,7 @@ typedef struct CH1 {
 	uint16_t shadow_freq;
 	uint8_t sweep_timer;
 	uint8_t sweep_enabled;
+	uint8_t negate_used;
 } CH1;
 
 typedef struct CH4 {
@@ -76,6 +77,7 @@ void init_apu (APU *apu);
 void init_apu_reg (APU *apu);
 
 void apu_step (APU *apu);
+void apu_div_reset (APU *apu, uint8_t old_div);
 
 uint8_t apu_read_reg (APU *apu, uint16_t addr);
 void apu_write_reg (APU *apu, uint16_t addr, uint8_t val);

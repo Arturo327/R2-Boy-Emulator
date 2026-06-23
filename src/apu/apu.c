@@ -10,6 +10,7 @@ static const uint16_t NOISE_DIVISOR[8] = {8,16,32,48,64,80,96,112};
 void init_apu (APU *apu) {
 	memset(apu, 0, sizeof(APU));
 	apu->sample_rate = 44100;
+	apu->ch1.negate_used = 0;
 }
  
 void init_apu_reg (APU *apu) {
@@ -41,27 +42,43 @@ void init_apu_reg (APU *apu) {
 	apu->enabled = 1;
 }
 
-static void apu_power_off (APU *apu) {
+static void apu_power_off (APU *apu)
+{
+	uint8_t len1 = apu->ch1.ch.length_counter;
+	uint8_t len2 = apu->ch2.length_counter;
+	uint8_t len4 = apu->ch4.ch.length_counter;
+
+	memset(&apu->ch1, 0, sizeof(apu->ch1));
+	memset(&apu->ch2, 0, sizeof(apu->ch2));
+	memset(&apu->ch4, 0, sizeof(apu->ch4));
+
+	apu->ch1.ch.length_counter = len1;
+	apu->ch2.length_counter = len2;
+	apu->ch4.ch.length_counter = len4;
+
 	apu->nr10 = apu->nr11 = apu->nr12 = apu->nr13 = apu->nr14 = 0;
 	apu->nr21 = apu->nr22 = apu->nr23 = apu->nr24 = 0;
 	apu->nr30 = apu->nr31 = apu->nr32 = apu->nr33 = apu->nr34 = 0;
 	apu->nr41 = apu->nr42 = apu->nr43 = apu->nr44 = 0;
 	apu->nr50 = apu->nr51 = 0;
-	apu->ch1.ch.enabled = apu->ch2.enabled = apu->ch4.ch.enabled = 0;
 	apu->enabled = 0;
 }
  
-static void push_sample (APU *apu, Sample s) {
+static void push_sample (APU *apu, Sample s)
+{
 	if (apu->buffer_pos + 2 > APU_BUFFER_LEN) return;
 	apu->buffer[apu->buffer_pos++] = s.left;
 	apu->buffer[apu->buffer_pos++] = s.right;
 }
 
-static void clock_length (CH *ch, uint8_t nr_x4) {
+static void clock_length (CH *ch, uint8_t nr_x4)
+{
 	if ((nr_x4 & 0x40) && ch->length_counter > 0)
 		if (--ch->length_counter == 0) ch->enabled = 0;
 }
-static void clock_envelope (CH *ch, uint8_t nr_x2) {
+
+static void clock_envelope (CH *ch, uint8_t nr_x2)
+{
 	uint8_t period = nr_x2 & 0x07;
 	if (!period) return;
 	if (ch->envelope_timer > 0) ch->envelope_timer--;
@@ -72,18 +89,25 @@ static void clock_envelope (CH *ch, uint8_t nr_x2) {
 	}
 }
 
-static uint16_t calc_sweep (APU *apu, int *overflow) {
+static uint16_t calc_sweep (APU *apu, int *overflow)
+{
 	uint8_t shift = apu->nr10 & 0x07;
 	uint16_t delta = apu->ch1.shadow_freq >> shift;
-	uint16_t new_freq = (apu->nr10 & 0x08)
-		? apu->ch1.shadow_freq - delta
-		: apu->ch1.shadow_freq + delta;
+	uint16_t new_freq;
+
+	if (apu->nr10 & 0x08) {
+		apu->ch1.negate_used = 1;
+		new_freq = apu->ch1.shadow_freq - delta;
+	} else {
+		new_freq = apu->ch1.shadow_freq + delta;
+	}
 
 	*overflow = (new_freq > 2047);
 	return new_freq;
 }
 
-static void clock_sweep (APU *apu) {
+static void clock_sweep (APU *apu)
+{
 	if (apu->ch1.sweep_timer > 0) apu->ch1.sweep_timer--;
 	if (apu->ch1.sweep_timer != 0) return;
 
@@ -109,7 +133,8 @@ static void clock_sweep (APU *apu) {
 	}
 }
 
-static void step_noise (CH4 *ch4, uint8_t nr43) {
+static void step_noise (CH4 *ch4, uint8_t nr43)
+{
 	if (ch4->ch.freq_timer <= 4) {
 		uint8_t shift = nr43 >> 4;
 		uint8_t code = nr43 & 0x07;
@@ -127,34 +152,37 @@ static void step_noise (CH4 *ch4, uint8_t nr43) {
 	ch4->ch.freq_timer -= 4;
 }
 
-static void trigger_common (CH *ch, uint8_t nr_x1, uint8_t nr_x2) {
+static void trigger_common (APU *apu, CH *ch, uint8_t nr_x2, uint8_t nr_x4)
+{
 	ch->enabled = (nr_x2 & 0xF8) != 0;
-	if (ch->length_counter == 0)
-		ch->length_counter = 64 - (nr_x1 & 0x3F);
+	if (ch->length_counter == 0) {
+		ch->length_counter = 64;
+		if ((nr_x4 & 0x40) && !(apu->frame_seq_step & 1))
+			ch->length_counter--;
+	}
 	ch->envelope_timer = (nr_x2 & 0x07) ? (nr_x2 & 0x07) : 8;
 	ch->volume = nr_x2 >> 4;
 }
 
-static void trigger_pulse_common (CH *ch, uint8_t nr_x1, uint8_t nr_x2,
+static void trigger_pulse_common (APU *apu, CH *ch, uint8_t nr_x2,
 		uint8_t nr_x3, uint8_t nr_x4)
 {
-	trigger_common (ch, nr_x1, nr_x2);
+	trigger_common (apu, ch, nr_x2, nr_x4);
 	uint16_t freq = nr_x3 | ((nr_x4 & 0x07) << 8);
 	ch->freq_timer = (2048 - freq) << 2;
 }
 
 void apu_trigger_ch1 (APU *apu)
 {
-	trigger_pulse_common(&apu->ch1.ch, apu->nr11, apu->nr12, apu->nr13, apu->nr14);
-	if ((apu->nr14 & 0x40) && (apu->frame_seq_step & 1))
-		clock_length(&apu->ch1.ch, apu->nr14);
+	trigger_pulse_common(apu, &apu->ch1.ch, apu->nr12, apu->nr13, apu->nr14);
 
 	uint16_t freq = apu->nr13 | ((apu->nr14 & 0x07) << 8);
-	apu->ch1.shadow_freq  = freq;
+	apu->ch1.shadow_freq = freq;
 	uint8_t period = (apu->nr10 & 0x70) >> 4;
-	apu->ch1.sweep_timer   = period ? period : 8;
+	apu->ch1.sweep_timer = period ? period : 8;
 	apu->ch1.sweep_enabled = period || (apu->nr10 & 0x07);
-
+	apu->ch1.negate_used = 0;
+	
 	if (apu->nr10 & 0x07) {
 		int overflow;
 		calc_sweep(apu, &overflow);
@@ -162,19 +190,16 @@ void apu_trigger_ch1 (APU *apu)
 	}
 }
 
-void apu_trigger_ch2 (APU *apu) {
-	trigger_pulse_common(&apu->ch2, apu->nr21, apu->nr22, apu->nr23, apu->nr24);
-	if ((apu->nr24 & 0x40) && (apu->frame_seq_step & 1))
-		clock_length(&apu->ch2, apu->nr24);
+void apu_trigger_ch2 (APU *apu)
+{
+	trigger_pulse_common(apu, &apu->ch2, apu->nr22, apu->nr23, apu->nr24);
 }
 
 void apu_trigger_ch4 (APU *apu)
 {
-	trigger_common(&apu->ch4.ch, apu->nr41, apu->nr42);
-	if ((apu->nr44 & 0x40) && (apu->frame_seq_step & 1))
-		clock_length(&apu->ch4.ch, apu->nr44);
-	apu->ch4.lfsr = 0x7FFF;
+	trigger_common(apu, &apu->ch4.ch, apu->nr42, apu->nr44);
 
+	apu->ch4.lfsr = 0x7FFF;
 	uint8_t shift = apu->nr43 >> 4;
 	uint8_t code = apu->nr43 & 0x07;
 	apu->ch4.ch.freq_timer = NOISE_DIVISOR[code] << shift;
@@ -186,6 +211,7 @@ static int16_t dac (CH *ch, uint8_t nr_x1)
 	uint8_t bit = (DUTY_TABLE[nr_x1 >> 6] >> ch->duty_step) & 1;
 	return bit ? (int16_t)ch->volume : -(int16_t)ch->volume;
 }
+
 static void step_freq (CH *ch, uint8_t nr_x3, uint8_t nr_x4)
 {
 	if (ch->freq_timer <= 4) {
@@ -254,6 +280,23 @@ static Sample mix_channels (APU *apu) {
 	HPF(apu, &s);
 	return s;
 }
+
+static void clock_frame_seq (APU *apu)
+{
+	apu->frame_seq_step = (apu->frame_seq_step + 1) & 7;
+
+	if ((apu->frame_seq_step & 1) == 0) {
+		clock_length(&apu->ch1.ch, apu->nr14);
+		clock_length(&apu->ch2, apu->nr24);
+		clock_length(&apu->ch4.ch, apu->nr44);
+	}
+	if (apu->frame_seq_step == 2 || apu->frame_seq_step == 6) clock_sweep(apu);
+	if (apu->frame_seq_step == 7) {
+		clock_envelope(&apu->ch1.ch, apu->nr12);
+		clock_envelope(&apu->ch2, apu->nr22);
+		clock_envelope(&apu->ch4.ch, apu->nr42);
+	}
+}
  
 void apu_step (APU *apu) 
 {
@@ -264,19 +307,7 @@ void apu_step (APU *apu)
 	apu->frame_seq_counter += 4;
 	if (apu->frame_seq_counter >= 8192) {
 		apu->frame_seq_counter -= 8192;
-		apu->frame_seq_step = (apu->frame_seq_step + 1) & 7;
-
-		if ((apu->frame_seq_step & 1) == 0) {
-			clock_length(&apu->ch1.ch, apu->nr14);
-			clock_length(&apu->ch2, apu->nr24);
-			clock_length(&apu->ch4.ch, apu->nr44);
-		}
-		if (apu->frame_seq_step == 2 || apu->frame_seq_step == 6) clock_sweep(apu);
-		if (apu->frame_seq_step == 7) {
-			clock_envelope(&apu->ch1.ch, apu->nr12);
-			clock_envelope(&apu->ch2, apu->nr22);
-			clock_envelope(&apu->ch4.ch, apu->nr42);
-		}
+		clock_frame_seq(apu);
 	}
  
 	apu->sample_counter += apu->sample_rate << 2;
@@ -285,6 +316,13 @@ void apu_step (APU *apu)
 		Sample s = mix_channels(apu);
 		push_sample(apu, s);
 	}
+}
+
+void apu_div_reset (APU *apu, uint8_t old_div)
+{
+	if (old_div & 0x10)
+		clock_frame_seq(apu);
+	apu->frame_seq_counter = 0;
 }
 
 uint8_t apu_read_reg (APU *apu, uint16_t addr) {
@@ -317,43 +355,72 @@ uint8_t apu_read_reg (APU *apu, uint16_t addr) {
 
 		case 0xFF24: return apu->nr50;
 		case 0xFF25: return apu->nr51;
-		case 0xFF26: return (apu->enabled ? 0x80 : 0x00) | 0x70;
+		case 0xFF26: {
+			uint8_t status = 0;
+			if (apu->ch1.ch.enabled) status |= 0x01;
+			if (apu->ch2.enabled) status |= 0x02;
+			if (apu->ch4.ch.enabled) status |= 0x08;
+			return (apu->enabled ? 0x80 : 0x00) | 0x70 | status;
+		}
 
 		default: return 0xFF;
 	}
 }
 
 void apu_write_reg (APU *apu, uint16_t addr, uint8_t val) {
-
+	
 	if (addr >= 0xFF30 && addr <= 0xFF3F) {
 		apu->wave_ram[addr - 0xFF30] = val;
 		return;
 	}
 
+	if (!apu->enabled) {
+		switch (addr) {
+			case 0xFF11: apu->ch1.ch.length_counter = 64 - (val & 0x3F); break;
+			case 0xFF16: apu->ch2.length_counter = 64 - (val & 0x3F); break;
+			case 0xFF20: apu->ch4.ch.length_counter = 64 - (val & 0x3F); break;
+			case 0xFF26: {
+				if (val & 0x80) {
+					apu->enabled = 1;
+					apu->frame_seq_step = 0;
+				}
+				break;
+			}
+			default: break;
+		}
+		return;
+	}
+
 	switch (addr) {
-		case 0xFF10: apu->nr10 = val; break;
-		case 0xFF11: apu->nr11 = val; break;
-		case 0xFF12: apu->nr12 = val; break;
+		case 0xFF10: {
+			uint8_t prev = apu->nr10;
+			apu->nr10 = val;
+			if ((prev & 0x08) && !(val & 0x08) && apu->ch1.negate_used)
+				apu->ch1.ch.enabled = 0;
+			break;
+		}
+		case 0xFF11: apu->nr11 = val; apu->ch1.ch.length_counter = 64 - (val & 0x3F); break;
+		case 0xFF12: apu->nr12 = val; if (!(val & 0xF8)) apu->ch1.ch.enabled = 0; break;
 		case 0xFF13: apu->nr13 = val; break;
 		case 0xFF14: {
 			uint8_t prev = apu->nr14;
 			apu->nr14 = val & 0xC7;
 			
-			if (!(prev & 0x40) && (val & 0x40) && !(val & 0x80) && (apu->frame_seq_step & 1))
+			if (!(prev & 0x40) && (val & 0x40) && !(apu->frame_seq_step & 1))
 				clock_length(&apu->ch1.ch, apu->nr14);
 
 			if (val & 0x80) apu_trigger_ch1(apu);
 			break;
 		}
 
-		case 0xFF16: apu->nr21 = val; break;
-		case 0xFF17: apu->nr22 = val; break;
+		case 0xFF16: apu->nr21 = val; apu->ch2.length_counter = 64 - (val & 0x3F); break;
+		case 0xFF17: apu->nr22 = val; if (!(val & 0xF8)) apu->ch2.enabled = 0; break;
 		case 0xFF18: apu->nr23 = val; break;
 		case 0xFF19: {
 			uint8_t prev = apu->nr24;
 			apu->nr24 = val & 0xC7;
 			
-			if (!(prev & 0x40) && (val & 0x40) && !(val & 0x80) && (apu->frame_seq_step & 1))
+			if (!(prev & 0x40) && (val & 0x40) && !(apu->frame_seq_step & 1))
 				clock_length(&apu->ch2, apu->nr24);
 
 			if (val & 0x80) apu_trigger_ch2(apu);
@@ -366,14 +433,14 @@ void apu_write_reg (APU *apu, uint16_t addr, uint8_t val) {
 		case 0xFF1D: apu->nr33 = val; break;
 		case 0xFF1E: apu->nr34 = val; break;
 
-		case 0xFF20: apu->nr41 = val; break;
-		case 0xFF21: apu->nr42 = val; break;
+		case 0xFF20: apu->nr41 = val; apu->ch4.ch.length_counter = 64 - (val & 0x3F); break;
+		case 0xFF21: apu->nr42 = val; if (!(val & 0xF8)) apu->ch4.ch.enabled = 0; break;
 		case 0xFF22: apu->nr43 = val; break;
 		case 0xFF23: {
 			uint8_t prev = apu->nr44;
 			apu->nr44 = val & 0xC7;
 			
-			if (!(prev & 0x40) && (val & 0x40) && !(val & 0x80) && (apu->frame_seq_step & 1))
+			if (!(prev & 0x40) && (val & 0x40) && !(apu->frame_seq_step & 1))
 				clock_length(&apu->ch4.ch, apu->nr44);
 
 			if (val & 0x80) apu_trigger_ch4(apu);
@@ -393,18 +460,3 @@ void apu_write_reg (APU *apu, uint16_t addr, uint8_t val) {
 		
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
