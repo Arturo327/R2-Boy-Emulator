@@ -10,11 +10,12 @@
 
 #define LINE0_SHORTEN 6
 
-static const uint32_t PALETA[4] = {
-	0xFFFFFFFF,  // blanco
-	0xFFAAAAAA,  // gris claro
-	0xFF555555,  // gris oscuro
-	0xFF000000,  // negro
+static const uint32_t PALETA[5] = {
+	0xFFC6DE8C,	// blanco
+	0xFF84A563,	// gris claro
+	0xFF396139,	// gris oscuro
+	0xFF081810,	// negro
+	0xFFD2E6A6	// blanco "más blanco"
 };
 
 void init_ppu_reg (PPU *ppu) {
@@ -216,6 +217,12 @@ static void scan_oam (PPU *ppu, int x) {
 void ppu_step (PPU *ppu) {
 
 	if (!(ppu->lcdc & 0x80)) {
+		if (!ppu->lcd_was_off) {
+			int pixels = sizeof(ppu->framebuffer) / sizeof(ppu->framebuffer[0]);
+			for (int i = 0; i < pixels; i++) {
+				ppu->framebuffer[i] = PALETA[4];
+			}
+		}
 		ppu->ly = 0;
 		ppu->window_line = 0;
 		ppu->dots = 0;
