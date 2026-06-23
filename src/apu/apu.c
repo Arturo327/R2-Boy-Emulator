@@ -6,6 +6,7 @@
 
 static const uint8_t DUTY_TABLE[4] = { 0x01, 0x81, 0x87, 0x7E };
 static const uint16_t NOISE_DIVISOR[8] = {8,16,32,48,64,80,96,112};
+static const uint8_t WAVE_SHIFT[4] = {4, 0, 1, 2};
  
 void init_apu (APU *apu) {
 	memset(apu, 0, sizeof(APU));
@@ -46,14 +47,17 @@ static void apu_power_off (APU *apu)
 {
 	uint8_t len1 = apu->ch1.ch.length_counter;
 	uint8_t len2 = apu->ch2.length_counter;
+	uint8_t len3 = apu->ch3.length_counter;
 	uint8_t len4 = apu->ch4.ch.length_counter;
 
 	memset(&apu->ch1, 0, sizeof(apu->ch1));
 	memset(&apu->ch2, 0, sizeof(apu->ch2));
+	memset(&apu->ch3, 0, sizeof(apu->ch3));
 	memset(&apu->ch4, 0, sizeof(apu->ch4));
 
 	apu->ch1.ch.length_counter = len1;
 	apu->ch2.length_counter = len2;
+	apu->ch3.length_counter = len3;
 	apu->ch4.ch.length_counter = len4;
 
 	apu->nr10 = apu->nr11 = apu->nr12 = apu->nr13 = apu->nr14 = 0;
@@ -75,6 +79,11 @@ static void clock_length (CH *ch, uint8_t nr_x4)
 {
 	if ((nr_x4 & 0x40) && ch->length_counter > 0)
 		if (--ch->length_counter == 0) ch->enabled = 0;
+}
+static void clock_length_ch3 (APU *apu)
+{
+	if ((apu->nr34 & 0x40) && apu->ch3.length_counter > 0)
+		if (--apu->ch3.length_counter == 0) apu->ch3.enabled = 0;
 }
 
 static void clock_envelope (CH *ch, uint8_t nr_x2)
@@ -131,6 +140,20 @@ static void clock_sweep (APU *apu)
 		calc_sweep(apu, &overflow);
 		if (overflow) apu->ch1.ch.enabled = 0;
 	}
+}
+
+static void step_wave (APU *apu)
+{
+	CH3 *ch3 = &apu->ch3;
+	if (ch3->freq_timer <= 4) {
+		uint16_t freq = apu->nr33 | ((apu->nr34 & 0x07) << 8);
+		ch3->freq_timer += (2048 - freq) * 2;
+		ch3->position = (ch3->position + 1) & 31;
+
+		uint8_t byte = apu->wave_ram[apu->ch3.position >> 1];
+		ch3->sample_buffer = (ch3->position & 1) ? (byte & 0x0F) : (byte >> 4);
+	}
+	ch3->freq_timer -= 4;
 }
 
 static void step_noise (CH4 *ch4, uint8_t nr43)
@@ -195,6 +218,21 @@ void apu_trigger_ch2 (APU *apu)
 	trigger_pulse_common(apu, &apu->ch2, apu->nr22, apu->nr23, apu->nr24);
 }
 
+void apu_trigger_ch3 (APU *apu)
+{
+	apu->ch3.enabled = (apu->nr30 & 0x80) != 0;
+
+	if (apu->ch3.length_counter == 0) {
+		apu->ch3.length_counter = 256;
+		if ((apu->nr34 & 0x40) && !(apu->frame_seq_step & 1))
+			apu->ch3.length_counter--;
+	}
+
+	uint16_t freq = apu->nr33 | ((apu->nr34 & 0x07) << 8);
+	apu->ch3.freq_timer = (2048 - freq) * 2;
+	apu->ch3.position = 0;
+}
+
 void apu_trigger_ch4 (APU *apu)
 {
 	trigger_common(apu, &apu->ch4.ch, apu->nr42, apu->nr44);
@@ -222,8 +260,12 @@ static void step_freq (CH *ch, uint8_t nr_x3, uint8_t nr_x4)
 	ch->freq_timer -= 4;
 }
 
-static int16_t dac_ch3 (APU *apu) {
-	return 0;
+static int16_t dac_ch3 (APU *apu)
+{
+	if (!apu->ch3.enabled) return 0;
+	uint8_t shift = WAVE_SHIFT[(apu->nr32 >> 5) & 0x03];
+	uint8_t sample = apu->ch3.sample_buffer >> shift;
+	return (int16_t)sample - 8;
 }
 
 static int16_t dac_ch4 (APU *apu)
@@ -288,6 +330,7 @@ static void clock_frame_seq (APU *apu)
 	if ((apu->frame_seq_step & 1) == 0) {
 		clock_length(&apu->ch1.ch, apu->nr14);
 		clock_length(&apu->ch2, apu->nr24);
+		clock_length_ch3(apu);
 		clock_length(&apu->ch4.ch, apu->nr44);
 	}
 	if (apu->frame_seq_step == 2 || apu->frame_seq_step == 6) clock_sweep(apu);
@@ -302,6 +345,7 @@ void apu_step (APU *apu)
 {
 	step_freq(&apu->ch1.ch, apu->nr13, apu->nr14);
 	step_freq(&apu->ch2, apu->nr23, apu->nr24);
+	step_wave(apu);
 	step_noise(&apu->ch4, apu->nr43);
  
 	apu->frame_seq_counter += 4;
@@ -359,6 +403,7 @@ uint8_t apu_read_reg (APU *apu, uint16_t addr) {
 			uint8_t status = 0;
 			if (apu->ch1.ch.enabled) status |= 0x01;
 			if (apu->ch2.enabled) status |= 0x02;
+			if (apu->ch3.enabled) status |= 0x04;
 			if (apu->ch4.ch.enabled) status |= 0x08;
 			return (apu->enabled ? 0x80 : 0x00) | 0x70 | status;
 		}
@@ -378,6 +423,7 @@ void apu_write_reg (APU *apu, uint16_t addr, uint8_t val) {
 		switch (addr) {
 			case 0xFF11: apu->ch1.ch.length_counter = 64 - (val & 0x3F); break;
 			case 0xFF16: apu->ch2.length_counter = 64 - (val & 0x3F); break;
+			case 0xFF1B: apu->ch3.length_counter = 256 - val; break;
 			case 0xFF20: apu->ch4.ch.length_counter = 64 - (val & 0x3F); break;
 			case 0xFF26: {
 				if (val & 0x80) {
@@ -427,11 +473,20 @@ void apu_write_reg (APU *apu, uint16_t addr, uint8_t val) {
 			break;
 		}
 
-		case 0xFF1A: apu->nr30 = val; break;
-		case 0xFF1B: apu->nr31 = val; break;
+		case 0xFF1A: apu->nr30 = val; if (!(val & 0x80)) apu->ch3.enabled = 0; break;
+		case 0xFF1B: apu->nr31 = val; apu->ch3.length_counter = 256 - val; break;
 		case 0xFF1C: apu->nr32 = val; break;
 		case 0xFF1D: apu->nr33 = val; break;
-		case 0xFF1E: apu->nr34 = val; break;
+		case 0xFF1E: {
+			uint8_t prev = apu->nr34;
+			apu->nr34 = val & 0xC7;
+
+			if (!(prev & 0x40) && (val & 0x40) && !(apu->frame_seq_step & 1))
+				clock_length_ch3(apu);
+
+			if (val & 0x80) apu_trigger_ch3(apu);
+				break;
+		}
 
 		case 0xFF20: apu->nr41 = val; apu->ch4.ch.length_counter = 64 - (val & 0x3F); break;
 		case 0xFF21: apu->nr42 = val; if (!(val & 0xF8)) apu->ch4.ch.enabled = 0; break;

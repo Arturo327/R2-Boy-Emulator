@@ -12,6 +12,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 - Cartridge loading
 - Timer emulation
 - PPU (Pixel Processing Unit) emulation
+- APU (Audio Processing Unit) emulation
 - SDL-based graphics output
 - Keyboard input support
 - Testing support
@@ -25,7 +26,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 This project is under active development.
 
 Planned:
-- Audio emulation
+- Pass dmg_sound Blargg tests
 
 ---
 

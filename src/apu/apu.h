@@ -34,6 +34,14 @@ typedef struct CH1 {
 	uint8_t negate_used;
 } CH1;
 
+typedef struct CH3 {
+	uint16_t freq_timer;
+	uint16_t length_counter;
+	uint8_t enabled;
+	uint8_t position;
+	uint8_t sample_buffer;
+} CH3;
+
 typedef struct CH4 {
 	CH ch;
 	uint16_t lfsr;
@@ -51,6 +59,7 @@ typedef struct APU {
 
 	CH1 ch1;
 	CH ch2;
+	CH3 ch3;
 	CH4 ch4;
 
 	int32_t right_capacitor;
@@ -71,6 +80,7 @@ typedef struct APU {
 
 void apu_trigger_ch1 (APU *apu);
 void apu_trigger_ch2 (APU *apu);
+void apu_trigger_ch3 (APU *apu);
 void apu_trigger_ch4 (APU *apu);
 
 void init_apu (APU *apu);
