@@ -78,11 +78,6 @@ typedef struct APU {
 
 } APU;
 
-void apu_trigger_ch1 (APU *apu);
-void apu_trigger_ch2 (APU *apu);
-void apu_trigger_ch3 (APU *apu);
-void apu_trigger_ch4 (APU *apu);
-
 void init_apu (APU *apu);
 void init_apu_reg (APU *apu);
 

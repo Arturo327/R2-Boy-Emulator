@@ -195,7 +195,7 @@ static void trigger_pulse_common (APU *apu, CH *ch, uint8_t nr_x2,
 	ch->freq_timer = (2048 - freq) << 2;
 }
 
-void apu_trigger_ch1 (APU *apu)
+static void apu_trigger_ch1 (APU *apu)
 {
 	trigger_pulse_common(apu, &apu->ch1.ch, apu->nr12, apu->nr13, apu->nr14);
 
@@ -213,12 +213,12 @@ void apu_trigger_ch1 (APU *apu)
 	}
 }
 
-void apu_trigger_ch2 (APU *apu)
+static void apu_trigger_ch2 (APU *apu)
 {
 	trigger_pulse_common(apu, &apu->ch2, apu->nr22, apu->nr23, apu->nr24);
 }
 
-void apu_trigger_ch3 (APU *apu)
+static void apu_trigger_ch3 (APU *apu)
 {
 	apu->ch3.enabled = (apu->nr30 & 0x80) != 0;
 
@@ -233,7 +233,7 @@ void apu_trigger_ch3 (APU *apu)
 	apu->ch3.position = 0;
 }
 
-void apu_trigger_ch4 (APU *apu)
+static void apu_trigger_ch4 (APU *apu)
 {
 	trigger_common(apu, &apu->ch4.ch, apu->nr42, apu->nr44);
 
