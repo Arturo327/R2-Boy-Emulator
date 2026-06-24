@@ -153,7 +153,11 @@ uint8_t bus_read8 (void *ctx, uint16_t addr) {
 	}
 
 	if (addr < 0xFF80) {
-		if ((addr >= 0xFF10 && addr <= 0xFF26) || (addr >= 0xFF30 && addr <= 0xFF3F))
+
+		if (addr >= 0xFF30 && addr <= 0xFF3F)
+			return apu_wave_ram_read(&gb->apu, addr);
+
+		if (addr >= 0xFF10 && addr <= 0xFF26)
 			return apu_read_reg(&gb->apu, addr);
 
 		switch (addr) {
@@ -282,7 +286,12 @@ void bus_write8 (void *ctx, uint16_t addr, uint8_t val) {
 
 	if (addr < 0xFF80) {
 
-		if ((addr >= 0xFF10 && addr <= 0xFF26) || (addr >= 0xFF30 && addr <= 0xFF3F)) {
+		if (addr >= 0xFF30 && addr <= 0xFF3F) {
+			apu_wave_ram_write(&gb->apu, addr, val);
+			return;
+		}
+
+		if (addr >= 0xFF10 && addr <= 0xFF26) {
 			apu_write_reg(&gb->apu, addr, val);
 			return;
 		}

@@ -40,6 +40,7 @@ typedef struct CH3 {
 	uint8_t enabled;
 	uint8_t position;
 	uint8_t sample_buffer;
+	uint8_t just_accessed;
 } CH3;
 
 typedef struct CH4 {
@@ -86,5 +87,8 @@ void apu_div_reset (APU *apu, uint8_t old_div);
 
 uint8_t apu_read_reg (APU *apu, uint16_t addr);
 void apu_write_reg (APU *apu, uint16_t addr, uint8_t val);
+
+uint8_t apu_wave_ram_read (APU *apu, uint16_t addr);
+void apu_wave_ram_write (APU *apu, uint16_t addr, uint8_t val);
 
 #endif

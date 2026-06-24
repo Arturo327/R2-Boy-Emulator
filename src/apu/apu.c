@@ -12,6 +12,7 @@ void init_apu (APU *apu) {
 	memset(apu, 0, sizeof(APU));
 	apu->sample_rate = 44100;
 	apu->ch1.negate_used = 0;
+	apu->ch3.just_accessed = 0;
 }
  
 void init_apu_reg (APU *apu) {
@@ -47,7 +48,7 @@ static void apu_power_off (APU *apu)
 {
 	uint8_t len1 = apu->ch1.ch.length_counter;
 	uint8_t len2 = apu->ch2.length_counter;
-	uint8_t len3 = apu->ch3.length_counter;
+	uint16_t len3 = apu->ch3.length_counter;
 	uint8_t len4 = apu->ch4.ch.length_counter;
 
 	memset(&apu->ch1, 0, sizeof(apu->ch1));
@@ -145,6 +146,7 @@ static void clock_sweep (APU *apu)
 static void step_wave (APU *apu)
 {
 	CH3 *ch3 = &apu->ch3;
+	ch3->just_accessed = 0;
 	if (ch3->freq_timer <= 4) {
 		uint16_t freq = apu->nr33 | ((apu->nr34 & 0x07) << 8);
 		ch3->freq_timer += (2048 - freq) * 2;
@@ -220,6 +222,19 @@ static void apu_trigger_ch2 (APU *apu)
 
 static void apu_trigger_ch3 (APU *apu)
 {
+	if (apu->ch3.enabled && apu->ch3.just_accessed) {
+		uint8_t byte = apu->ch3.position >> 1;
+		if (byte < 4) {
+			apu->wave_ram[0] = apu->wave_ram[byte];
+		} else {
+			uint8_t block = byte & ~3;
+			apu->wave_ram[0] = apu->wave_ram[block];
+			apu->wave_ram[1] = apu->wave_ram[block + 1];
+			apu->wave_ram[2] = apu->wave_ram[block + 2];
+			apu->wave_ram[3] = apu->wave_ram[block + 3];
+		}
+	}
+
 	apu->ch3.enabled = (apu->nr30 & 0x80) != 0;
 
 	if (apu->ch3.length_counter == 0) {
@@ -327,6 +342,8 @@ static void clock_frame_seq (APU *apu)
 {
 	apu->frame_seq_step = (apu->frame_seq_step + 1) & 7;
 
+	if (!apu->enabled) return;
+
 	if ((apu->frame_seq_step & 1) == 0) {
 		clock_length(&apu->ch1.ch, apu->nr14);
 		clock_length(&apu->ch2, apu->nr24);
@@ -369,11 +386,8 @@ void apu_div_reset (APU *apu, uint8_t old_div)
 	apu->frame_seq_counter = 0;
 }
 
-uint8_t apu_read_reg (APU *apu, uint16_t addr) {
-
-	if (addr >= 0xFF30 && addr <= 0xFF3F)
-		return apu->wave_ram[addr - 0xFF30];
-
+uint8_t apu_read_reg (APU *apu, uint16_t addr)
+{
 	switch (addr) {
 		case 0xFF10: return apu->nr10 | 0x80;
 		case 0xFF11: return apu->nr11 | 0x3F;
@@ -412,13 +426,8 @@ uint8_t apu_read_reg (APU *apu, uint16_t addr) {
 	}
 }
 
-void apu_write_reg (APU *apu, uint16_t addr, uint8_t val) {
-	
-	if (addr >= 0xFF30 && addr <= 0xFF3F) {
-		apu->wave_ram[addr - 0xFF30] = val;
-		return;
-	}
-
+void apu_write_reg (APU *apu, uint16_t addr, uint8_t val)
+{
 	if (!apu->enabled) {
 		switch (addr) {
 			case 0xFF11: apu->ch1.ch.length_counter = 64 - (val & 0x3F); break;
@@ -514,4 +523,24 @@ void apu_write_reg (APU *apu, uint16_t addr, uint8_t val) {
 		}
 		
 	}
+}
+
+uint8_t apu_wave_ram_read (APU *apu, uint16_t addr)
+{
+	if (apu->ch3.enabled) {
+		if (apu->ch3.just_accessed)
+			return apu->wave_ram[apu->ch3.position >> 1];
+		return 0xFF;
+	}
+	return apu->wave_ram[addr - 0xFF30];
+}
+
+void apu_wave_ram_write (APU *apu, uint16_t addr, uint8_t val)
+{
+	if (apu->ch3.enabled) {
+		if (apu->ch3.just_accessed)
+			apu->wave_ram[apu->ch3.position >> 1] = val;
+		return;
+	}
+	apu->wave_ram[addr - 0xFF30] = val;
 }
