@@ -439,8 +439,7 @@ void apu_write_reg (APU *apu, uint16_t addr, uint8_t val)
 			case 0xFF26: {
 				if (val & 0x80) {
 					apu->enabled = 1;
-					apu->frame_seq_step = 0;
-					clock_frame_seq(apu);
+					apu->frame_seq_step = 7;
 					apu->frame_seq_counter = 0;
 				}
 				break;
