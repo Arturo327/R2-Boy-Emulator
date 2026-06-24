@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Isrc -g -Wall -Wextra -O2 -march=native
+CFLAGS = -Isrc -Wall -Wextra -O2 -march=native
 
 SRC = $(shell find src -name '*.c')
 OBJ = $(patsubst src/%.c,build/%.o,$(SRC))
@@ -22,7 +22,7 @@ test: build/r2boy
 	done
 
 clean_sav:
-	find . -name "*.sav" -delete
+	find tests/ -name "*.sav" -delete
 
 clean:
 	rm -f $(OBJ) build/r2boy

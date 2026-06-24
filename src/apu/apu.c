@@ -143,11 +143,21 @@ static void clock_sweep (APU *apu)
 	}
 }
 
+static void step_freq (CH *ch, uint8_t nr_x3, uint8_t nr_x4)
+{
+	if (ch->freq_timer == 0) {
+		uint16_t freq = nr_x3 | ((nr_x4 & 0x07) << 8);
+		ch->freq_timer += (2048 - freq) * 4;
+		ch->duty_step = (ch->duty_step + 1) & 7;
+	}
+	ch->freq_timer--;
+}
+
 static void step_wave (APU *apu)
 {
 	CH3 *ch3 = &apu->ch3;
 	ch3->just_accessed = 0;
-	if (ch3->freq_timer <= 4) {
+	if (ch3->freq_timer == 0) {
 		uint16_t freq = apu->nr33 | ((apu->nr34 & 0x07) << 8);
 		ch3->freq_timer += (2048 - freq) * 2;
 		ch3->position = (ch3->position + 1) & 31;
@@ -155,12 +165,12 @@ static void step_wave (APU *apu)
 		uint8_t byte = apu->wave_ram[apu->ch3.position >> 1];
 		ch3->sample_buffer = (ch3->position & 1) ? (byte & 0x0F) : (byte >> 4);
 	}
-	ch3->freq_timer -= 4;
+	ch3->freq_timer--;
 }
 
 static void step_noise (CH4 *ch4, uint8_t nr43)
 {
-	if (ch4->ch.freq_timer <= 4) {
+	if (ch4->ch.freq_timer == 0) {
 		uint8_t shift = nr43 >> 4;
 		uint8_t code = nr43 & 0x07;
 		ch4->ch.freq_timer += (uint16_t)(NOISE_DIVISOR[code] << shift);
@@ -174,7 +184,7 @@ static void step_noise (CH4 *ch4, uint8_t nr43)
 		
 		ch4->lfsr = lfsr;
 	}
-	ch4->ch.freq_timer -= 4;
+	ch4->ch.freq_timer--;
 }
 
 static void trigger_common (APU *apu, CH *ch, uint8_t nr_x2, uint8_t nr_x4)
@@ -265,16 +275,6 @@ static int16_t dac (CH *ch, uint8_t nr_x1)
 	return bit ? (int16_t)ch->volume : -(int16_t)ch->volume;
 }
 
-static void step_freq (CH *ch, uint8_t nr_x3, uint8_t nr_x4)
-{
-	if (ch->freq_timer <= 4) {
-		uint16_t freq = nr_x3 | ((nr_x4 & 0x07) << 8);
-		ch->freq_timer += (2048 - freq) * 4;
-		ch->duty_step = (ch->duty_step + 1) & 7;
-	}
-	ch->freq_timer -= 4;
-}
-
 static int16_t dac_ch3 (APU *apu)
 {
 	if (!apu->ch3.enabled) return 0;
@@ -342,8 +342,6 @@ static void clock_frame_seq (APU *apu)
 {
 	apu->frame_seq_step = (apu->frame_seq_step + 1) & 7;
 
-	if (!apu->enabled) return;
-
 	if ((apu->frame_seq_step & 1) == 0) {
 		clock_length(&apu->ch1.ch, apu->nr14);
 		clock_length(&apu->ch2, apu->nr24);
@@ -360,22 +358,26 @@ static void clock_frame_seq (APU *apu)
  
 void apu_step (APU *apu) 
 {
-	step_freq(&apu->ch1.ch, apu->nr13, apu->nr14);
-	step_freq(&apu->ch2, apu->nr23, apu->nr24);
-	step_wave(apu);
-	step_noise(&apu->ch4, apu->nr43);
- 
-	apu->frame_seq_counter += 4;
-	if (apu->frame_seq_counter >= 8192) {
-		apu->frame_seq_counter -= 8192;
-		clock_frame_seq(apu);
-	}
- 
-	apu->sample_counter += apu->sample_rate << 2;
-	if (apu->sample_counter >= APU_CPU_CLOCK) {
-		apu->sample_counter -= APU_CPU_CLOCK;
-		Sample s = mix_channels(apu);
-		push_sample(apu, s);
+	for (int i = 0; i < 4; i++)
+	{
+		step_freq(&apu->ch1.ch, apu->nr13, apu->nr14);
+		step_freq(&apu->ch2, apu->nr23, apu->nr24);
+		step_wave(apu);
+		step_noise(&apu->ch4, apu->nr43);
+	 
+		apu->sample_counter += apu->sample_rate;
+		if (apu->sample_counter >= APU_CPU_CLOCK) {
+			apu->sample_counter -= APU_CPU_CLOCK;
+			Sample s = mix_channels(apu);
+			push_sample(apu, s);
+		}
+		
+		if (!apu->enabled) return;
+		apu->frame_seq_counter++;
+		if (apu->frame_seq_counter >= 8192) {
+			apu->frame_seq_counter -= 8192;
+			clock_frame_seq(apu);
+		}
 	}
 }
 
@@ -438,6 +440,8 @@ void apu_write_reg (APU *apu, uint16_t addr, uint8_t val)
 				if (val & 0x80) {
 					apu->enabled = 1;
 					apu->frame_seq_step = 0;
+					clock_frame_seq(apu);
+					apu->frame_seq_counter = 0;
 				}
 				break;
 			}
