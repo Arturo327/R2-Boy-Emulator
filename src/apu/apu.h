@@ -40,7 +40,7 @@ typedef struct CH3 {
 	uint8_t enabled;
 	uint8_t position;
 	uint8_t sample_buffer;
-	uint8_t just_accessed;
+	uint8_t fetch_count;
 } CH3;
 
 typedef struct CH4 {
