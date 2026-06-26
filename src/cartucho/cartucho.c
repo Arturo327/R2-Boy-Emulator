@@ -1,4 +1,5 @@
 #include "cartucho/cartucho.h"
+#include "cartucho/mbc1.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -36,6 +37,46 @@ static void normalize_mbc (Cartucho *cart, uint8_t header_type) {
 	}
 }
 
+static void select_mbc_fx (Cartucho *cart) {
+	switch (cart->mbc_type) {
+		case MBC_NONE:
+			cart->read_rom = mbcNone_read_rom;
+			cart->write_rom = mbcNone_write_rom;
+			cart->read_ram = mbcNone_read_ram;
+			cart->write_ram = mbcNone_write_ram;
+			break;
+
+		case MBC1:
+			cart->read_rom = mbc1_read_rom;
+			cart->write_rom = mbc1_write_rom;
+			cart->read_ram = mbc1_read_ram;
+			cart->write_ram = mbc1_write_ram;
+			break;
+		
+		/*
+		case MBC2:
+			cart->read_rom = mbc2_read_rom;
+			cart->write_rom = mbc2_write_rom;
+			cart->read_ram = mbc2_read_ram;
+			cart->write_ram = mbc2_write_ram;
+			break;
+
+		case MBC3:
+			cart->read_rom = mbc3_read_rom;
+			cart->write_rom = mbc3_write_rom;
+			cart->read_ram = mbc3_read_ram;
+			cart->write_ram = mbc3_write_ram;
+			break;
+
+		case MBC5:
+			cart->read_rom = mbc5_read_rom;
+			cart->write_rom = mbc5_write_rom;
+			cart->read_ram = mbc5_read_ram;
+			cart->write_ram = mbc5_write_ram;
+			break;
+		*/
+	}
+}
 
 int load_rom (Cartucho *cart, const char *filename) {
 	cart->rom_bank = 1;
@@ -44,9 +85,7 @@ int load_rom (Cartucho *cart, const char *filename) {
 	cart->mbc_mode = 0;
 
 	FILE *f = fopen(filename, "rb");
-	if (!f) {
-		return 0;
-	}
+	if (!f) return 0;
 
 	fseek(f, 0, SEEK_END);
 	cart->rom_size = ftell(f);
@@ -78,6 +117,8 @@ int load_rom (Cartucho *cart, const char *filename) {
 			cart->ram_enabled = 1;
 		}
 	}
+
+	select_mbc_fx(cart);
 
 	printf("ROM: %s\n", filename);
 	return 1;

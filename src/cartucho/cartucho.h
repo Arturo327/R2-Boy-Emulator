@@ -9,6 +9,8 @@
 #define MBC3 3
 #define MBC5 5
 
+typedef struct GB GB;
+
 typedef struct Cartucho {
 	uint8_t *rom;
 	uint32_t rom_size;
@@ -25,6 +27,11 @@ typedef struct Cartucho {
 	uint8_t ram_enabled;
 
 	int battery;
+
+	uint8_t (*read_rom) (GB *gb, uint16_t addr);
+	void (*write_rom) (GB *gb, uint16_t addr, uint8_t val);
+	uint8_t (*read_ram) (GB *gb, uint16_t addr);
+	void (*write_ram) (GB *gb, uint16_t addr, uint8_t val);
 } Cartucho;
 
 int load_rom (Cartucho *cart, const char *filename);

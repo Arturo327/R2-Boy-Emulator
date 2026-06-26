@@ -82,38 +82,15 @@ void oam_bug (GB *gb, uint16_t val, int is_write) {
 		oam[curr + i] = oam[prev + i];
 }
 
-uint8_t bus_read8 (void *ctx, uint16_t addr) {
+static uint8_t bus_read8 (void *ctx, uint16_t addr) {
 	GB *gb = (GB *)ctx;
 
 	if (addr < 0x100 && gb->boot_rom_enabled) {
 		return gb->memory.bios[addr];
 	}
 
-	if (addr < 0x4000) {
-		uint32_t bank = 0;
-		if (gb->memory.cart.mbc_type == MBC1 &&
-		    gb->memory.cart.mbc_mode == 1) {
-			bank = gb->memory.cart.rom_bank & 0x60;
-			if (gb->memory.cart.rom_banks)
-				bank &= (gb->memory.cart.rom_banks - 1);
-		}
-		uint32_t offset = (bank << 14) + addr;
-		if (offset < gb->memory.cart.rom_size)
-			return gb->memory.cart.rom[offset];
-		return 0xFF;
-
-	}
-
 	if (addr < 0x8000) {
-		uint32_t bank = gb->memory.cart.rom_bank;
-		if ((bank & 0x1F) == 0) bank |= 0x01;
-		if (gb->memory.cart.rom_banks)
-			bank &= (gb->memory.cart.rom_banks - 1);
-		uint32_t offset = (bank << 14) + (addr - 0x4000);
-		if (offset < gb->memory.cart.rom_size)
-			return gb->memory.cart.rom[offset];
-		return 0xFF;
-
+		return gb->memory.cart.read_rom(gb, addr);
 	}
 
 	if (addr < 0xA000) {
@@ -121,19 +98,7 @@ uint8_t bus_read8 (void *ctx, uint16_t addr) {
 	}
 
 	if (addr < 0xC000) {
-		if (!gb->memory.cart.ram_enabled || !gb->memory.cart.ram)
-			return 0xFF;
-		uint32_t ram_bank = gb->memory.cart.ram_bank;
-		if (gb->memory.cart.mbc_type == MBC1 &&
-		    gb->memory.cart.mbc_mode == 0)
-			ram_bank = 0;
-		if (gb->memory.cart.ram_banks > 0)
-			ram_bank &= (gb->memory.cart.ram_banks - 1);
-		uint32_t offset = (ram_bank << 13) + (addr - 0xA000);
-		if (offset < gb->memory.cart.ram_size)
-			return gb->memory.cart.ram[offset];
-		return 0xFF;
-
+		return gb->memory.cart.read_ram(gb, addr);
 	}
 
 	if (addr < 0xE000) {
@@ -216,34 +181,12 @@ uint8_t bus_read8 (void *ctx, uint16_t addr) {
 	return gb->interrupts.IE;
 }
 
-void bus_write8 (void *ctx, uint16_t addr, uint8_t val) {
+static void bus_write8 (void *ctx, uint16_t addr, uint8_t val) {
 	GB *gb = (GB *)ctx;
 
 	if (addr < 0x8000) {
-		if (gb->memory.cart.mbc_type == 0)
-			return;
-		if (gb->memory.cart.mbc_type == MBC1) {
-			if (addr < 0x2000) {
-				gb->memory.cart.ram_enabled = ((val & 0x0F) == 0x0A);
-			}
-			else if (addr < 0x4000) {
-				uint8_t lo = val & 0x1F;
-				if (lo == 0) lo = 1;
-				gb->memory.cart.rom_bank =
-					(gb->memory.cart.rom_bank & 0x60) | lo;
-			}
-			else if (addr < 0x6000) {
-				uint8_t sec = val & 0x03;
-				gb->memory.cart.ram_bank = sec;
-				gb->memory.cart.rom_bank =
-					(gb->memory.cart.rom_bank & 0x1F) | (sec << 5);
-			}
-			else {
-				gb->memory.cart.mbc_mode = val & 0x01;
-			}
-			return;
-		}
-
+		gb->memory.cart.write_rom(gb, addr, val);
+		return;
 	}
 
 	if (addr < 0xA000) {
@@ -252,19 +195,8 @@ void bus_write8 (void *ctx, uint16_t addr, uint8_t val) {
 	}
 
 	if (addr < 0xC000) {
-		if (gb->memory.cart.ram_enabled && gb->memory.cart.ram) {
-			uint32_t ram_bank = gb->memory.cart.ram_bank;
-			if (gb->memory.cart.mbc_type == MBC1 &&
-			    gb->memory.cart.mbc_mode == 0)
-				ram_bank = 0;
-			if (gb->memory.cart.ram_banks > 0)
-				ram_bank &= (gb->memory.cart.ram_banks - 1);
-			uint32_t offset = (ram_bank << 13) + (addr - 0xA000);
-			if (offset < gb->memory.cart.ram_size)
-				gb->memory.cart.ram[offset] = val;
-		}
+		gb->memory.cart.write_ram(gb, addr, val);
 		return;
-
 	}
 
 	if (addr < 0xE000) {
