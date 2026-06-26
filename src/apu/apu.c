@@ -11,7 +11,6 @@ static const uint8_t WAVE_SHIFT[4] = {4, 0, 1, 2};
 void init_apu (APU *apu) {
 	memset(apu, 0, sizeof(APU));
 	apu->sample_rate = 44100;
-	apu->ch1.negate_used = 0;
 }
  
 void init_apu_reg (APU *apu) {
@@ -75,12 +74,19 @@ static void push_sample (APU *apu, Sample s)
 	apu->buffer[apu->buffer_pos++] = s.right;
 }
 
-static int ch3_wave_window (APU *apu, uint8_t *byte_index)
+static int ch3_wave_window (APU *apu, uint8_t *byte)
 {
 	if (!apu->ch3.enabled) return 0;
-	if (apu->ch3.freq_timer != 2) return 0;
-	if (apu->ch3.fetch_count < 2) return 0;
-	*byte_index = ((apu->ch3.position + 31) & 31) >> 1;
+	if (apu->ch3.freq_timer != 0) return 0;
+	*byte = ((apu->ch3.position + 1) & 31) >> 1;
+	return 1;
+}
+
+static int ch3_trigger_corrupt_byte (APU *apu, uint8_t *byte)
+{
+	if (!apu->ch3.enabled) return 0;
+	if (apu->ch3.freq_timer == 0) return 0;
+	*byte = ((apu->ch3.position + 1) & 31) >> 1;
 	return 1;
 }
 
@@ -172,8 +178,6 @@ static void step_wave (APU *apu)
 
 		uint8_t byte = apu->wave_ram[apu->ch3.position >> 1];
 		ch3->sample_buffer = (ch3->position & 1) ? (byte & 0x0F) : (byte >> 4);
-
-		if (ch3->fetch_count < 2) ch3->fetch_count++;
 	}
 	ch3->freq_timer--;
 }
@@ -243,7 +247,7 @@ static void apu_trigger_ch2 (APU *apu)
 static void apu_trigger_ch3 (APU *apu)
 {
 	uint8_t byte;
-	if (ch3_wave_window(apu, &byte)) {
+	if (ch3_trigger_corrupt_byte(apu, &byte)) {
 		if (byte < 4) {
 			apu->wave_ram[0] = apu->wave_ram[byte];
 		} else {
@@ -264,9 +268,8 @@ static void apu_trigger_ch3 (APU *apu)
 	}
 
 	uint16_t freq = apu->nr33 | ((apu->nr34 & 0x07) << 8);
-	apu->ch3.freq_timer = (2048 - freq) * 2;
+	apu->ch3.freq_timer = (2048 - freq) * 2 + 6;
 	apu->ch3.position = 0;
-	apu->ch3.fetch_count = 0;
 }
 
 static void apu_trigger_ch4 (APU *apu)

@@ -175,6 +175,8 @@ uint8_t bus_read8 (void *ctx, uint16_t addr) {
 				}
 				return sel | lo | 0xC0;
 			}
+
+			// Serial Port
 			case 0xFF01: return gb->joypad.SB;
 			case 0xFF02: return gb->joypad.SC & 0x7F;
 
@@ -309,6 +311,8 @@ void bus_write8 (void *ctx, uint16_t addr, uint8_t val) {
 				}
 				break;
 			}
+
+			// Serial Port
 			case 0xFF01: gb->joypad.SB = val; break;
 			case 0xFF02: gb->joypad.SC = val; break;
 

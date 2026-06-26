@@ -26,7 +26,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 This project is under active development.
 
 Planned:
-- Pass dmg_sound Blargg tests
+- MBC support
 
 ---
 
@@ -116,18 +116,7 @@ the register values used by Mooneye test ROMs to determine whether the test pass
 
 The emulator aims to emulate the Game Boy hardware at the cycle level whenever possible.
 
-Currently passes the following test ROMs:
-
-Blargg:
-
-- halt_bug
-- instr_timing
-- cpu_instrs
-- mem_timing
-- mem_timing-2
-- oam_bug
-
-- dmg_acid2
+It currently passes all Blargg tests (including oam bug!) and dmg-acid2. It also fails cgb sound exacly like a real DMG.
 
 ---
 
