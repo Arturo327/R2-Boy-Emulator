@@ -32,7 +32,7 @@ int init_screen (LCD *lcd) {
 
 	lcd->renderer = SDL_CreateRenderer(
 		lcd->window, -1,
-		SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
+		SDL_RENDERER_ACCELERATED
 	);
 	if (!lcd->renderer) {
 		fprintf(stderr, "SDL_CreateRenderer error: %s, trying software\n", SDL_GetError());
@@ -77,7 +77,6 @@ void update_screen (LCD *lcd, uint32_t *framebuffer) {
 	if (!lcd->texture || !lcd->renderer) return;
 
 	SDL_UpdateTexture(lcd->texture, NULL, framebuffer, 160 * sizeof(uint32_t));
-	SDL_RenderClear(lcd->renderer);
 	SDL_RenderCopy(lcd->renderer, lcd->texture, NULL, NULL);
 	SDL_RenderPresent(lcd->renderer);
 }
@@ -123,10 +122,9 @@ int init_audio (Audio *audio) {
 	want.freq = 44100;
 	want.format = AUDIO_S16SYS;
 	want.channels = 2;
-	want.samples = 1024;
+	want.samples = 512;
 
-	audio->dev = SDL_OpenAudioDevice(NULL, 0, &want, &have,
-		SDL_AUDIO_ALLOW_FREQUENCY_CHANGE | SDL_AUDIO_ALLOW_SAMPLES_CHANGE);
+	audio->dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
 
 	if (!audio->dev) {
 		fprintf(stderr, "SDL_OpenAudioDevice error: %s\n", SDL_GetError());

@@ -47,6 +47,15 @@ static int run_test (const char *romfile) {
 	return 0;
 }
 
+static void sleep_until (uint64_t target, uint64_t freq) {
+	while (1) {
+		uint64_t now = SDL_GetPerformanceCounter();
+		if (now >= target) break;
+		uint64_t remaining_ms = (target - now) * 1000 / freq;
+		if (remaining_ms > 2) SDL_Delay(1);
+	}
+}
+
 int main (int argc, char *argv[])
 {
 	static struct option long_options[] = {
@@ -96,8 +105,12 @@ int main (int argc, char *argv[])
 	}
 
 	double frames_per_sec = 4194304.0 / 70224.0;
-	uint32_t bytes_per_video_frame = (uint32_t)(gb.audio.sample_rate / frames_per_sec) * 2 * sizeof(int16_t);
-	uint32_t target_queued_bytes = bytes_per_video_frame * 3;
+	uint32_t bytes_per_frame = (uint32_t)((double)gb.audio.sample_rate / frames_per_sec * 2.0 * sizeof(int16_t));
+	uint32_t max_queued = bytes_per_frame * 1.5;
+
+	uint64_t freq = SDL_GetPerformanceFrequency();
+	uint64_t frame_ticks = (uint64_t)(freq / frames_per_sec);
+	uint64_t next_frame = SDL_GetPerformanceCounter();
 
 	while (gb.running) {
 		if (!handle_events(&gb)) {
@@ -105,17 +118,42 @@ int main (int argc, char *argv[])
 			break;
 		}
 
+		int quit = 0;
 		while (gb.clock < 70224) {
 			gb_step(&gb);
+
+			if (gb.apu.buffer_pos >= 256)
+				queue_audio(&gb);
+
+			if ((gb.clock & 511) == 0) {
+				if (!handle_events(&gb)) {
+					quit = 1;
+					break;
+				}
+			}
+
 		}
-		update_screen(&gb.lcd, gb.ppu.framebuffer);
+
+		if (quit) {
+			gb.running = 0;
+			break;
+		}
+
 		queue_audio(&gb);
+		update_screen(&gb.lcd, gb.ppu.framebuffer);
 		gb.clock -= 70224;
 
-		while (SDL_GetQueuedAudioSize(gb.audio.dev) > target_queued_bytes) {
-			SDL_Delay(1);
-		}
+		next_frame += frame_ticks;
 
+		uint64_t now = SDL_GetPerformanceCounter();
+		if (next_frame < now) next_frame = now;
+
+		sleep_until(next_frame, freq);
+
+		while (SDL_GetQueuedAudioSize(gb.audio.dev) > max_queued) {
+			SDL_Delay(1);
+			next_frame = SDL_GetPerformanceCounter();
+		}
 	}
 
 	cleanup(&gb);
