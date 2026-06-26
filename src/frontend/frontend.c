@@ -77,6 +77,7 @@ void update_screen (LCD *lcd, uint32_t *framebuffer) {
 	if (!lcd->texture || !lcd->renderer) return;
 
 	SDL_UpdateTexture(lcd->texture, NULL, framebuffer, 160 * sizeof(uint32_t));
+	SDL_RenderClear(lcd->renderer);
 	SDL_RenderCopy(lcd->renderer, lcd->texture, NULL, NULL);
 	SDL_RenderPresent(lcd->renderer);
 }
@@ -116,15 +117,47 @@ int handle_events (GB *gb) {
 	return 1;
 }
 
+void ring_push (AudioRing *r, int16_t *src, uint32_t n)
+{
+	uint32_t wp = atomic_load_explicit(&r->write_pos, memory_order_relaxed);
+	for (uint32_t i = 0; i < n; i++)
+		r->buffer[(wp + i) & (AUDIO_RING_SIZE - 1)] = src[i];
+	atomic_store_explicit(&r->write_pos, wp + n, memory_order_release);
+}
+
+static void audio_callback (void *userdata, uint8_t *stream, int len)
+{
+	AudioRing *r = (AudioRing *)userdata;
+	int16_t *out = (int16_t *)stream;
+	int n = len / sizeof(int16_t);
+
+	uint32_t wp = atomic_load_explicit(&r->write_pos, memory_order_acquire);
+	uint32_t rp = atomic_load_explicit(&r->read_pos, memory_order_relaxed);
+	uint32_t avail = (wp - rp) & (AUDIO_RING_SIZE - 1);
+	int fill = avail < (uint32_t)n ? (int)avail : n;
+
+	for (int i = 0; i < fill; i++)
+		out[i] = r->buffer[(rp + i) & (AUDIO_RING_SIZE - 1)];
+
+	if (fill < n) {
+		memset(out + fill, 0, (n - fill) * sizeof(int16_t));
+	}
+
+	atomic_store_explicit(&r->read_pos, rp + fill, memory_order_release);
+}
+
 int init_audio (Audio *audio) {
 
 	SDL_AudioSpec want = {0}, have;
 	want.freq = 44100;
 	want.format = AUDIO_S16SYS;
 	want.channels = 2;
-	want.samples = 512;
+	want.samples = 256;
+	want.callback = audio_callback;
+	want.userdata = &audio->ring;
 
-	audio->dev = SDL_OpenAudioDevice(NULL, 0, &want, &have, SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
+	audio->dev = SDL_OpenAudioDevice(NULL, 0, &want, &have,
+		SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
 
 	if (!audio->dev) {
 		fprintf(stderr, "SDL_OpenAudioDevice error: %s\n", SDL_GetError());
@@ -145,9 +178,7 @@ void cleanup_audio (Audio *audio) {
 }
 
 void queue_audio (GB *gb) {
-	if (!gb->audio.dev) return;
-	if (gb->apu.buffer_pos == 0) return;
-
-	SDL_QueueAudio(gb->audio.dev, gb->apu.buffer, gb->apu.buffer_pos * sizeof(int16_t));
+	if (!gb->audio.dev || gb->apu.buffer_pos == 0) return;
+	ring_push(&gb->audio.ring, gb->apu.buffer, gb->apu.buffer_pos);
 	gb->apu.buffer_pos = 0;
 }
