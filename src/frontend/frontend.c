@@ -13,6 +13,7 @@
 
 int init_screen (LCD *lcd) {
 
+	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO) < 0) {
 		fprintf(stderr, "SDL_Init error: %s\n", SDL_GetError());
 		return 0;
