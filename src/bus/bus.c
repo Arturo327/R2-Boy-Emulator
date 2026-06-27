@@ -82,8 +82,23 @@ void oam_bug (GB *gb, uint16_t val, int is_write) {
 		oam[curr + i] = oam[prev + i];
 }
 
-static uint8_t bus_read8 (void *ctx, uint16_t addr) {
+uint8_t dma_read_source (GB *gb, uint16_t addr)
+{
+	if (addr < 0x8000) return gb->memory.cart.read_rom(gb, addr);
+	if (addr < 0xA000) return gb->memory.vram[addr - 0x8000];
+	if (addr < 0xC000) return gb->memory.cart.read_ram(gb, addr);
+	if (addr < 0xE000) return gb->memory.wram[addr - 0xC000];
+	if (addr < 0xFE00) return gb->memory.wram[addr - 0xE000];
+	return 0xFF;
+}
+
+static uint8_t bus_read8 (void *ctx, uint16_t addr)
+{
 	GB *gb = (GB *)ctx;
+
+	if (gb->dma_active && addr < 0xFF00) {
+		return 0xFF;
+	}
 
 	if (addr < 0x100 && gb->boot_rom_enabled) {
 		return gb->memory.bios[addr];
@@ -181,8 +196,13 @@ static uint8_t bus_read8 (void *ctx, uint16_t addr) {
 	return gb->interrupts.IE;
 }
 
-static void bus_write8 (void *ctx, uint16_t addr, uint8_t val) {
+static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
+{
 	GB *gb = (GB *)ctx;
+
+	if (gb->dma_active && addr < 0xFF00) {
+		return;
+	}
 
 	if (addr < 0x8000) {
 		gb->memory.cart.write_rom(gb, addr, val);
@@ -279,9 +299,10 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val) {
 			}
 			case 0xFF46: {
 				gb->ppu.dma = val;
-				gb->dma_active = 1;
+				gb->dma_active = 0;
 				gb->dma_src = (uint16_t)val << 8;
 				gb->dma_index = 0;
+				gb->dma_delay = 2;
 				break;
 			}
 			case 0xFF47: gb->ppu.bgp = val; break;

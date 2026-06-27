@@ -26,5 +26,6 @@ typedef struct Bus {
 void init_bus (Bus *bus, GB *gb);
 void joypad_update (GB *gb, uint8_t new_buttons);
 void oam_bug (GB *gb, uint16_t val, int is_write);
+uint8_t dma_read_source (GB *gb, uint16_t addr);
 
 #endif

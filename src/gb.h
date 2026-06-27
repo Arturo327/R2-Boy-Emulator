@@ -45,6 +45,7 @@ typedef struct GB {
 	uint8_t dma_active;
 	uint16_t dma_src;
 	uint8_t dma_index;
+	uint8_t dma_delay;
 
 	uint8_t boot_rom_enabled;
 	uint8_t boot_rom_disable_pending;

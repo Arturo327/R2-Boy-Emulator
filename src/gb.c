@@ -4,7 +4,8 @@
 #include <string.h>
 #include <time.h>
 
-static int load_bios (GB *gb, const char *filename) {
+static int load_bios (GB *gb, const char *filename)
+{
 	FILE *f = fopen(filename, "rb");
 	if (!f) return 0;
 
@@ -14,7 +15,8 @@ static int load_bios (GB *gb, const char *filename) {
 	return n == 0x100;
 }
 
-static int init_core (GB *gb, const char *romfile, const char *biosfile) {
+static int init_core (GB *gb, const char *romfile, const char *biosfile)
+{
 	memset(gb, 0, sizeof(GB));
 
 	init_ppu(&gb->ppu);
@@ -52,8 +54,8 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile) {
 	return 0;
 }
 
-void init (GB *gb, const char *romfile, const char *biosfile) {
-
+void init (GB *gb, const char *romfile, const char *biosfile)
+{
 	if (init_core(gb, romfile, biosfile)) {
 		gb->running = 0;
 		return;
@@ -73,8 +75,8 @@ void init (GB *gb, const char *romfile, const char *biosfile) {
 	gb->running = 1;
 }
 
-void init_test (GB *gb, const char *romfile, const char *biosfile) {
-
+void init_test (GB *gb, const char *romfile, const char *biosfile)
+{
 	if (init_core(gb, romfile, biosfile)) {
 		gb->running = 0;
 		return;
@@ -89,22 +91,27 @@ void cleanup (GB *gb) {
 	cleanup_screen(&gb->lcd);
 }
 
-void gb_step (GB *gb) {
-
+void gb_step (GB *gb)
+{
 	if (gb->boot_rom_disable_pending && gb->cpu.pc >= 0x0100) {
 		gb->boot_rom_enabled = 0;
 		gb->boot_rom_disable_pending = 0;
 	}
 
-	if (gb->dma_active) {
-		gb->memory.oam[gb->dma_index] = gb->bus.read8(gb->bus.ctx, gb->dma_src + gb->dma_index);
+	cpu_step(&gb->cpu);
+
+	if (gb->dma_delay > 0) {
+		gb->dma_delay--;
+		if (gb->dma_delay == 0)
+			gb->dma_active = 1;
+
+	} else if (gb->dma_active) {
+		gb->memory.oam[gb->dma_index] = dma_read_source(gb, gb->dma_src + gb->dma_index);
 		gb->dma_index++;
 		if (gb->dma_index >= 0xA0)
 			gb->dma_active = 0;
-	} else {
-		cpu_step(&gb->cpu);
 	}
-	
+
 	if (timer_step(&gb->timer)) {
 		gb->interrupts.IF |= 0x04;
 	}
