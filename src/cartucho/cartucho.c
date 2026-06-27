@@ -1,5 +1,6 @@
 #include "cartucho/cartucho.h"
 #include "cartucho/mbc1.h"
+#include "cartucho/mbc2.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -53,7 +54,6 @@ static void select_mbc_fx (Cartucho *cart) {
 			cart->write_ram = mbc1_write_ram;
 			break;
 		
-		/*
 		case MBC2:
 			cart->read_rom = mbc2_read_rom;
 			cart->write_rom = mbc2_write_rom;
@@ -61,6 +61,7 @@ static void select_mbc_fx (Cartucho *cart) {
 			cart->write_ram = mbc2_write_ram;
 			break;
 
+		/*
 		case MBC3:
 			cart->read_rom = mbc3_read_rom;
 			cart->write_rom = mbc3_write_rom;
@@ -78,7 +79,8 @@ static void select_mbc_fx (Cartucho *cart) {
 	}
 }
 
-int load_rom (Cartucho *cart, const char *filename) {
+int load_rom (Cartucho *cart, const char *filename)
+{
 	cart->rom_bank = 1;
 	cart->ram_bank = 0;
 	cart->ram_enabled = 0;
@@ -109,6 +111,11 @@ int load_rom (Cartucho *cart, const char *filename) {
 	uint8_t ram_type = cart->rom[0x0149];
 	uint32_t ram_sizes[] = {0, 2*1024, 8*1024, 32*1024, 128*1024, 64*1024};
 	cart->ram_size = (ram_type < 6) ? ram_sizes[ram_type] : 0;
+
+	if (cart->mbc_type == MBC2) {
+		cart->ram_size = 512;
+	}
+
 	cart->ram_banks = cart->ram_size / 0x2000;
 
 	if (cart->ram_size) {

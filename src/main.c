@@ -37,7 +37,8 @@ static int run_test (const char *romfile)
 	const uint64_t MAX_CYCLES = 500000000ULL;
 	int truth_time = 0;
 	while (gb.clock < MAX_CYCLES) {
-		if (gb.bus.read8(gb.bus.ctx, gb.cpu.pc) == 0x40) {
+		if (gb.cpu.instr_head >= gb.cpu.instr_tail && !gb.cpu.halted &&
+				gb.bus.read8(gb.bus.ctx, gb.cpu.pc) == 0x40) {
 			truth_time = 1;
 			break;
 		}
