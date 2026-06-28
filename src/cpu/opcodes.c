@@ -1203,7 +1203,7 @@ void push_pc_l (GB *gb) {
 	gb->bus.write8(gb->bus.ctx, --gb->cpu.sp, (uint8_t)gb->cpu.pc);
 }
 
-void call_z (GB *gb) {
+void call_wz (GB *gb) {
 	push_pc_l(gb);
 	jump(gb);
 }
@@ -1213,7 +1213,7 @@ void decode_call_imm16 (GB *gb) {		// 0xCD
 	push_mcycle(gb, ld_w_imm8);
 	push_mcycle(gb, dec16_sp);
 	push_mcycle(gb, push_pc_h);
-	push_mcycle(gb, call_z);
+	push_mcycle(gb, call_wz);
 }
 
 void service (CPU *cpu, uint16_t addr, uint8_t flag_bit) {
@@ -1224,7 +1224,7 @@ void service (CPU *cpu, uint16_t addr, uint8_t flag_bit) {
 	push_mcycle(gb, nop);
 	push_mcycle(gb, dec16_sp);
 	push_mcycle(gb, push_pc_h);
-	push_mcycle(gb, call_z);
+	push_mcycle(gb, call_wz);
 }
 
 // --------------------- CALL cond, imm16 ------------------
@@ -1234,7 +1234,7 @@ void decode_call_z_imm16 (GB *gb) {		// 0xCC
 	push_mcycle(gb, check_jp_z);
 	push_mcycle(gb, dec16_sp);
 	push_mcycle(gb, push_pc_h);
-	push_mcycle(gb, call_z);
+	push_mcycle(gb, call_wz);
 }
 
 void decode_call_c_imm16 (GB *gb) {		// 0xDC
@@ -1242,7 +1242,7 @@ void decode_call_c_imm16 (GB *gb) {		// 0xDC
 	push_mcycle(gb, check_jp_c);
 	push_mcycle(gb, dec16_sp);
 	push_mcycle(gb, push_pc_h);
-	push_mcycle(gb, call_z);
+	push_mcycle(gb, call_wz);
 }
 
 void decode_call_nz_imm16 (GB *gb) {		// 0xC4
@@ -1250,7 +1250,7 @@ void decode_call_nz_imm16 (GB *gb) {		// 0xC4
 	push_mcycle(gb, check_jp_nz);
 	push_mcycle(gb, dec16_sp);
 	push_mcycle(gb, push_pc_h);
-	push_mcycle(gb, call_z);
+	push_mcycle(gb, call_wz);
 }
 
 void decode_call_nc_imm16 (GB *gb) {		// 0xD4
@@ -1258,7 +1258,7 @@ void decode_call_nc_imm16 (GB *gb) {		// 0xD4
 	push_mcycle(gb, check_jp_nc);
 	push_mcycle(gb, dec16_sp);
 	push_mcycle(gb, push_pc_h);
-	push_mcycle(gb, call_z);
+	push_mcycle(gb, call_wz);
 }
 
 // -------------------- RST tgt3 -------------------------
