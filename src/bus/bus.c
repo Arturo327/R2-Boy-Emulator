@@ -107,10 +107,6 @@ static uint8_t bus_read8 (void *ctx, uint16_t addr)
 {
 	GB *gb = (GB *)ctx;
 
-	if (gb->dma_active && addr < 0xFF00) {
-		return 0xFF;
-	}
-
 	if (addr < 0x100 && gb->boot_rom_enabled) {
 		return gb->memory.bios[addr];
 	}
@@ -136,6 +132,7 @@ static uint8_t bus_read8 (void *ctx, uint16_t addr)
 	}
 
 	if (addr < 0xFEA0) {
+		if (gb->dma_active) return 0xFF;
 		return gb->memory.oam[addr - 0xFE00];
 	}
 
@@ -211,10 +208,6 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 {
 	GB *gb = (GB *)ctx;
 
-	if (gb->dma_active && addr < 0xFF00) {
-		return;
-	}
-
 	if (addr < 0x8000) {
 		gb->memory.cart.write_rom(gb, addr, val);
 		return;
@@ -241,6 +234,7 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 	}
 
 	if (addr < 0xFEA0) {
+		if (gb->dma_active) return;
 		gb->memory.oam[addr - 0xFE00] = val;
 		return;
 	}
