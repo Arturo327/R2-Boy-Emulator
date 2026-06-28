@@ -341,7 +341,6 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 			}
 			case 0xFF46: {
 				gb->ppu.dma = val;
-				gb->dma_active = 0;
 				gb->dma_src = (uint16_t)val << 8;
 				gb->dma_index = 0;
 				gb->dma_delay = 2;

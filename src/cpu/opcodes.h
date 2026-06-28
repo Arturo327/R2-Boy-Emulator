@@ -13,7 +13,7 @@ typedef struct {
 	opcode_fn cb[256];
 } OpcodeTable;
 
-void service (CPU *cpu, uint16_t addr, uint8_t flag_bit);
+void service (CPU *cpu);
 void decode_instr (GB *gb, uint8_t opcode);
 void init_opcodes (OpcodeTable *t);
 

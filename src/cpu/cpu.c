@@ -32,11 +32,7 @@ static int handle_interrupts (CPU *cpu) {
 		return 0;
 
 	in->IME = 0;
-	if (fired & 0x01) service(cpu, 0x40, 0x01);
-	else if (fired & 0x02) service(cpu, 0x48, 0x02);
-	else if (fired & 0x04) service(cpu, 0x50, 0x04);
-	else if (fired & 0x08) service(cpu, 0x58, 0x08);
-	else if (fired & 0x10) service(cpu, 0x60, 0x10);
+	service(cpu);
 	return 1;
 }
 
@@ -48,7 +44,10 @@ void cpu_step (CPU *cpu) {
 
 		cpu->instr_tail = cpu->instr_head = 0;
 
-		if (handle_interrupts(cpu)) return;
+		if (handle_interrupts(cpu)) {
+			cpu->instr_stack[cpu->instr_head++](gb);
+			return;
+		}
 		if (cpu->halted) return;
 
 		if (cpu->bus->interrupts->ei_pending) {

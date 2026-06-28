@@ -1216,15 +1216,29 @@ void decode_call_imm16 (GB *gb) {		// 0xCD
 	push_mcycle(gb, call_wz);
 }
 
-void service (CPU *cpu, uint16_t addr, uint8_t flag_bit) {
-	cpu->bus->interrupts->IF &= ~flag_bit;
-	GB *gb = (GB *)cpu->bus->ctx;
+static void service_vector (GB *gb) {
+	uint8_t fired = gb->interrupts.IE & gb->interrupts.IF & 0x1F;
+	uint16_t addr = 0x0000;
+
+	if (fired & 0x01) { addr = 0x40; gb->interrupts.IF &= ~0x01; }
+	else if (fired & 0x02) { addr = 0x48; gb->interrupts.IF &= ~0x02; }
+	else if (fired & 0x04) { addr = 0x50; gb->interrupts.IF &= ~0x04; }
+	else if (fired & 0x08) { addr = 0x58; gb->interrupts.IF &= ~0x08; }
+	else if (fired & 0x10) { addr = 0x60; gb->interrupts.IF &= ~0x10; }
+
 	gb->cpu.wz = addr;
+	push_pc_l(gb);
+	jump(gb);
+}
+
+
+void service (CPU *cpu) {
+	GB *gb = (GB *)cpu->bus->ctx;
 	push_mcycle(gb, nop);
 	push_mcycle(gb, nop);
 	push_mcycle(gb, dec16_sp);
 	push_mcycle(gb, push_pc_h);
-	push_mcycle(gb, call_wz);
+	push_mcycle(gb, service_vector);
 }
 
 // --------------------- CALL cond, imm16 ------------------
