@@ -1,30 +1,43 @@
 #include "timer/timer.h"
 
-int timer_step (Timer *timer) {
+int timer_step (Timer *timer)
+{
 	int hay_interrupt = 0;
 
-	timer->div_counter += 4;
-	if (timer->div_counter >= 256) {
-		timer->div_counter -= 256;
-		timer->div++;
-	}
+	for (int i = 0; i < 4; i++) {
 
-	if (timer->tac & 0x04) {
-		int a;
+		int bit = 0;
 		switch (timer->tac & 0x03) {
-			case 0: a = 1024; break;
-			case 1: a = 16; break;
-			case 2: a = 64; break;
-			case 3: a = 256; break;
+			case 0: bit = (timer->div >> 9) & 1; break;
+			case 1: bit = (timer->div >> 3) & 1; break;
+			case 2: bit = (timer->div >> 5) & 1; break;
+			case 3: bit = (timer->div >> 7) & 1; break;
 		}
-		timer->tima_counter += 4;
-		while (timer->tima_counter >= a) {
-			timer->tima_counter -= a;
-			timer->tima++;
-			if (timer->tima == 0) {
+		int tima_enable = (timer->tac & 0x04) ? 1 : 0;
+		int before = bit & tima_enable;
+
+		timer->div++;
+
+		switch (timer->tac & 0x03) {
+			case 0: bit = (timer->div >> 9) & 1; break;
+			case 1: bit = (timer->div >> 3) & 1; break;
+			case 2: bit = (timer->div >> 5) & 1; break;
+			case 3: bit = (timer->div >> 7) & 1; break;
+		}
+		int after = bit & tima_enable;
+
+		if (timer->tima_overflow > 0) {
+			timer->tima_overflow--;
+			if (timer->tima_overflow == 0) {
 				timer->tima = timer->tma;
 				hay_interrupt = 1;
 			}
+		}
+
+		if (before == 1 && after == 0) {
+			timer->tima++;
+			if (timer->tima == 0)
+				timer->tima_overflow = 4;
 		}
 	}
 

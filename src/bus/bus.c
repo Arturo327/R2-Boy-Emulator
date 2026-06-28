@@ -2,6 +2,17 @@
 #include "gb.h"
 #include "ppu/ppu.h"
 
+static int timer_selected_bit (uint16_t div, uint8_t tac)
+{
+	switch (tac & 0x03) {
+		case 0: return (div >> 9) & 1;
+		case 1: return (div >> 3) & 1;
+		case 2: return (div >> 5) & 1;
+		case 3: return (div >> 7) & 1;
+		default: return 0;
+	}
+}
+
 static uint8_t joypad_calc_lo (GB *gb) {
 	uint8_t sel = gb->joypad.joyp & 0x30;
 	uint8_t lo = 0x0F;
@@ -161,10 +172,10 @@ static uint8_t bus_read8 (void *ctx, uint16_t addr)
 			case 0xFF02: return gb->joypad.SC & 0x7F;
 
 			// Timer
-			case 0xFF04: return gb->timer.div;
+			case 0xFF04: return (uint8_t)(gb->timer.div >> 8);
 			case 0xFF05: return gb->timer.tima;
 			case 0xFF06: return gb->timer.tma;
-			case 0xFF07: return gb->timer.tac;
+			case 0xFF07: return gb->timer.tac | 0xF8;
 
 			// Interrupts
 			case 0xFF0F: return gb->interrupts.IF | 0xE0;
@@ -270,17 +281,41 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 
 			// Timer
 			case 0xFF04: {
-				uint8_t old_div = gb->timer.div;
+				uint8_t old_div = (uint8_t)(gb->timer.div >> 8);
+				if (timer_selected_bit(gb->timer.div, gb->timer.tac) && (gb->timer.tac & 0x04)) {
+					gb->timer.tima++;
+					if (gb->timer.tima == 0)
+						gb->timer.tima_overflow = 4;
+				}
 				gb->timer.div = 0;
-				gb->timer.div_counter = 0;
-				gb->timer.tima_counter = 0;
 				apu_div_reset(&gb->apu, old_div);
 				break;
 			}
-			case 0xFF05: gb->timer.tima = val; break;
+			case 0xFF05: {
+				if (gb->timer.tima_overflow > 1) {
+					gb->timer.tima = val;
+					gb->timer.tima_overflow = 0;
+				} else if (gb->timer.tima_overflow == 0) {
+					gb->timer.tima = val;
+				}
+				break;
+			}
 			case 0xFF06: gb->timer.tma = val; break;
-			case 0xFF07: gb->timer.tac = val; break;
+			case 0xFF07: {
+				int and_before = timer_selected_bit(gb->timer.div, gb->timer.tac)
+					& ((gb->timer.tac >> 2) & 1);
+				gb->timer.tac = val;
+				int and_after = timer_selected_bit(gb->timer.div, gb->timer.tac)
+					& ((gb->timer.tac >> 2) & 1);
+				if (and_before == 1 && and_after == 0) {
+					gb->timer.tima++;
+					if (gb->timer.tima == 0)
+						gb->timer.tima_overflow = 4;
+				}
+				break;
+			}
 
+			// Interrupts
 			case 0xFF0F: gb->interrupts.IF = (val & 0x1F) | 0xE0; break;
 
 			// PPU

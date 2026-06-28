@@ -28,6 +28,7 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile)
 		init_ppu_reg(&gb->ppu);
 		init_apu_reg(&gb->apu);
 		init_cpu(&gb->cpu);
+		gb->timer.div = 0xAB34;
 		gb->boot_rom_enabled = 0;
 		printf("Could not load BOOT ROM %s. Running without BIOS\n", biosfile);
 
@@ -38,6 +39,8 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile)
 	}
 
 	init_bus(&gb->bus, gb);
+
+	gb->timer.tac = 0xF8;
 
 	strncpy(gb->rom_path, romfile, sizeof(gb->rom_path) - 1);
 	gb->rom_path[sizeof(gb->rom_path) - 1] = '\0';

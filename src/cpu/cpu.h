@@ -41,10 +41,10 @@ typedef struct CPU {
 	uint16_t pc;
 
 	union {
-		uint16_t buff16;
+		uint16_t wz;
 		struct {
-			uint8_t buff;
-			uint8_t buff_h;
+			uint8_t z;
+			uint8_t w;
 		};
 	};
 
