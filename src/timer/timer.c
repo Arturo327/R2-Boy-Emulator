@@ -3,6 +3,7 @@
 int timer_step (Timer *timer)
 {
 	int hay_interrupt = 0;
+	timer->reload = 0;
 
 	for (int i = 0; i < 4; i++) {
 
@@ -30,14 +31,16 @@ int timer_step (Timer *timer)
 			timer->tima_overflow--;
 			if (timer->tima_overflow == 0) {
 				timer->tima = timer->tma;
+				timer->reload = 1;
 				hay_interrupt = 1;
 			}
 		}
 
 		if (before == 1 && after == 0) {
 			timer->tima++;
-			if (timer->tima == 0)
+			if (timer->tima == 0 && !timer->reload) {
 				timer->tima_overflow = 4;
+			}
 		}
 	}
 

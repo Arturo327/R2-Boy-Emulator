@@ -292,7 +292,9 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 				break;
 			}
 			case 0xFF05: {
-				if (gb->timer.tima_overflow > 1) {
+				if (gb->timer.reload) {
+					gb->timer.reload = 0;
+				} else if (gb->timer.tima_overflow > 1) {
 					gb->timer.tima = val;
 					gb->timer.tima_overflow = 0;
 				} else if (gb->timer.tima_overflow == 0) {
@@ -300,7 +302,12 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 				}
 				break;
 			}
-			case 0xFF06: gb->timer.tma = val; break;
+			case 0xFF06: {
+				gb->timer.tma = val;
+				if (gb->timer.tima_overflow > 0 || gb->timer.reload) gb->timer.tima = val;
+				if (gb->timer.reload) gb->timer.reload = 0;
+				break;
+			}
 			case 0xFF07: {
 				int and_before = timer_selected_bit(gb->timer.div, gb->timer.tac)
 					& ((gb->timer.tac >> 2) & 1);
