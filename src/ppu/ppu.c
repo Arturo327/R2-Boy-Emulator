@@ -49,7 +49,6 @@ void init_ppu (PPU *ppu) {
 	ppu->sp_delay = 0;
 
 	ppu->lcd_was_off = 0;
-	ppu->oam_startup = 0;
 	ppu->short_line = 0;
 
 	ppu->hblank_pending = 0;
@@ -250,8 +249,10 @@ void ppu_step (PPU *ppu) {
 		ppu->mode = HBLANK;
 		ppu->stat = (ppu->stat & 0xFC) | HBLANK;
 		check_lyc(ppu);
-		ppu->oam_startup = 1;
+		ppu->first_line = 1;
 		ppu->short_line = 1;
+		ppu->hblank_pending = 0;
+		ppu->x = 0;
 	}
 
 	ppu->ready = 0;
@@ -283,15 +284,20 @@ void ppu_step (PPU *ppu) {
 
 		} else if (ppu->mode == HBLANK) {
 
-			if (ppu->oam_startup) {
+			if (ppu->first_line) {
 
 				if (ppu->dots == 0) {
-					ppu->dots = 0;
-					ppu->oam_startup = 0;
-					ppu->mode = OAM_SCAN;
-					ppu->stat = (ppu->stat & 0xFC) | OAM_SCAN;
 					ppu->x = 0;
 					ppu->num_sprites = 0;
+				}
+				if (ppu->mode != HBLANK) {
+					ppu->mode = HBLANK;
+					ppu->stat = (ppu->stat & 0xFC) | HBLANK;
+				}
+				if (ppu->dots >= 80) {
+					ppu->first_line = 0;
+					ppu->dots -= 80;
+					update_stat(ppu, DRAWING);
 					continue;
 				}
 

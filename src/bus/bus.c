@@ -181,7 +181,10 @@ static uint8_t bus_read8 (void *ctx, uint16_t addr)
 
 			// PPU
 			case 0xFF40: return gb->ppu.lcdc;
-			case 0xFF41: return gb->ppu.stat | 0x80;
+			case 0xFF41: {
+				gb->ppu.stat = (gb->ppu.stat & 0xFC) | gb->ppu.mode;
+				return gb->ppu.stat | 0x80;
+			}
 			case 0xFF42: return gb->ppu.scy;
 			case 0xFF43: return gb->ppu.scx;
 			case 0xFF44: return gb->ppu.ly;
