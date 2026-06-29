@@ -3,6 +3,11 @@
 
 #include <stdint.h>
 
+#define HBLANK 0
+#define VBLANK 1
+#define OAM_SCAN 2
+#define DRAWING 3
+
 typedef struct Sprite {
 	uint8_t y;
 	uint8_t x;
@@ -66,6 +71,7 @@ typedef struct PPU {
 
 	Bus *bus;
 
+	uint8_t stat_line;
 	uint8_t lcdc, stat, scy, scx, ly, lyc, dma, bgp, obp0, obp1, wy, wx;
 } PPU;
 

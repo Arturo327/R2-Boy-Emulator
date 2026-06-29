@@ -3,11 +3,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define HBLANK 0
-#define VBLANK 1
-#define OAM_SCAN 2
-#define DRAWING 3
-
 #define LINE0_SHORTEN 6
 
 static const uint32_t PALETA[5] = {
@@ -60,20 +55,43 @@ void init_ppu (PPU *ppu) {
 	ppu->hblank_pending = 0;
 }
 
-static void update_stat (PPU *ppu, int new_mode) {
+static void update_stat_line_ex (PPU *ppu, int force_mode2) {
+	int line = 0;
+	if ((ppu->stat & 0x40) && (ppu->stat & 0x04)) line = 1;
+	if ((ppu->stat & 0x20) && (ppu->mode == OAM_SCAN || force_mode2)) line = 1;
+	if ((ppu->stat & 0x10) && ppu->mode == VBLANK) line = 1;
+	if ((ppu->stat & 0x08) && ppu->mode == HBLANK) line = 1;
+
+	if (line && !ppu->stat_line && (ppu->lcdc & 0x80))
+		ppu->bus->interrupts->IF |= 0x02;
+
+	ppu->stat_line = line;
+}
+
+void update_stat_line (PPU *ppu) {
+	update_stat_line_ex(ppu, 0);
+}
+
+void check_lyc (PPU *ppu) {
+	if (ppu->ly == ppu->lyc) {
+		ppu->stat |= 0x04;
+	} else {
+		ppu->stat &= ~0x04;
+	}
+	update_stat_line(ppu);
+}
+
+static void update_stat (PPU *ppu, int new_mode)
+{
 	if (ppu->mode == new_mode) return;
 	ppu->mode = new_mode;
 	ppu->stat = (ppu->stat & 0xFC) | new_mode;
 
-	int stat_irq = 0;
 	if (new_mode == HBLANK) {
 		ppu->mode0_cycles = 376 - ppu->mode3_cycles;
 		if (ppu->mode0_cycles < 0) ppu->mode0_cycles = 0;
-		if (ppu->stat & 0x08) stat_irq = 1;
 	}
-	if (new_mode == VBLANK && (ppu->stat & 0x10)) stat_irq = 1;
 	if (new_mode == OAM_SCAN) {
-		if (ppu->stat & 0x20) stat_irq = 1;
 		ppu->x = 0;
 		ppu->num_sprites = 0;
 	}
@@ -101,18 +119,10 @@ static void update_stat (PPU *ppu, int new_mode) {
 		ppu->hblank_pending = 0;
 	}
 
-	if (stat_irq)
-		ppu->bus->interrupts->IF |= 0x02;
-}
-
-void check_lyc (PPU *ppu) {
-	if (ppu->ly == ppu->lyc) {
-		ppu->stat |= 0x04;
-		if (ppu->stat & 0x40)
-			ppu->bus->interrupts->IF |= 0x02;
-	} else {
-		ppu->stat &= ~0x04;
-	}
+	if (new_mode == VBLANK)
+		update_stat_line_ex(ppu, 1);
+	else
+		update_stat_line(ppu);
 }
 
 static uint32_t decode_color (uint8_t color_id, uint8_t pal) {

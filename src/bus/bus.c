@@ -116,6 +116,7 @@ static uint8_t bus_read8 (void *ctx, uint16_t addr)
 	}
 
 	if (addr < 0xA000) {
+		if (gb->ppu.mode == DRAWING) return 0xFF;
 		return gb->memory.vram[addr - 0x8000];
 	}
 
@@ -133,6 +134,7 @@ static uint8_t bus_read8 (void *ctx, uint16_t addr)
 
 	if (addr < 0xFEA0) {
 		if (gb->dma_active) return 0xFF;
+		if (gb->ppu.mode == OAM_SCAN || gb->ppu.mode == DRAWING) return 0xFF;
 		return gb->memory.oam[addr - 0xFE00];
 	}
 
@@ -214,6 +216,7 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 	}
 
 	if (addr < 0xA000) {
+		if (gb->ppu.mode == DRAWING) return;
 		gb->memory.vram[addr - 0x8000] = val;
 		return;
 	}
@@ -235,6 +238,7 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 
 	if (addr < 0xFEA0) {
 		if (gb->dma_active) return;
+		if (gb->ppu.mode == OAM_SCAN || gb->ppu.mode == DRAWING) return;
 		gb->memory.oam[addr - 0xFE00] = val;
 		return;
 	}
@@ -323,6 +327,7 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 			case 0xFF40: gb->ppu.lcdc = val; break;
 			case 0xFF41: {
 				gb->ppu.stat = (gb->ppu.stat & 0x07) | (val & 0x78);
+				update_stat_line(&gb->ppu);
 				break;
 			}
 			case 0xFF42: gb->ppu.scy = val; break;
@@ -330,7 +335,9 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 			case 0xFF44: break;
 			case 0xFF45: {
 				gb->ppu.lyc = val;
-				check_lyc(&gb->ppu);
+				gb->ppu.lyc = val;
+				if (gb->ppu.lcdc & 0x80)
+					check_lyc(&gb->ppu);
 				break;
 			}
 			case 0xFF46: {
