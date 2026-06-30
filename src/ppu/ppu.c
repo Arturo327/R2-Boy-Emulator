@@ -83,6 +83,7 @@ static void update_stat (PPU *ppu, int new_mode)
 	if (new_mode == OAM_SCAN) {
 		ppu->x = 0;
 		ppu->num_sprites = 0;
+		ppu->oam_write_blocked = 1;
 	}
 	if (new_mode == DRAWING) {
 		ppu->mode3_cycles = 0;
@@ -249,6 +250,8 @@ void ppu_step (PPU *ppu) {
 
 	ppu->ready = 0;
 	int time_dots = 4;
+
+	if (ppu->mode == OAM_SCAN) ppu->oam_write_blocked ^= 1;
 
 	while (time_dots > 0) {
 

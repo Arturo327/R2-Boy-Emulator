@@ -219,7 +219,7 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 	}
 
 	if (addr < 0xA000) {
-		if (gb->ppu.mode == DRAWING || gb->ppu.vram_pre_block) return;
+		if (gb->ppu.mode == DRAWING) return;
 		gb->memory.vram[addr - 0x8000] = val;
 		return;
 	}
@@ -241,7 +241,8 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 
 	if (addr < 0xFEA0) {
 		if (gb->dma_active) return;
-		if (gb->ppu.mode == OAM_SCAN || gb->ppu.mode == DRAWING || gb->ppu.oam_pre_block) return;
+		if (gb->ppu.mode == DRAWING) return;
+		if (gb->ppu.mode == OAM_SCAN && gb->ppu.oam_write_blocked) return;
 		gb->memory.oam[addr - 0xFE00] = val;
 		return;
 	}

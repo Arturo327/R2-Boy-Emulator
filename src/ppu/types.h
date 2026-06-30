@@ -52,6 +52,7 @@ typedef struct PPU {
 	uint8_t lyc_delay;
 	uint8_t oam_pre_block;
 	uint8_t vram_pre_block;
+	uint8_t oam_write_blocked;
 	int mode;
 	int dots;
 	int ready;
