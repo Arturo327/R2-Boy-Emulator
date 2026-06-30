@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define LINE0_SHORTEN 6
+#define LINE0_SHORTEN 2
 
 static const uint32_t PALETA[5] = {
 	0xFFC6DE8C,	// blanco
@@ -13,8 +13,8 @@ static const uint32_t PALETA[5] = {
 	0xFFD2E6A6	// blanco "más blanco"
 };
 
-void init_ppu_reg (PPU *ppu) {
-
+void init_ppu_reg (PPU *ppu)
+{
 	ppu->lcdc = 0x91;
 	ppu->stat = 0x86;
 	ppu->ly = 0x00;
@@ -25,36 +25,15 @@ void init_ppu_reg (PPU *ppu) {
 
 }
 
-void init_ppu (PPU *ppu) {
-
+void init_ppu (PPU *ppu)
+{
 	ppu->mode = OAM_SCAN;
-	ppu->dots = 0;
-	ppu->ready = 0;
-
 	ppu->bus = NULL;
-	ppu->x = 0;
-	ppu->num_sprites = 0;
-	ppu->mode3_cycles = 0;
-
-	ppu->num_bg_fifo = 0;
-	ppu->window_line = 0;
-	ppu->window_active = 0;
-
-	ppu->num_sp_fifo = 0;
-	ppu->sprite_active = 0;
-	ppu->sprite_step = 0;
-	ppu->sprite_waiting = 0;
 	ppu->pending_sprite = -1;
-	ppu->sel_sprite = 0;
-	ppu->sp_delay = 0;
-
-	ppu->lcd_was_off = 0;
-	ppu->short_line = 0;
-
-	ppu->hblank_pending = 0;
 }
 
-static void update_stat_line_ex (PPU *ppu, int force_mode2) {
+static void update_stat_line_ex (PPU *ppu, int force_mode2)
+{
 	int line = 0;
 	if ((ppu->stat & 0x40) && (ppu->stat & 0x04)) line = 1;
 	if ((ppu->stat & 0x20) && (ppu->mode == OAM_SCAN || force_mode2)) line = 1;
@@ -71,13 +50,24 @@ void update_stat_line (PPU *ppu) {
 	update_stat_line_ex(ppu, 0);
 }
 
-void check_lyc (PPU *ppu) {
+void check_lyc (PPU *ppu)
+{
 	if (ppu->ly == ppu->lyc) {
 		ppu->stat |= 0x04;
 	} else {
 		ppu->stat &= ~0x04;
 	}
 	update_stat_line(ppu);
+}
+
+static void check_lyc_delayed (PPU *ppu)
+{
+	if (ppu->ly == ppu->lyc) {
+		ppu->lyc_delay = 2;
+	} else {
+		ppu->stat &= ~0x04;
+		update_stat_line(ppu);
+	}
 }
 
 static void update_stat (PPU *ppu, int new_mode)
@@ -240,6 +230,9 @@ void ppu_step (PPU *ppu) {
 		ppu->hblank_pending = 0;
 		ppu->lcd_was_off = 1;
 		ppu->x = 0;
+		ppu->lyc_delay = 0;
+		ppu->oam_pre_block = 0;
+		ppu->vram_pre_block = 0;
 		return;
 	}
 
@@ -250,7 +243,6 @@ void ppu_step (PPU *ppu) {
 		ppu->stat = (ppu->stat & 0xFC) | HBLANK;
 		check_lyc(ppu);
 		ppu->first_line = 1;
-		ppu->short_line = 1;
 		ppu->hblank_pending = 0;
 		ppu->x = 0;
 	}
@@ -259,11 +251,20 @@ void ppu_step (PPU *ppu) {
 	int time_dots = 4;
 
 	while (time_dots > 0) {
+
+		if (ppu->lyc_delay > 0 && --ppu->lyc_delay == 0) {
+			ppu->stat |= 0x04;
+			update_stat_line(ppu);
+		}
+
 		if (ppu->mode == OAM_SCAN) {
+
+			if (ppu->dots == 76) ppu->vram_pre_block = 1;
 
 			if (ppu->dots == 80) {
 				ppu->dots = 0;
 				update_stat(ppu, DRAWING);
+				ppu->vram_pre_block = 0;
 				continue;
 			}
 			if (!(ppu->dots & 1)) scan_oam(ppu, ppu->x++);
@@ -284,20 +285,29 @@ void ppu_step (PPU *ppu) {
 
 		} else if (ppu->mode == HBLANK) {
 
+			if (ppu->dots == ppu->mode0_cycles - 4) {
+				ppu->ly++;
+				check_lyc_delayed(ppu);
+				if (ppu->ly != 144) ppu->oam_pre_block = 1;
+			}
+
 			if (ppu->first_line) {
 
 				if (ppu->dots == 0) {
 					ppu->x = 0;
 					ppu->num_sprites = 0;
 				}
-				if (ppu->mode != HBLANK) {
-					ppu->mode = HBLANK;
-					ppu->stat = (ppu->stat & 0xFC) | HBLANK;
+				if (ppu->dots == 77) {
+					ppu->oam_pre_block = 1;
+					ppu->vram_pre_block = 1;
 				}
-				if (ppu->dots >= 80) {
+				if (ppu->dots >= 78) {
 					ppu->first_line = 0;
-					ppu->dots -= 80;
+					ppu->short_line = 1;
+					ppu->dots -= 78;
 					update_stat(ppu, DRAWING);
+					ppu->oam_pre_block = 0;
+					ppu->vram_pre_block = 0;
 					continue;
 				}
 
@@ -305,18 +315,15 @@ void ppu_step (PPU *ppu) {
 
 				if (ppu->dots == ppu->mode0_cycles - LINE0_SHORTEN) {
 					ppu->short_line = 0;
-					ppu->ly++;
-					check_lyc(ppu);
 					ppu->dots = 0;
 					update_stat(ppu, OAM_SCAN);
+					ppu->oam_pre_block = 0;
 					continue;
 				}
 
 			} else if (ppu->dots >= ppu->mode0_cycles) {
 
 				ppu->dots -= ppu->mode0_cycles;
-				ppu->ly++;
-				check_lyc(ppu);
 
 				if (ppu->ly == 144) {
 					update_stat(ppu, VBLANK);
@@ -325,10 +332,13 @@ void ppu_step (PPU *ppu) {
 				} else {
 					update_stat(ppu, OAM_SCAN);
 				}
+				ppu->oam_pre_block = 0;
 				continue;
 			}
 
 		} else {
+
+			if (ppu->dots == 455 && ppu->ly == 153) ppu->oam_pre_block = 1;
 
 			if (ppu->dots >= 456) {
 				ppu->dots -= 456;
@@ -338,6 +348,7 @@ void ppu_step (PPU *ppu) {
 					ppu->ly = 0;
 					update_stat(ppu, OAM_SCAN);
 					ppu->window_line = 0;
+					ppu->oam_pre_block = 0;
 				}
 				check_lyc(ppu);
 				continue;

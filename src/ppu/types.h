@@ -49,6 +49,9 @@ typedef struct PPU {
 	uint8_t startup_tiles;
 
 	uint8_t hblank_pending;
+	uint8_t lyc_delay;
+	uint8_t oam_pre_block;
+	uint8_t vram_pre_block;
 	int mode;
 	int dots;
 	int ready;

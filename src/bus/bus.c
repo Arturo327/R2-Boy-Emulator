@@ -64,7 +64,7 @@ static void oam_bug_rw (GB *gb) {
 void oam_bug (GB *gb, uint16_t val, int is_write) {
 
 	if ((val & 0xFF00) != 0xFE00) return;
-	if (gb->ppu.mode != 2) return;
+	if (gb->ppu.mode != OAM_SCAN) return;
 	if (gb->ppu.dots >= 80) return;
 
 	if (is_write == 2) {
@@ -116,7 +116,7 @@ static uint8_t bus_read8 (void *ctx, uint16_t addr)
 	}
 
 	if (addr < 0xA000) {
-		if (gb->ppu.mode == DRAWING) return 0xFF;
+		if (gb->ppu.mode == DRAWING || gb->ppu.vram_pre_block) return 0xFF;
 		return gb->memory.vram[addr - 0x8000];
 	}
 
@@ -134,7 +134,7 @@ static uint8_t bus_read8 (void *ctx, uint16_t addr)
 
 	if (addr < 0xFEA0) {
 		if (gb->dma_active) return 0xFF;
-		if (gb->ppu.mode == OAM_SCAN || gb->ppu.mode == DRAWING) return 0xFF;
+		if (gb->ppu.mode == OAM_SCAN || gb->ppu.mode == DRAWING || gb->ppu.oam_pre_block) return 0xFF;
 		return gb->memory.oam[addr - 0xFE00];
 	}
 
@@ -219,7 +219,7 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 	}
 
 	if (addr < 0xA000) {
-		if (gb->ppu.mode == DRAWING) return;
+		if (gb->ppu.mode == DRAWING || gb->ppu.vram_pre_block) return;
 		gb->memory.vram[addr - 0x8000] = val;
 		return;
 	}
@@ -241,7 +241,7 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 
 	if (addr < 0xFEA0) {
 		if (gb->dma_active) return;
-		if (gb->ppu.mode == OAM_SCAN || gb->ppu.mode == DRAWING) return;
+		if (gb->ppu.mode == OAM_SCAN || gb->ppu.mode == DRAWING || gb->ppu.oam_pre_block) return;
 		gb->memory.oam[addr - 0xFE00] = val;
 		return;
 	}
