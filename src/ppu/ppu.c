@@ -92,7 +92,12 @@ static void update_stat (PPU *ppu, int new_mode)
 
 		ppu->fetcher_t = 0;
 		ppu->window_active = 0;
-		ppu->bg_discard = ppu->scx & 7;
+
+		int a = ppu->scx & 7;
+		if (a == 0) ppu->bg_discard = 0;
+		else if (a <= 4) ppu->bg_discard = 4;
+		else ppu->bg_discard = 8;
+
 		ppu->startup_tiles = 2;
 		ppu->num_bg_fifo = 0;
 
@@ -148,9 +153,10 @@ static int dot_line_step (PPU *ppu) {
 		ppu->x++;
 	}
 
+	uint8_t prev_startup = ppu->startup_tiles;
 	if (!ppu->sprite_active && ppu->sp_delay == 0) bg_fetch(ppu);
 
-	if (ppu->startup_tiles > 0) {
+	if (prev_startup > 0) {
 		ppu->mode3_cycles++;
 		return 0;
 	}
