@@ -70,6 +70,36 @@ static void check_lyc_delayed (PPU *ppu)
 	}
 }
 
+static void reset_drawing (PPU *ppu) {
+	ppu->mode3_cycles = 0;
+	ppu->x = 0;
+	ppu->fetch_x = ppu->scx & ~7;
+
+	ppu->fetcher_t = 0;
+	ppu->window_active = 0;
+
+	int a = ppu->scx & 7;
+	if (a == 0) ppu->bg_discard = 0;
+	else if (a <= 4) ppu->bg_discard = 4;
+	else ppu->bg_discard = 8;
+
+	ppu->startup_tiles = 2;
+	ppu->num_bg_fifo = 0;
+
+	ppu->sprite_active = 0;
+	ppu->sprite_waiting = 0;
+	ppu->sprite_step = 0;
+	ppu->pending_sprite = -1;
+	ppu->num_sp_fifo = 0;
+	ppu->sp_tiles_touched = 0;
+	ppu->sp_delay = 0;
+	for (int i = 0; i < 10; i++) {
+		ppu->sp_done[i] = 0;
+	}
+
+	ppu->hblank_pending = 0;
+}
+
 static void update_stat (PPU *ppu, int new_mode)
 {
 	if (ppu->mode == new_mode) return;
@@ -86,32 +116,7 @@ static void update_stat (PPU *ppu, int new_mode)
 		ppu->oam_write_blocked = 1;
 	}
 	if (new_mode == DRAWING) {
-		ppu->mode3_cycles = 0;
-		ppu->x = 0;
-		ppu->fetch_x = ppu->scx & ~7;
-
-		ppu->fetcher_t = 0;
-		ppu->window_active = 0;
-
-		int a = ppu->scx & 7;
-		if (a == 0) ppu->bg_discard = 0;
-		else if (a <= 4) ppu->bg_discard = 4;
-		else ppu->bg_discard = 8;
-
-		ppu->startup_tiles = 2;
-		ppu->num_bg_fifo = 0;
-
-		ppu->sprite_active = 0;
-		ppu->sprite_waiting = 0;
-		ppu->sprite_step = 0;
-		ppu->pending_sprite = -1;
-		ppu->num_sp_fifo = 0;
-		ppu->sp_delay = 0;
-		for (int i = 0; i < 10; i++) {
-			ppu->sp_done[i] = 0;
-		}
-
-		ppu->hblank_pending = 0;
+		reset_drawing(ppu);
 	}
 
 	if (new_mode == VBLANK)
@@ -132,7 +137,29 @@ static uint32_t solve_priority (PPU *ppu, SpritePixel sp, uint8_t bg) {
 	return decode_color(bg, ppu->bgp);
 }
 
-static int dot_line_step (PPU *ppu) {
+static void calc_sp_delay (PPU *ppu)
+{
+	int sprite_x = ppu->sprites[ppu->pending_sprite].x;
+	int col = (sprite_x + ppu->scx) & 7;
+	int tile = ((sprite_x + ppu->scx) & 0xFF) >> 3;
+
+	if (ppu->sp_tiles_touched & (1 << tile)) {
+		ppu->sp_delay = 0;
+	} else {
+		ppu->sp_tiles_touched |= (1 << tile);
+		int d = 5 - col;
+		ppu->sp_delay = (d > 0) ? (uint8_t)d : 0;
+	}
+}
+
+static int dot_line_step (PPU *ppu)
+{
+	if (ppu->sp_delay > 0) {
+		ppu->sp_delay--;
+		if (ppu->sp_delay == 0) ppu->sprite_active = 1;
+		ppu->mode3_cycles++;
+		return 0;
+	}
 
 	if (ppu->num_bg_fifo > 0 && ppu->startup_tiles == 0 && !ppu->sprite_active
 			&& !ppu->sprite_waiting && ppu->bg_discard == 0 && ppu->sp_delay == 0) {
@@ -167,19 +194,11 @@ static int dot_line_step (PPU *ppu) {
 		return 0;
 	}
 
-	if (ppu->sp_delay > 0) {
-		ppu->sp_delay--;
-		if (ppu->sp_delay == 0) ppu->sprite_active = 1;
-		ppu->mode3_cycles++;
-		return 0;
-	}
-
 	if (!ppu->sprite_active && !ppu->sprite_waiting && (ppu->lcdc & 0x02))
 		start_sprites(ppu);
 
 	if (ppu->sprite_waiting && ppu->num_bg_fifo > 0) {
-		int d = 5 - (int)((ppu->x + ppu->scx) & 7);
-		ppu->sp_delay = (d > 0) ? (uint8_t)d : 0;
+		calc_sp_delay(ppu);
 		ppu->sprite_waiting = 0;
 		if (ppu->sp_delay == 0) ppu->sprite_active = 1;
 		ppu->mode3_cycles++;
@@ -193,8 +212,7 @@ static int dot_line_step (PPU *ppu) {
 			start_sprites(ppu);
 
 		if (ppu->sprite_waiting) {
-			int d = 5 - (int)((ppu->x + ppu->scx) & 7);
-			ppu->sp_delay = (d > 0) ? (uint8_t)d : 0;
+			calc_sp_delay(ppu);
 			ppu->sprite_waiting = 0;
 			if (ppu->sp_delay == 0) ppu->sprite_active = 1;
 		}

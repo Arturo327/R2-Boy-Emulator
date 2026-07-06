@@ -3,7 +3,7 @@
 
 void start_sprites (PPU *ppu) {
 
-	if (ppu->x == 0) {
+	if (ppu->x <= 1) {
 		int upper_x = -9;
 		int best_sprite = -1;
 		for (int i = ppu->num_sprites - 1; i >= 0; i--) {
