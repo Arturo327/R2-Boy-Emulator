@@ -26,7 +26,8 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 This project is under active development.
 
 Planned:
-- MBC support
+- Implement remaining MBC types
+- Serial Data Transfer implementation
 
 ---
 
@@ -68,7 +69,7 @@ build/r2boy
 Run a Game Boy ROM:
 
 ```bash
-./build/r2boy [-d/--debug] [-b/--bios bios_file] rom.gb
+./build/r2boy [-d|--debug] [-b|--bios bios_file] rom.gb
 ```
 
 ---

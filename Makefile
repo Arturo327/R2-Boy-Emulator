@@ -6,6 +6,8 @@ OBJ = $(patsubst src/%.c,build/%.o,$(SRC))
 
 all: build/r2boy
 
+.PHONY: all test clean clean_sav
+
 build/r2boy: $(OBJ)
 	$(CC) $(OBJ) -lSDL2 -o $@
 
@@ -14,7 +16,7 @@ build/%.o: src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 test: build/r2boy
-	@for rom in tests/mooneye/*; do \
+	@find tests/mooneye/acceptance/ -name "*.gb" | while read rom; do \
 		if [ -f "$$rom" ]; then \
 			echo "=== Ejecutando: $$rom ==="; \
 			./build/r2boy -d "$$rom"; \
