@@ -35,7 +35,7 @@ typedef struct PPU {
 	uint8_t sp_delay;
 	uint32_t sp_tiles_touched;
 
-	uint8_t pending_sprite;
+	int8_t pending_sprite;
 	uint8_t sp_done[10];
 
 	SpritePixel sp_fifo[8];
@@ -72,8 +72,8 @@ typedef struct PPU {
 	uint8_t window_active;
 	uint8_t window_line;
 
-	uint8_t mode3_cycles;
-	uint8_t mode0_cycles;
+	uint16_t mode3_cycles;
+	uint16_t mode0_cycles;
 
 	Bus *bus;
 

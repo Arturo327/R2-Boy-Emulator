@@ -151,6 +151,60 @@ static void calc_sp_delay (PPU *ppu)
 	}
 }
 
+static void draw_pixel (PPU *ppu)
+{
+	if (ppu->num_bg_fifo == 0 || ppu->startup_tiles > 0) return;
+	if (ppu->sprite_active || ppu->sprite_waiting) return;
+	if (ppu->bg_discard > 0 || ppu->sp_delay > 0) return;
+
+	uint8_t bg = bg_fifo_pop(ppu);
+	uint32_t final_pixel;
+
+	if (ppu->num_sp_fifo > 0) {
+		SpritePixel sp = get_sp_pixel(ppu);
+		if (!(ppu->lcdc & 1)) bg = 0;
+		final_pixel = solve_priority(ppu, sp, bg);
+	} else {
+		if (!(ppu->lcdc & 1)) final_pixel = PALETA[0];
+		else final_pixel = decode_color(bg, ppu->bgp);
+	}
+
+	ppu->framebuffer[ppu->ly * 160 + ppu->x] = final_pixel;
+	ppu->x++;	
+}
+
+static inline void begin_sprite_delay (PPU *ppu)
+{
+	calc_sp_delay(ppu);
+	ppu->sprite_waiting = 0;
+	if (ppu->sp_delay == 0) ppu->sprite_active = 1;
+}
+
+static int handle_sprites (PPU *ppu)
+{
+	if (!ppu->sprite_active && !ppu->sprite_waiting && (ppu->lcdc & 0x02))
+		start_sprites(ppu);
+
+	if (ppu->sprite_waiting && ppu->num_bg_fifo > 0) {
+		begin_sprite_delay(ppu);
+		return 1;
+	}
+
+	if (ppu->sprite_active) {
+		sprite_fetch(ppu);
+
+		if (!ppu->sprite_active && !ppu->sprite_waiting && (ppu->lcdc & 0x02))
+			start_sprites(ppu);
+
+		if (ppu->sprite_waiting) {
+			begin_sprite_delay(ppu);
+		}
+		return 1;
+	}
+
+	return 0;
+}
+
 static int dot_line_step (PPU *ppu)
 {
 	if (ppu->sp_delay > 0) {
@@ -160,24 +214,7 @@ static int dot_line_step (PPU *ppu)
 		return 0;
 	}
 
-	if (ppu->num_bg_fifo > 0 && ppu->startup_tiles == 0 && !ppu->sprite_active
-			&& !ppu->sprite_waiting && ppu->bg_discard == 0 && ppu->sp_delay == 0) {
-
-		uint8_t bg = bg_fifo_pop(ppu);
-		uint32_t final_pixel;
-
-		if (ppu->num_sp_fifo > 0) {
-			SpritePixel sp = get_sp_pixel(ppu);
-			if (!(ppu->lcdc & 1)) bg = 0;
-			final_pixel = solve_priority(ppu, sp, bg);
-		} else {
-			if (!(ppu->lcdc & 1)) final_pixel = PALETA[0];
-			else final_pixel = decode_color(bg, ppu->bgp);
-		}
-
-		ppu->framebuffer[ppu->ly * 160 + ppu->x] = final_pixel;
-		ppu->x++;
-	}
+	draw_pixel(ppu);
 
 	uint8_t prev_startup = ppu->startup_tiles;
 	if (!ppu->sprite_active && ppu->sp_delay == 0) bg_fetch(ppu);
@@ -193,29 +230,7 @@ static int dot_line_step (PPU *ppu)
 		return 0;
 	}
 
-	if (!ppu->sprite_active && !ppu->sprite_waiting && (ppu->lcdc & 0x02))
-		start_sprites(ppu);
-
-	if (ppu->sprite_waiting && ppu->num_bg_fifo > 0) {
-		calc_sp_delay(ppu);
-		ppu->sprite_waiting = 0;
-		if (ppu->sp_delay == 0) ppu->sprite_active = 1;
-		ppu->mode3_cycles++;
-		return 0;
-	}
-
-	if (ppu->sprite_active) {
-		sprite_fetch(ppu);
-
-		if (!ppu->sprite_active && !ppu->sprite_waiting && (ppu->lcdc & 0x02))
-			start_sprites(ppu);
-
-		if (ppu->sprite_waiting) {
-			calc_sp_delay(ppu);
-			ppu->sprite_waiting = 0;
-			if (ppu->sp_delay == 0) ppu->sprite_active = 1;
-		}
-
+	if (handle_sprites(ppu)) {
 		ppu->mode3_cycles++;
 		return 0;
 	}
