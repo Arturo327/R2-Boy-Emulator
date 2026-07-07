@@ -26,7 +26,7 @@ typedef struct PPU {
 	uint32_t framebuffer[160 * 144];
 
 	Sprite sprites[10];
-	int num_sprites;
+	uint8_t num_sprites;
 
 	uint8_t sel_sprite;
 	uint8_t sprite_active;
@@ -35,7 +35,7 @@ typedef struct PPU {
 	uint8_t sp_delay;
 	uint32_t sp_tiles_touched;
 
-	int pending_sprite;
+	uint8_t pending_sprite;
 	uint8_t sp_done[10];
 
 	SpritePixel sp_fifo[8];
@@ -54,12 +54,12 @@ typedef struct PPU {
 	uint8_t oam_pre_block;
 	uint8_t vram_pre_block;
 	uint8_t oam_write_blocked;
-	int mode;
-	int dots;
-	int ready;
+	uint8_t mode;
+	uint16_t dots;
+	uint8_t ready;
 	uint8_t lcd_was_off;
 
-	int x;
+	uint8_t x;
 	uint8_t fetch_x;
 	uint8_t short_line;
 	uint8_t first_line;
@@ -72,8 +72,8 @@ typedef struct PPU {
 	uint8_t window_active;
 	uint8_t window_line;
 
-	int mode3_cycles;
-	int mode0_cycles;
+	uint8_t mode3_cycles;
+	uint8_t mode0_cycles;
 
 	Bus *bus;
 

@@ -108,7 +108,6 @@ static void update_stat (PPU *ppu, int new_mode)
 
 	if (new_mode == HBLANK) {
 		ppu->mode0_cycles = 376 - ppu->mode3_cycles;
-		if (ppu->mode0_cycles < 0) ppu->mode0_cycles = 0;
 	}
 	if (new_mode == OAM_SCAN) {
 		ppu->x = 0;
