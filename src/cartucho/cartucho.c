@@ -89,10 +89,33 @@ static void select_mbc_fx (Cartucho *cart) {
 	}
 }
 
+static int is_multicart (Cartucho *cart)
+{
+	if (cart->mbc_type != MBC1 || cart->rom_size != 0x100000)
+		return 0;
+
+	// Logo de Nintendo
+	static const uint8_t logo[48] = {
+		0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B,
+		0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D,
+		0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E,
+		0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
+		0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC,
+		0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E
+	};
+
+	uint32_t offset = (0x10 * 0x4000) + 0x0104;
+	if (offset + sizeof(logo) <= cart->rom_size)
+		return memcmp(cart->rom + offset, logo, sizeof(logo)) == 0;
+
+	return 0;
+}
+
 int load_rom (Cartucho *cart, const char *filename)
 {
 	cart->rom_bank = 1;
 	cart->ram_bank = 0;
+	cart->bank1 = 1;
 	cart->ram_enabled = 0;
 	cart->mbc_mode = 0;
 
@@ -117,26 +140,23 @@ int load_rom (Cartucho *cart, const char *filename)
 	cart->rom_banks = cart->rom_size / 0x4000;
 
 	normalize_mbc(cart, cart->rom[0x0147]);
+	cart->multicart = is_multicart(cart);
 
 	uint8_t ram_type = cart->rom[0x0149];
 	uint32_t ram_sizes[] = {0, 2*1024, 8*1024, 32*1024, 128*1024, 64*1024};
 	cart->ram_size = (ram_type < 6) ? ram_sizes[ram_type] : 0;
 
-	if (cart->mbc_type == MBC2) {
+	if (cart->mbc_type == MBC2)
 		cart->ram_size = 512;
-	}
 
 	cart->ram_banks = cart->ram_size / 0x2000;
-
 	if (cart->ram_size) {
 		cart->ram = calloc(1, cart->ram_size);
-		if (cart->mbc_type == MBC_NONE) {
+		if (cart->mbc_type == MBC_NONE)
 			cart->ram_enabled = 1;
-		}
 	}
 
 	select_mbc_fx(cart);
-
 	printf("ROM: %s\n", filename);
 	return 1;
 }

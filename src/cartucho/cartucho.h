@@ -26,6 +26,10 @@ typedef struct Cartucho {
 	uint8_t ram_bank;
 	uint8_t ram_enabled;
 
+	uint8_t bank1;
+	uint8_t bank2;
+	uint8_t multicart;
+
 	int battery;
 
 	uint8_t (*read_rom) (GB *gb, uint16_t addr);

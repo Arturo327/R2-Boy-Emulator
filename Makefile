@@ -17,11 +17,19 @@ build/%.o: src/%.c
 
 test: build/r2boy
 	@find tests/mooneye/acceptance/ -name "*.gb" | while read rom; do \
-		if [ -f "$$rom" ]; then \
-			echo "=== Ejecutando: $$rom ==="; \
-			./build/r2boy -d "$$rom"; \
-		fi \
+		echo "=== Ejecutando: $$rom ==="; \
+		./build/r2boy -d "$$rom"; \
+		echo ""; \
 	done
+	@find tests/mooneye/acceptance/ -name "*.sav" -delete
+
+test_mbc: build/r2boy
+	@find tests/mooneye/emulator-only/ -name "*.gb" | while read rom; do \
+		echo "=== Ejecutando: $$rom ==="; \
+		./build/r2boy -d "$$rom"; \
+		echo ""; \
+	done
+	@find tests/mooneye/emulator-only/ -name "*.sav" -delete
 
 clean_sav:
 	find tests/ -name "*.sav" -delete
