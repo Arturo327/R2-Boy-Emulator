@@ -153,22 +153,11 @@ static uint8_t bus_read8 (void *ctx, uint16_t addr)
 		switch (addr) {
 
 			// Joypad
-			case 0xFF00: {
-				uint8_t sel = gb->joypad.joyp & 0x30;
-				uint8_t lo = 0x0F;
-
-				if (!(sel & 0x20)) {
-					lo &= ~((gb->joypad.buttons >> 4) & 0x0F);
-				}
-				if (!(sel & 0x10)) {
-					lo &= ~(gb->joypad.buttons & 0x0F);
-				}
-				return sel | lo | 0xC0;
-			}
+			case 0xFF00: return (gb->joypad.joyp & 0x30) | joypad_calc_lo(gb) | 0xC0;
 
 			// Serial Port
-			case 0xFF01: return gb->joypad.SB;
-			case 0xFF02: return gb->joypad.SC & 0x7F;
+			case 0xFF01: return gb->serial.SB;
+			case 0xFF02: return serial_read_sc(&gb->serial);
 
 			// Timer
 			case 0xFF04: return (uint8_t)(gb->timer.div >> 8);
@@ -278,8 +267,8 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 			}
 
 			// Serial Port
-			case 0xFF01: gb->joypad.SB = val; break;
-			case 0xFF02: gb->joypad.SC = val; break;
+			case 0xFF01: gb->serial.SB = val; break;
+			case 0xFF02: serial_write_sc(&gb->serial, val); break;
 
 			// Timer
 			case 0xFF04: {

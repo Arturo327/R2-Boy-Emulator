@@ -29,6 +29,9 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile)
 		init_apu_reg(&gb->apu);
 		init_cpu(&gb->cpu);
 		gb->timer.div = 0xAB34;
+		gb->serial.SC = 0x7E;
+		gb->timer.tac = 0xF8;
+		gb->joypad.joyp = 0xCF;
 		gb->boot_rom_enabled = 0;
 		printf("Could not load BOOT ROM %s. Running without BIOS\n", biosfile);
 
@@ -40,8 +43,6 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile)
 
 	init_bus(&gb->bus, gb);
 
-	gb->timer.tac = 0xF8;
-
 	strncpy(gb->rom_path, romfile, sizeof(gb->rom_path) - 1);
 	gb->rom_path[sizeof(gb->rom_path) - 1] = '\0';
 
@@ -51,8 +52,6 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile)
 	}
 
 	load_sram(&gb->memory.cart, romfile);
-
-	gb->joypad.joyp = 0xCF;
 
 	return 0;
 }
@@ -118,6 +117,10 @@ void gb_step (GB *gb)
 	if (timer_step(&gb->timer)) {
 		gb->interrupts.IF |= 0x04;
 	}
+	if (serial_step(&gb->serial)) {
+		gb->interrupts.IF |= 0x08;
+	}
+
 	ppu_step(&gb->ppu);
 	apu_step(&gb->apu);
 	gb->clock += 4;

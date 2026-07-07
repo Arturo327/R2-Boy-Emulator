@@ -18,6 +18,9 @@ static void normalize_mbc (Cartucho *cart, uint8_t header_type) {
 		case 0x05: cart->mbc_type = MBC2; break;
 		case 0x06: cart->mbc_type = MBC2; cart->battery = 1; break;
 
+		case 0x08: cart->mbc_type = MBC_NONE; break;
+		case 0x09: cart->mbc_type = MBC_NONE; cart->battery = 1; break;
+
 		case 0x0F: cart->mbc_type = MBC3; cart->battery = 1; break;
 		case 0x10: cart->mbc_type = MBC3; cart->battery = 1; break;
 		case 0x11: cart->mbc_type = MBC3; break;
@@ -76,6 +79,13 @@ static void select_mbc_fx (Cartucho *cart) {
 			cart->write_ram = mbc5_write_ram;
 			break;
 		*/
+		default:
+			printf("Cartridge: MBC%d unimplemented, using ROM-only (probably incorrect banking)\n", cart->mbc_type);
+			cart->read_rom	= mbcNone_read_rom;
+			cart->write_rom = mbcNone_write_rom;
+			cart->read_ram	= mbcNone_read_ram;
+			cart->write_ram = mbcNone_write_ram;
+			break;
 	}
 }
 
@@ -159,6 +169,7 @@ int load_sram (Cartucho *cart, const char *romfile) {
 	int a = fread(cart->ram, 1, cart->ram_size, f);
 	if (!a) {
 		fprintf(stderr, "Could not load saved game %s\n", path);
+		fclose(f);
 		return 0;
 	}
 	fclose(f);

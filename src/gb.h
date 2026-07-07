@@ -7,6 +7,7 @@
 #include "ppu/ppu.h"
 #include "apu/apu.h"
 #include "timer/timer.h"
+#include "serial/serial.h"
 #include "cartucho/cartucho.h"
 #include "cpu/opcodes.h"
 #include "frontend/frontend.h"
@@ -14,8 +15,6 @@
 typedef struct Joypad {
 	uint8_t buttons;
 	uint8_t joyp;
-	uint8_t SB;
-	uint8_t SC;
 } Joypad;
 
 typedef struct Memory {
@@ -41,6 +40,7 @@ typedef struct GB {
 	Interrupts interrupts;
 	Timer timer;
 	Joypad joypad;
+	Serial serial;
 
 	uint8_t dma_active;
 	uint16_t dma_src;

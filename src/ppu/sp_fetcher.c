@@ -10,7 +10,7 @@ void start_sprites (PPU *ppu) {
 			if (ppu->sp_done[i]) continue;
 			Sprite *sp = ppu->sprites + i;
 			int start_x = sp->x - 8;
-			if (start_x >= 0) continue;
+			if (start_x > 0) continue;
 			if (start_x <= upper_x) continue;
 			upper_x = start_x;
 			best_sprite = i;

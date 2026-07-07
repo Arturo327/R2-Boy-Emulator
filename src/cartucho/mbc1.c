@@ -23,8 +23,8 @@ uint8_t mbcNone_read_ram (GB *gb, uint16_t addr)
 
 	uint16_t offset = addr - 0xA000;
 
-	if (offset < gb->memory.cart.rom_size)
-		return gb->memory.cart.rom[offset];
+	if (offset < gb->memory.cart.ram_size)
+		return gb->memory.cart.ram[offset];
 
 	return 0xFF;
 }
@@ -35,8 +35,8 @@ void mbcNone_write_ram (GB *gb, uint16_t addr, uint8_t val)
 
 	uint16_t offset = addr - 0xA000;
 
-	if (offset < gb->memory.cart.rom_size)
-		gb->memory.cart.rom[offset] = val;
+	if (offset < gb->memory.cart.ram_size)
+		gb->memory.cart.ram[offset] = val;
 }
 
 uint8_t mbc1_read_rom (GB *gb, uint16_t addr)
