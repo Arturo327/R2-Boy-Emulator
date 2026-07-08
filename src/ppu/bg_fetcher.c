@@ -21,6 +21,7 @@ void bg_fetch (PPU *ppu) {
 			ppu->fetch_x = 0;
 			ppu->num_bg_fifo = 0;
 			ppu->bg_discard = 0;
+			ppu->bg_discard_px = 0;
 			ppu->startup_tiles = 0;
 		}
 	}

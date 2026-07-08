@@ -3,8 +3,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define LINE0_SHORTEN 2
-
 static const uint32_t PALETA[5] = {
 	0xFFC6DE8C,	// blanco
 	0xFF84A563,	// gris claro
@@ -79,6 +77,7 @@ static void reset_drawing (PPU *ppu) {
 	ppu->window_active = 0;
 
 	int a = ppu->scx & 7;
+	ppu->bg_discard_px = a;
 	if (a == 0) ppu->bg_discard = 0;
 	else if (a <= 4) ppu->bg_discard = 4;
 	else ppu->bg_discard = 8;
@@ -224,10 +223,13 @@ static int dot_line_step (PPU *ppu)
 		return 0;
 	}
 	if (ppu->bg_discard > 0) {
-		ppu->bg_discard--;
-		(void)bg_fifo_pop(ppu);
-		ppu->mode3_cycles++;
-		return 0;
+    		ppu->bg_discard--;
+    		if (ppu->bg_discard_px > 0) {
+        		ppu->bg_discard_px--;
+        		(void)bg_fifo_pop(ppu);
+    		}
+    		ppu->mode3_cycles++;
+    		return 0;
 	}
 
 	if (handle_sprites(ppu)) {
@@ -354,7 +356,7 @@ void ppu_step (PPU *ppu) {
 
 			} else if (ppu->short_line) {
 
-				if (ppu->dots == ppu->mode0_cycles - LINE0_SHORTEN) {
+				if (ppu->dots == ppu->mode0_cycles - 2) {
 					ppu->short_line = 0;
 					ppu->dots = 0;
 					update_stat(ppu, OAM_SCAN);

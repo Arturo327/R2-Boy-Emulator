@@ -47,6 +47,7 @@ typedef struct PPU {
 	uint8_t num_bg_fifo;
 	uint8_t fetcher_buffer[8];
 	uint8_t bg_discard;
+	uint8_t bg_discard_px;
 	uint8_t startup_tiles;
 
 	uint8_t hblank_pending;

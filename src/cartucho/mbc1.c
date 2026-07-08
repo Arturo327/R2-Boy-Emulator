@@ -18,25 +18,27 @@ void mbcNone_write_rom (GB *gb, uint16_t addr, uint8_t val)
 
 uint8_t mbcNone_read_ram (GB *gb, uint16_t addr)
 {
-	if (!gb->memory.cart.ram_enabled || !gb->memory.cart.ram)
+	Cartucho *cart = &gb->memory.cart;
+	if (!cart->ram_enabled || !cart->ram)
 		return 0xFF;
 
 	uint16_t offset = addr - 0xA000;
 
-	if (offset < gb->memory.cart.ram_size)
-		return gb->memory.cart.ram[offset];
+	if (offset < cart->ram_size)
+		return cart->ram[offset];
 
 	return 0xFF;
 }
 
 void mbcNone_write_ram (GB *gb, uint16_t addr, uint8_t val)
 {
-	if (!gb->memory.cart.ram_enabled || !gb->memory.cart.ram) return;
+	Cartucho *cart = &gb->memory.cart;
+	if (!cart->ram_enabled || !cart->ram) return;
 
 	uint16_t offset = addr - 0xA000;
 
-	if (offset < gb->memory.cart.ram_size)
-		gb->memory.cart.ram[offset] = val;
+	if (offset < cart->ram_size)
+		cart->ram[offset] = val;
 }
 
 static inline uint32_t mbc1_bank_number (Cartucho *cart)
@@ -51,10 +53,6 @@ static inline uint32_t mbc1_bank_number (Cartucho *cart)
 		shift = 5;
 	}
 
-	/*
-	uint8_t low = cart->bank1 & mask;
-	if (low == 0) low = 1;
-	*/
 	uint8_t low = cart->bank1 & 0x1F;
 	if (low == 0) low = 1;
 	low &= mask;
@@ -111,30 +109,32 @@ void mbc1_write_rom (GB *gb, uint16_t addr, uint8_t val)
 
 uint8_t mbc1_read_ram (GB *gb, uint16_t addr)
 {
-	if (!gb->memory.cart.ram_enabled || !gb->memory.cart.ram)
+	Cartucho *cart = &gb->memory.cart;
+	if (!cart->ram_enabled || !cart->ram)
 		return 0xFF;
 
-	uint32_t ram_bank = gb->memory.cart.ram_bank;
-	if (gb->memory.cart.mbc_mode == 0)
+	uint32_t ram_bank = cart->ram_bank;
+	if (cart->mbc_mode == 0)
 		ram_bank = 0;
-	if (gb->memory.cart.ram_banks > 0)
+	if (cart->ram_banks > 0)
 		ram_bank &= (gb->memory.cart.ram_banks - 1);
 
 	uint32_t offset = (ram_bank << 13) + (addr - 0xA000);
-	if (offset < gb->memory.cart.ram_size)
-		return gb->memory.cart.ram[offset];
+	if (offset < cart->ram_size)
+		return cart->ram[offset];
 	return 0xFF;
 }
 
 void mbc1_write_ram (GB *gb, uint16_t addr, uint8_t val)
 {
-	if (!gb->memory.cart.ram_enabled || !gb->memory.cart.ram) return;
+	Cartucho *cart = &gb->memory.cart;
+	if (!cart->ram_enabled || !cart->ram) return;
 
-	uint32_t ram_bank = gb->memory.cart.ram_bank;
-	if (gb->memory.cart.mbc_mode == 0) ram_bank = 0;
-	if (gb->memory.cart.ram_banks > 0) ram_bank &= (gb->memory.cart.ram_banks - 1);
+	uint32_t ram_bank = cart->ram_bank;
+	if (cart->mbc_mode == 0) ram_bank = 0;
+	if (cart->ram_banks > 0) ram_bank &= (cart->ram_banks - 1);
 
 	uint32_t offset = (ram_bank << 13) + (addr - 0xA000);
-	if (offset < gb->memory.cart.ram_size)
-		gb->memory.cart.ram[offset] = val;
+	if (offset < cart->ram_size)
+		cart->ram[offset] = val;
 }

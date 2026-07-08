@@ -2,6 +2,7 @@
 #define CARTUCHO_H
 
 #include <stdint.h>
+#include <time.h>
 
 #define MBC_NONE 0
 #define MBC1 1
@@ -10,6 +11,21 @@
 #define MBC5 5
 
 typedef struct GB GB;
+
+typedef struct RTC {
+	uint8_t s, m, h;
+	uint16_t d;
+	uint8_t halt;
+	uint8_t carry;
+
+	uint8_t s_l, m_l, h_l;
+	uint16_t d_l;
+	uint8_t halt_l;
+	uint8_t carry_l;
+
+	uint8_t latch_prev;
+	time_t base;
+} RTC;
 
 typedef struct Cartucho {
 	uint8_t *rom;
@@ -29,6 +45,10 @@ typedef struct Cartucho {
 	uint8_t bank1;
 	uint8_t bank2;
 	uint8_t multicart;
+	uint8_t mbc30;
+
+	uint8_t has_rtc;
+	RTC rtc;
 
 	int battery;
 
