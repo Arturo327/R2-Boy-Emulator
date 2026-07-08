@@ -26,8 +26,8 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 This project is under active development.
 
 Planned:
-- Implement remaining MBC types
-- Serial Data Transfer implementation
+- Link Cable
+- CGB support (more in the future)
 
 ---
 
@@ -85,6 +85,8 @@ R2-Boy supports the Game Boy boot ROM, just use the option:
 If you don't use the option, it will use the default path "roms/bios.bin".
 
 If the emulator cannot find a boot ROM, it will manually initialize the registers and directly run the game.
+
+The initialization of the registers is exacly the same you would obtain after boot in a DMG-ABC.
 
 ---
 
