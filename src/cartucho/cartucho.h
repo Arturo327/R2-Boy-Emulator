@@ -64,5 +64,6 @@ typedef struct Cartucho {
 int load_rom (Cartucho *cart, const char *filename);
 int load_sram (Cartucho *cart, const char *romfile);
 int save_sram (Cartucho *cart, const char *romfile);
+void free_cart (Cartucho *cart);
 
 #endif

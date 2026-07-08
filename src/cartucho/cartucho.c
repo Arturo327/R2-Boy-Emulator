@@ -81,10 +81,10 @@ static void select_mbc_fx (Cartucho *cart) {
 			break;
 
 		default:
-			printf("Cartridge: MBC%d unimplemented, using ROM-only (probably incorrect banking)\n", cart->mbc_type);
-			cart->read_rom	= mbcNone_read_rom;
+			fprintf(stderr, "Cartridge: MBC%d unimplemented, using ROM-only (probably incorrect banking)\n", cart->mbc_type);
+			cart->read_rom = mbcNone_read_rom;
 			cart->write_rom = mbcNone_write_rom;
-			cart->read_ram	= mbcNone_read_ram;
+			cart->read_ram = mbcNone_read_ram;
 			cart->write_ram = mbcNone_write_ram;
 			break;
 	}
@@ -162,8 +162,6 @@ int load_rom (Cartucho *cart, const char *filename)
 	}
 
 	cart->mbc30 = is_mbc30(cart);
-	if (cart->mbc30)
-		printf("MBC30 detected (rom_banks=%u, ram_size=%u)\n", cart->rom_banks, cart->ram_size);
 
 	select_mbc_fx(cart);
 	printf("ROM: %s\n", filename);
@@ -200,7 +198,7 @@ int load_sram (Cartucho *cart, const char *romfile)
 	if (cart->ram && cart->ram_size > 0) {
 		int a = fread(cart->ram, 1, cart->ram_size, f);
 		if (!a) {
-			printf("Could not load saved game %s\n", path);
+			fprintf(stderr, "Could not load saved game %s\n", path);
 			fclose(f);
 			return 0;
 		}
@@ -244,7 +242,10 @@ int save_sram (Cartucho *cart, const char *romfile)
 	make_sav_path(romfile, path, sizeof(path));
 
 	FILE *f = fopen(path, "wb");
-	if (!f) { printf("Could not save game %s\n", path); return 0; }
+	if (!f) {
+		fprintf(stderr, "Could not save game %s\n", path);
+		return 0;
+	}
 
 	if (cart->ram && cart->ram_size > 0)
 		fwrite(cart->ram, 1, cart->ram_size, f);
@@ -264,4 +265,10 @@ int save_sram (Cartucho *cart, const char *romfile)
 	fclose(f);
 	printf("Saved game: %s\n", path);
 	return 1;
+}
+
+void free_cart (Cartucho *cart)
+{
+	free(cart->rom);
+	free(cart->ram);
 }

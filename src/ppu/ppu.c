@@ -302,9 +302,9 @@ void ppu_step (PPU *ppu) {
 
 		if (ppu->mode == OAM_SCAN) {
 
-			if (ppu->dots == 76) ppu->vram_pre_block = 1;
+			if (ppu->dots == OAM_SCAN_DOTS - 4) ppu->vram_pre_block = 1;
 
-			if (ppu->dots == 80) {
+			if (ppu->dots == OAM_SCAN_DOTS) {
 				ppu->dots = 0;
 				update_stat(ppu, DRAWING);
 				ppu->vram_pre_block = 0;
@@ -331,7 +331,7 @@ void ppu_step (PPU *ppu) {
 			if (ppu->dots == ppu->mode0_cycles - 4) {
 				ppu->ly++;
 				check_lyc_delayed(ppu);
-				if (ppu->ly != 144) ppu->oam_pre_block = 1;
+				if (ppu->ly != DRAWING_LINES) ppu->oam_pre_block = 1;
 			}
 
 			if (ppu->first_line) {
@@ -340,14 +340,14 @@ void ppu_step (PPU *ppu) {
 					ppu->x = 0;
 					ppu->num_sprites = 0;
 				}
-				if (ppu->dots == 77) {
+				if (ppu->dots == OAM_SCAN_DOTS - 3) {
 					ppu->oam_pre_block = 1;
 					ppu->vram_pre_block = 1;
 				}
-				if (ppu->dots >= 78) {
+				if (ppu->dots >= OAM_SCAN_DOTS - 2) {
 					ppu->first_line = 0;
 					ppu->short_line = 1;
-					ppu->dots -= 78;
+					ppu->dots -= OAM_SCAN_DOTS - 2;
 					update_stat(ppu, DRAWING);
 					ppu->oam_pre_block = 0;
 					ppu->vram_pre_block = 0;
@@ -368,7 +368,7 @@ void ppu_step (PPU *ppu) {
 
 				ppu->dots -= ppu->mode0_cycles;
 
-				if (ppu->ly == 144) {
+				if (ppu->ly == DRAWING_LINES) {
 					update_stat(ppu, VBLANK);
 					ppu->bus->interrupts->IF |= 0x01;
 					ppu->ready = 1;
@@ -381,13 +381,14 @@ void ppu_step (PPU *ppu) {
 
 		} else {
 
-			if (ppu->dots == 455 && ppu->ly == 153) ppu->oam_pre_block = 1;
+			if (ppu->dots == LINE_DOTS - 1 && ppu->ly == TOTAL_LINES - 1)
+				ppu->oam_pre_block = 1;
 
-			if (ppu->dots >= 456) {
-				ppu->dots -= 456;
+			if (ppu->dots >= LINE_DOTS) {
+				ppu->dots -= LINE_DOTS;
 				ppu->ly++;
 
-				if (ppu->ly > 153) {
+				if (ppu->ly >= TOTAL_LINES) {
 					ppu->ly = 0;
 					update_stat(ppu, OAM_SCAN);
 					ppu->window_line = 0;

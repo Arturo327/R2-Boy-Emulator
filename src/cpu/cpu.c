@@ -57,13 +57,15 @@ void cpu_step (CPU *cpu) {
 
 		uint8_t opcode;
 		if (cpu->halt_bug) {
+			oam_bug((GB*)cpu->bus->ctx, cpu->pc, 0);
 			opcode = cpu->bus->read8(cpu->bus->ctx, cpu->pc);
 			cpu->halt_bug = 0;
 		} else {
+			oam_bug((GB*)cpu->bus->ctx, cpu->pc, 2);
 			opcode = cpu->bus->read8(cpu->bus->ctx, cpu->pc++);
 		}
 
-		if (opcode == 0xFB) cpu->bus->interrupts->ei_pending = 1;
+		//if (opcode == 0xFB) cpu->bus->interrupts->ei_pending = 1;
 
 		decode_instr(gb, opcode);
 

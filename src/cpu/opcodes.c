@@ -1,6 +1,7 @@
 #include "gb.h"
 #include "cpu/opcodes.h"
 #include <stdlib.h>
+#include <stdio.h>
 
 #define FLAG_Z 0x80
 #define FLAG_N 0x40
@@ -88,13 +89,19 @@ void ld_wzmem_sp_high (GB *gb) {
 	write8(gb, gb->cpu.wz + 1, sp_h);
 }
 
+// ------------------ ILLEGAL OPCODE ------------------
+
+void illegal_opcode (GB *gb) {
+	uint8_t opcode = gb->cpu.bus->read8(gb, gb->cpu.pc - 1);
+	printf("WARNING: ILEGAL OPCODE %#X\n", opcode);
+}
+
 // ---------------------- BLOCK 0 --------------------------
 
 // ---------------------- NOP --------------------------
 
 void nop (GB *gb) {
 	(void)gb;
-	return;
 }
 
 // --------------------- STOP ------------------------
@@ -2331,7 +2338,7 @@ void init_opcodes (OpcodeTable *t) {
 	t->main[0xD0] = decode_ret_nc;
 	t->main[0xD1] = decode_pop_de;
 	t->main[0xD2] = decode_jp_nc_imm16;
-	t->main[0xD3] = NULL;
+	t->main[0xD3] = illegal_opcode;
 	t->main[0xD4] = decode_call_nc_imm16;
 	t->main[0xD5] = decode_push_de;
 	t->main[0xD6] = decode_sub_a_imm8;
@@ -2340,17 +2347,17 @@ void init_opcodes (OpcodeTable *t) {
 	t->main[0xD8] = decode_ret_c;
 	t->main[0xD9] = decode_reti;
 	t->main[0xDA] = decode_jp_c_imm16;
-	t->main[0xDB] = NULL;
+	t->main[0xDB] = illegal_opcode;
 	t->main[0xDC] = decode_call_c_imm16;
-	t->main[0xDD] = NULL;
+	t->main[0xDD] = illegal_opcode;
 	t->main[0xDE] = decode_sbc_a_imm8;
 	t->main[0xDF] = decode_rst_3;
 
 	t->main[0xE0] = decode_ldh_imm8_a;
 	t->main[0xE1] = decode_pop_hl;
 	t->main[0xE2] = decode_ldh_c_a;
-	t->main[0xE3] = NULL;
-	t->main[0xE4] = NULL;
+	t->main[0xE3] = illegal_opcode;
+	t->main[0xE4] = illegal_opcode;
 	t->main[0xE5] = decode_push_hl;
 	t->main[0xE6] = decode_and_a_imm8;
 	t->main[0xE7] = decode_rst_4;
@@ -2358,9 +2365,9 @@ void init_opcodes (OpcodeTable *t) {
 	t->main[0xE8] = decode_add_sp_imm8;
 	t->main[0xE9] = jp_hl;
 	t->main[0xEA] = decode_ld_imm16_a;
-	t->main[0xEB] = NULL;
-	t->main[0xEC] = NULL;
-	t->main[0xED] = NULL;
+	t->main[0xEB] = illegal_opcode;
+	t->main[0xEC] = illegal_opcode;
+	t->main[0xED] = illegal_opcode;
 	t->main[0xEE] = decode_xor_a_imm8;
 	t->main[0xEF] = decode_rst_5;
 
@@ -2368,7 +2375,7 @@ void init_opcodes (OpcodeTable *t) {
 	t->main[0xF1] = decode_pop_af;
 	t->main[0xF2] = decode_ldh_a_c;
 	t->main[0xF3] = di;
-	t->main[0xF4] = NULL;
+	t->main[0xF4] = illegal_opcode;
 	t->main[0xF5] = decode_push_af;
 	t->main[0xF6] = decode_or_a_imm8;
 	t->main[0xF7] = decode_rst_6;
@@ -2377,8 +2384,8 @@ void init_opcodes (OpcodeTable *t) {
 	t->main[0xF9] = decode_ld_sp_hl;
 	t->main[0xFA] = decode_ld_a_imm16;
 	t->main[0xFB] = ei;
-	t->main[0xFC] = NULL;
-	t->main[0xFD] = NULL;
+	t->main[0xFC] = illegal_opcode;
+	t->main[0xFD] = illegal_opcode;
 	t->main[0xFE] = decode_cp_a_imm8;
 	t->main[0xFF] = decode_rst_7;
 

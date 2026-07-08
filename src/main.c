@@ -30,7 +30,7 @@ static int run_test (const char *romfile)
 
 	init_test (&gb, romfile, "no_load_bios");
 	if (!gb.running) {
-		printf("FAIL: %s (could not load ROM)\n", romfile);
+		fprintf(stderr, "FAIL: %s (could not load ROM)\n", romfile);
 		return 1;
 	}
 
@@ -71,25 +71,48 @@ typedef struct {
 	int debug;
 } Args;
 
-static void print_usage (const char *prog) {
-	fprintf(stderr, "Use: %s [-d/--debug] [-b/--bios bios_file] game.gb\n", prog);
+static inline void print_usage_err (const char *prog) {
+	fprintf(stderr, "Use: %s [-h|--help] [-v|--version] [-d|--debug] [-b|--bios bios_file] game.gb\nExecute %s --help for more info\n", prog, prog);
+}
+static inline void print_usage (const char *prog) {
+	printf("R2-Boy v1.0.0-beta\n\n");
+	printf("USE:\n");
+	printf("    %s [-h|--help] [-v|--version] [-d|--debug] [-b|--bios bios_file] game.gb\n\n", prog);
+
+	printf("OPTIONS:\n");
+	printf("    -h, --help              Print this help message\n");
+    	printf("    -v, --version           Print version information\n");
+    	printf("    -d, --debug             Desactivates frontend and checks registers to determine weather the test passed\n");
+    	printf("    -b, --bios <BIOS_FILE>  Specify the path of the BOOT ROM. [default: 'roms/boot.bin'] If it is not found, the emulator will boot without a BIOS.\n\n");
+
+    	printf("KEYBOARD MAPPINGS:\n");
+    	printf("    Directional Arrows      D-Pad (Up, Down, Left, Right)\n");
+    	printf("    X                       A Button\n");
+    	printf("    Z                       B Button\n");
+    	printf("    Enter                   START\n");
+    	printf("    Backspace               SELECT\n");
+}
+static inline void print_version (void) {
+	printf("R2-Boy v1.0.0-beta\n");
 }
 
 static Args parse_args (int argc, char *argv[])
 {
 	static struct option long_options[] = {
-		{"bios",  required_argument, 0, 'b'},
+		{"bios", required_argument, 0, 'b'},
 		{"debug", no_argument, 0, 'd'},
+		{"help", no_argument, 0, 'h'},
+		{"version", no_argument, 0, 'v'},
 		{0, 0, 0, 0}
 	};
 
 	Args args = {
 		.biosfile = "roms/bios.bin",
-		.debug	  = 0,
+		.debug = 0,
 	};
 
 	int opt;
-	while ((opt = getopt_long(argc, argv, "db:", long_options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "hvdb:", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 'd':
 			printf("DEBUG MODE active\n");
@@ -99,8 +122,14 @@ static Args parse_args (int argc, char *argv[])
 			printf("BIOS: %s\n", optarg);
 			args.biosfile = optarg;
 			break;
-		default:
+		case 'h':
 			print_usage(argv[0]);
+			exit(0);
+		case 'v':
+			print_version();
+			exit(0);
+		default:
+			print_usage_err(argv[0]);
 			exit(1);
 		}
 	}
@@ -185,10 +214,18 @@ int main (int argc, char *argv[])
 	if (args.debug)
 		return run_test(args.romfile);
 
-	GB gb = {0};
-	if (!init_emulator(&gb, args.romfile, args.biosfile))
+	GB *gb = malloc(sizeof(GB));
+	if (!gb) {
+		fprintf(stderr, "FAIL: Not enough memory. Buy more RAM.\n");
+		return 1;
+	}
+
+	if (!init_emulator(gb, args.romfile, args.biosfile))
 		return 1;
 
-	run(&gb);
+	run(gb);
+
+	free(gb);
+	gb = NULL;
 	return 0;
 }

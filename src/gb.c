@@ -91,6 +91,7 @@ void cleanup (GB *gb) {
 	save_sram(&gb->memory.cart, gb->rom_path);
 	cleanup_audio(&gb->audio);
 	cleanup_screen(&gb->lcd);
+	free_cart(&gb->memory.cart);
 }
 
 void gb_step (GB *gb)

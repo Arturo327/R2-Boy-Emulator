@@ -22,7 +22,7 @@ int init_screen (LCD *lcd) {
 	}
 
 	lcd->window = SDL_CreateWindow(
-		"r2boy",
+		"R2-Boy",
 		SDL_WINDOWPOS_CENTERED,
 		SDL_WINDOWPOS_CENTERED,
 		160 * 4, 144 * 4,

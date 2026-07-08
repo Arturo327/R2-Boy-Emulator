@@ -8,6 +8,12 @@
 #define OAM_SCAN 2
 #define DRAWING 3
 
+#define OAM_SCAN_DOTS 80
+#define LINE_DOTS 456
+#define DRAWING_HBLANK_DOTS 376
+#define DRAWING_LINES 144
+#define TOTAL_LINES 154
+
 typedef struct Sprite {
 	uint8_t y;
 	uint8_t x;
