@@ -51,6 +51,7 @@ typedef struct Cartucho {
 	RTC rtc;
 
 	uint8_t has_rumble;
+	uint8_t rumble_on;
 
 	uint8_t battery;
 

@@ -38,7 +38,7 @@ typedef struct Audio {
 
 int init_screen (LCD *lcd);
 void cleanup_screen (LCD *lcd);
-void update_screen (LCD *lcd, uint32_t *framebuffer);
+void update_screen (LCD *lcd, uint32_t *framebuffer, uint8_t rumble);
 int handle_events (GB *gb);
 
 int init_audio (Audio *audio);

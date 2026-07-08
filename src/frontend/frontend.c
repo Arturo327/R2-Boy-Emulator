@@ -1,6 +1,8 @@
 #include "frontend/frontend.h"
 #include "gb.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
 
 #define JOYPAD_RIGHT 0x01
 #define JOYPAD_LEFT 0x02
@@ -61,6 +63,7 @@ int init_screen (LCD *lcd) {
 		return 0;
 	}
 
+	srand((unsigned)time(NULL));
 	SDL_RenderSetLogicalSize(lcd->renderer, 160, 144);
 	SDL_SetRenderDrawColor(lcd->renderer, 0, 0, 0, 255);
 
@@ -74,12 +77,19 @@ void cleanup_screen (LCD *lcd) {
 	SDL_Quit();
 }
 
-void update_screen (LCD *lcd, uint32_t *framebuffer) {
+void update_screen (LCD *lcd, uint32_t *framebuffer, uint8_t rumble) {
 	if (!lcd->texture || !lcd->renderer) return;
 
 	SDL_UpdateTexture(lcd->texture, NULL, framebuffer, 160 * sizeof(uint32_t));
 	SDL_RenderClear(lcd->renderer);
-	SDL_RenderCopy(lcd->renderer, lcd->texture, NULL, NULL);
+
+	SDL_Rect dst = {0, 0, 160, 144};
+	if (rumble) {
+		dst.x = (rand() & 7) - 4;
+		dst.y = (rand() & 7) - 4;
+	}
+
+	SDL_RenderCopy(lcd->renderer, lcd->texture, NULL, &dst);
 	SDL_RenderPresent(lcd->renderer);
 }
 

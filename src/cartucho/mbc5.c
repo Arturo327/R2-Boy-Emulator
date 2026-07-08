@@ -35,10 +35,12 @@ void mbc5_write_rom (GB *gb, uint16_t addr, uint8_t val)
 		cart->bank2 = val & 0x01;
 
 	} else if (addr < 0x6000) {
-		if (cart->has_rumble)
+		if (cart->has_rumble) {
+			cart->rumble_on = (val >> 3) & 0x01;
 			cart->ram_bank = val & 0x07;
-		else
+		} else {
 			cart->ram_bank = val & 0x0F;
+		}
 	}
 }
 
