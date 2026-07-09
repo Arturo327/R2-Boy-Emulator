@@ -196,6 +196,7 @@ static void run (GB *gb)
 
 		queue_audio(gb);
 		update_screen(&gb->lcd, gb->ppu.framebuffer, gb->memory.cart.rumble_on);
+		update_rumble(&gb->pad, gb->memory.cart.rumble_on);
 		gb->clock -= 70224;
 
 		while (ring_used(&gb->audio.ring) > max_queued)

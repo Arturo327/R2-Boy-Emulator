@@ -117,13 +117,8 @@ static int is_mbc30 (Cartucho *cart) {
 	return (cart->rom_banks > 128) || (cart->ram_size > 0x8000);
 }
 
-int load_rom (Cartucho *cart, const char *filename)
+static int read_rom (Cartucho *cart, const char *filename)
 {
-	cart->rom_bank = 1;
-	cart->bank1 = 1;
-	cart->rtc.latch_prev = 0xFF;
-	cart->rtc.base = time(NULL);
-
 	FILE *f = fopen(filename, "rb");
 	if (!f) return 0;
 
@@ -135,6 +130,7 @@ int load_rom (Cartucho *cart, const char *filename)
 
 	if (!cart->rom) {
 		fclose(f);
+		fprintf(stderr, "Not enough memory to load the ROM %s", filename);
 		return 0;
 	}
 
@@ -142,7 +138,23 @@ int load_rom (Cartucho *cart, const char *filename)
 	fclose(f);
 	if (a != (int)cart->rom_size) return 0;
 
+	if (cart->rom_size < 0x150) {
+		fprintf(stderr, "ROM: file to small (%u bytes) for containing a valid header\n",
+			(unsigned)cart->rom_size);
+		return 0;
+	}
 	cart->rom_banks = cart->rom_size / 0x4000;
+	return 1;
+}
+
+int load_rom (Cartucho *cart, const char *filename)
+{
+	cart->rom_bank = 1;
+	cart->bank1 = 1;
+	cart->rtc.latch_prev = 0xFF;
+	cart->rtc.base = time(NULL);
+
+	if (!read_rom(cart, filename)) return 0;
 
 	normalize_mbc(cart, cart->rom[0x0147]);
 	cart->multicart = is_multicart(cart);

@@ -14,7 +14,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 - PPU (Pixel Processing Unit) emulation
 - APU (Audio Processing Unit) emulation
 - SDL-based graphics output
-- Keyboard input support
+- Keyboard and Gamepad input support
 - Testing support
 - Save game support
 - M-Cycle accurate

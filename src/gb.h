@@ -34,6 +34,8 @@ typedef struct GB {
 
 	LCD lcd;
 	Audio audio;
+	Gamepad pad;
+
 	Memory memory;
 	PPU ppu;
 	APU apu;

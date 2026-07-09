@@ -68,6 +68,8 @@ void init (GB *gb, const char *romfile, const char *biosfile)
 		return;
 	}
 
+	init_gamepad(&gb->pad);
+
 	if (!init_audio(&gb->audio)) {
 		gb->running = 0;
 		return;
@@ -90,6 +92,7 @@ void init_test (GB *gb, const char *romfile, const char *biosfile)
 void cleanup (GB *gb) {
 	save_sram(&gb->memory.cart, gb->rom_path);
 	cleanup_audio(&gb->audio);
+	cleanup_gamepad(&gb->pad);
 	cleanup_screen(&gb->lcd);
 	free_cart(&gb->memory.cart);
 }
