@@ -4,8 +4,20 @@
 void ring_push (AudioRing *r, int16_t *src, uint32_t n)
 {
 	uint32_t wp = atomic_load_explicit(&r->write_pos, memory_order_relaxed);
-	for (uint32_t i = 0; i < n; i++)
-		r->buffer[(wp + i) & (AUDIO_RING_SIZE - 1)] = src[i];
+	uint32_t rp = atomic_load_explicit(&r->read_pos, memory_order_acquire);
+	uint32_t free_space = AUDIO_RING_SIZE - ((wp - rp) & (AUDIO_RING_SIZE - 1));
+
+	if (n > free_space) n = free_space;
+	if (n == 0) return;
+
+	uint32_t idx = wp & (AUDIO_RING_SIZE - 1);
+	uint32_t first = AUDIO_RING_SIZE - idx;
+	if (first > n) first = n;
+
+	memcpy(r->buffer + idx, src, first * sizeof(int16_t));
+	if (n > first)
+		memcpy(r->buffer, src + first, (n - first) * sizeof(int16_t));
+
 	atomic_store_explicit(&r->write_pos, wp + n, memory_order_release);
 }
 

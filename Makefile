@@ -8,7 +8,7 @@ all: build/r2boy
 
 .PHONY: all test clean clean_sav
 
-build/r2boy: $(OBJ)
+build/r2boy: $(OBJ) build/
 	$(CC) $(OBJ) -lSDL2 -o $@
 
 build/%.o: src/%.c
@@ -35,4 +35,4 @@ clean_sav:
 	find tests/ -name "*.sav" -delete
 
 clean:
-	rm -f $(OBJ) build/r2boy
+	rm -r build/

@@ -99,8 +99,7 @@ uint8_t dma_read_source (GB *gb, uint16_t addr)
 	if (addr < 0xA000) return gb->memory.vram[addr - 0x8000];
 	if (addr < 0xC000) return gb->memory.cart.read_ram(gb, addr);
 	if (addr < 0xE000) return gb->memory.wram[addr - 0xC000];
-	if (addr < 0xFE00) return gb->memory.wram[addr - 0xE000];
-	return 0xFF;
+	return gb->memory.wram[addr - 0xE000];
 }
 
 static uint8_t bus_read8 (void *ctx, uint16_t addr)
