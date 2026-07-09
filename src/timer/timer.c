@@ -1,5 +1,16 @@
 #include "timer/timer.h"
 
+static int get_tac_bit (Timer *timer)
+{
+	switch (timer->tac & 0x03) {
+		case 0: return (timer->div >> 9) & 1;
+		case 1: return (timer->div >> 3) & 1;
+		case 2: return (timer->div >> 5) & 1;
+		case 3: return (timer->div >> 7) & 1;
+	}
+	return 0;
+}
+
 int timer_step (Timer *timer)
 {
 	int hay_interrupt = 0;
@@ -7,24 +18,13 @@ int timer_step (Timer *timer)
 
 	for (int i = 0; i < 4; i++) {
 
-		int bit = 0;
-		switch (timer->tac & 0x03) {
-			case 0: bit = (timer->div >> 9) & 1; break;
-			case 1: bit = (timer->div >> 3) & 1; break;
-			case 2: bit = (timer->div >> 5) & 1; break;
-			case 3: bit = (timer->div >> 7) & 1; break;
-		}
+		int bit = get_tac_bit(timer);
 		int tima_enable = (timer->tac & 0x04) ? 1 : 0;
 		int before = bit & tima_enable;
 
 		timer->div++;
 
-		switch (timer->tac & 0x03) {
-			case 0: bit = (timer->div >> 9) & 1; break;
-			case 1: bit = (timer->div >> 3) & 1; break;
-			case 2: bit = (timer->div >> 5) & 1; break;
-			case 3: bit = (timer->div >> 7) & 1; break;
-		}
+		bit = get_tac_bit(timer);
 		int after = bit & tima_enable;
 
 		if (timer->tima_overflow > 0) {

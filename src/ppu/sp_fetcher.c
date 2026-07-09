@@ -37,70 +37,86 @@ void start_sprites (PPU *ppu) {
 	}
 }
 
+static void get_sp_addr (PPU *ppu)
+{
+	ppu->sel_sprite = ppu->pending_sprite;
+
+	int line = (int)ppu->ly - ((int)ppu->sprites[ppu->sel_sprite].y - 16);
+
+	uint8_t sp_h = (ppu->lcdc & 0x04) ? 16 : 8;
+	uint8_t tile_line = (ppu->sprites[ppu->sel_sprite].flags & 0x40) ?
+		(sp_h - 1 - line) : line;
+
+	uint8_t tile = ppu->sprites[ppu->sel_sprite].tile;
+	if (ppu->lcdc & 0x04) tile &= 0xFE;
+	ppu->sp_addr = tile << 4;
+	ppu->sp_addr += tile_line << 1;
+}
+
+static void fetch_tile_low (PPU *ppu, GB *gb)
+{
+	uint8_t l = gb->memory.vram[ppu->sp_addr];
+	for (int i = 0; i < 8; i++) {
+		uint8_t bit = (ppu->sprites[ppu->sel_sprite].flags & 0x20) ?
+			i : 7 - i;
+		ppu->sp_buff[i].color = (l >> bit) & 1;
+		ppu->sp_buff[i].pal = (ppu->sprites[ppu->sel_sprite].flags & 0x10) ?
+			ppu->obp1 : ppu->obp0;
+	}
+}
+
+static void fetch_tile_high (PPU *ppu, GB *gb)
+{
+	uint8_t h = gb->memory.vram[ppu->sp_addr + 1];
+	for (int i = 0; i < 8; i++) {
+		uint8_t bit = (ppu->sprites[ppu->sel_sprite].flags & 0x20) ?
+			i : 7 - i;
+		ppu->sp_buff[i].color |= ((h >> bit) & 1) << 1;
+		ppu->sp_buff[i].bg_prio = ppu->sprites[ppu->sel_sprite].flags & 0x80;
+	}
+}
+
+static void push_sprite (PPU *ppu)
+{
+	int start_x = (int)ppu->sprites[ppu->sel_sprite].x - 8;
+
+	for (int i = ppu->num_sp_fifo; i < 8; i++)
+		ppu->sp_fifo[i].color = 0;
+
+	if (ppu->sprites[ppu->sel_sprite].x < 8) {
+		int shift = 8 - ppu->sprites[ppu->sel_sprite].x;
+		for (int i = shift; i < 8; i++) {
+			ppu->sp_buff[i - shift] = ppu->sp_buff[i];
+		}
+		for (int i = 8 - shift; i < 8; i++) ppu->sp_buff[i].color = 0;
+	}
+
+	for (int i = 0; i < 8; i++) {
+		if (!ppu->sp_buff[i].color) continue;
+		if (ppu->sp_fifo[i].color != 0 && ppu->sp_fifo[i].src_x < start_x) continue;
+		ppu->sp_buff[i].src_x = start_x;
+		ppu->sp_fifo[i] = ppu->sp_buff[i];
+	}
+
+	ppu->sprite_active = 0;
+	ppu->sprite_step = 0;
+	ppu->num_sp_fifo = 8;
+}
+
 void sprite_fetch (PPU *ppu) {
 	GB *gb = (GB *)ppu->bus->ctx;
 
 	if (ppu->sprite_step == 0) {
-
-		ppu->sel_sprite = ppu->pending_sprite;
-
-		int line = (int)ppu->ly - ((int)ppu->sprites[ppu->sel_sprite].y - 16);
-
-		uint8_t sp_h = (ppu->lcdc & 0x04) ? 16 : 8;
-		uint8_t tile_line = (ppu->sprites[ppu->sel_sprite].flags & 0x40) ?
-			(sp_h - 1 - line) : line;
-
-		uint8_t tile = ppu->sprites[ppu->sel_sprite].tile;
-		if (ppu->lcdc & 0x04) tile &= 0xFE;
-		ppu->sp_addr = tile << 4;
-		ppu->sp_addr += tile_line << 1;
+		get_sp_addr(ppu);
 
 	} else if (ppu->sprite_step == 2) {
-
-		uint8_t l = gb->memory.vram[ppu->sp_addr];
-		for (int i = 0; i < 8; i++) {
-			uint8_t bit = (ppu->sprites[ppu->sel_sprite].flags & 0x20) ?
-				i : 7 - i;
-			ppu->sp_buff[i].color = (l >> bit) & 1;
-			ppu->sp_buff[i].pal = (ppu->sprites[ppu->sel_sprite].flags & 0x10) ?
-				ppu->obp1 : ppu->obp0;
-		}
+		fetch_tile_low(ppu, gb);
 
 	} else if (ppu->sprite_step == 4) {
-
-		uint8_t h = gb->memory.vram[ppu->sp_addr + 1];
-		for (int i = 0; i < 8; i++) {
-			uint8_t bit = (ppu->sprites[ppu->sel_sprite].flags & 0x20) ?
-				i : 7 - i;
-			ppu->sp_buff[i].color |= ((h >> bit) & 1) << 1;
-			ppu->sp_buff[i].bg_prio = ppu->sprites[ppu->sel_sprite].flags & 0x80;
-		}
+		fetch_tile_high(ppu, gb);
 
 	} else if (ppu->sprite_step == 5) {
-
-		int start_x = (int)ppu->sprites[ppu->sel_sprite].x - 8;
-
-		for (int i = ppu->num_sp_fifo; i < 8; i++)
-			ppu->sp_fifo[i].color = 0;
-
-		if (ppu->sprites[ppu->sel_sprite].x < 8) {
-			int shift = 8 - ppu->sprites[ppu->sel_sprite].x;
-			for (int i = shift; i < 8; i++) {
-				ppu->sp_buff[i - shift] = ppu->sp_buff[i];
-			}
-			for (int i = 8 - shift; i < 8; i++) ppu->sp_buff[i].color = 0;
-		}
-
-		for (int i = 0; i < 8; i++) {
-			if (!ppu->sp_buff[i].color) continue;
-			if (ppu->sp_fifo[i].color != 0 && ppu->sp_fifo[i].src_x < start_x) continue;
-			ppu->sp_buff[i].src_x = start_x;
-			ppu->sp_fifo[i] = ppu->sp_buff[i];
-		}
-
-		ppu->sprite_active = 0;
-		ppu->sprite_step = 0;
-		ppu->num_sp_fifo = 8;
+		push_sprite(ppu);
 		return;
 	}
 
