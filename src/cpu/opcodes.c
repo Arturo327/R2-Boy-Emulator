@@ -64,19 +64,23 @@ void ld_z_hl (GB *gb) {
 }
 
 void ld_z_imm8 (GB *gb) {
-	gb->cpu.z = read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	gb->cpu.z = gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 }
 
 void ld_w_imm8 (GB *gb) {
-	gb->cpu.w = read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	gb->cpu.w = gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 }
 
 void ld_sp_low_imm8 (GB *gb) {
-	gb->cpu.sp = (uint16_t)read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	gb->cpu.sp = (uint16_t)gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 }
 
 void ld_sp_high_imm8 (GB *gb) {
-	gb->cpu.sp |= ((uint16_t)read8(gb, gb->cpu.pc++)) << 8;
+	oam_bug(gb, gb->cpu.pc, 2);
+	gb->cpu.sp |= ((uint16_t)gb->bus.read8(gb->bus.ctx, gb->cpu.pc++)) << 8;
 }
 
 void ld_wzmem_sp_low (GB *gb) {
@@ -146,9 +150,10 @@ void decode_ld_imm16_sp (GB *gb) {	// 0x08
 
 // ------------------ ld r8, imm8 ---------------------
 
-#define DEF_LD_NEXT8(name)			\
-void ld_##name##_imm8 (GB *gb) {		\
-	gb->cpu.name = read8(gb, gb->cpu.pc++);	\
+#define DEF_LD_NEXT8(name)					\
+void ld_##name##_imm8 (GB *gb) {				\
+	oam_bug(gb, gb->cpu.pc, 2);				\
+	gb->cpu.name = gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);\
 }
 
 DEF_LD_NEXT8(b)		// 0x06
@@ -394,7 +399,8 @@ void decode_jr_imm8 (GB *gb) {		// 0x18
 // ------------------- jr cond, imm8 ------------------
 
 void jr_check_z (GB *gb) {
-	uint8_t a8 = read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	uint8_t a8 = gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 	if (gb->cpu.f & FLAG_Z) {
 		gb->cpu.z = a8;
 		return;
@@ -407,7 +413,8 @@ void decode_jr_z_imm8 (GB *gb) {	// 0x28
 }
 
 void jr_check_c (GB *gb) {
-	uint8_t a8 = read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	uint8_t a8 = gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 	if (gb->cpu.f & FLAG_C) {
 		gb->cpu.z = a8;
 		return;
@@ -420,7 +427,8 @@ void decode_jr_c_imm8 (GB *gb) {	// 0x38
 }
 
 void jr_check_nz (GB *gb) {
-	uint8_t a8 = read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	uint8_t a8 = gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 	if (gb->cpu.f & FLAG_Z) {
 		clear_instrs(gb);
 		return;
@@ -433,7 +441,8 @@ void decode_jr_nz_imm8 (GB *gb) {	// 0x20
 }
 
 void jr_check_nc (GB *gb) {
-	uint8_t a8 = read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	uint8_t a8 = gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 	if (gb->cpu.f & FLAG_C) {
 		clear_instrs(gb);
 		return;
@@ -968,7 +977,8 @@ DECODE8(cp_a_hl)
 
 void add_a_imm8 (GB *gb) {		// 0xC6
 	uint8_t old = gb->cpu.a;
-	gb->cpu.a += read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	gb->cpu.a += gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 	set_z(gb, gb->cpu.a == 0);
 	set_n(gb, 0);
 	set_h(gb, (old & 0x0F) > (gb->cpu.a & 0x0F));
@@ -981,7 +991,8 @@ DECODE8(add_a_imm8)
 void adc_a_imm8 (GB *gb) {			// 0xCE
 	uint8_t old = gb->cpu.a;
 	uint8_t c = (gb->cpu.f & FLAG_C) >> 4;
-	uint8_t v = read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	uint8_t v = gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 	uint16_t r = (uint16_t)old + v + c;
 	gb->cpu.a = (uint8_t)r;
 	set_z(gb, gb->cpu.a == 0);
@@ -995,7 +1006,8 @@ DECODE8(adc_a_imm8)
 
 void sub_a_imm8 (GB *gb) {			// 0xD6
 	uint8_t old = gb->cpu.a;
-	uint8_t v = read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	uint8_t v = gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 	gb->cpu.a -= v;
 	set_z(gb, gb->cpu.a == 0);
 	set_n(gb, 1);
@@ -1009,7 +1021,8 @@ DECODE8(sub_a_imm8)
 void sbc_a_imm8 (GB *gb) {			// 0xDE
 	uint8_t old = gb->cpu.a;
 	uint8_t c = (gb->cpu.f & FLAG_C) >> 4;
-	uint8_t v = read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	uint8_t v = gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 	gb->cpu.a = old - v - c;
 	set_z(gb, gb->cpu.a == 0);
 	set_n(gb, 1);
@@ -1021,7 +1034,8 @@ DECODE8(sbc_a_imm8)
 // ------------------ AND a, imm8 ------------------
 
 void and_a_imm8 (GB *gb) {			// 0xE6
-	gb->cpu.a &= read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	gb->cpu.a &= gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 	set_z(gb, gb->cpu.a == 0);
 	set_n(gb, 0);
 	set_h(gb, 1);
@@ -1032,7 +1046,8 @@ DECODE8(and_a_imm8)
 // ------------------ XOR a, imm8 -------------------
 
 void xor_a_imm8 (GB *gb) {			// 0xEE
-	gb->cpu.a ^= read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	gb->cpu.a ^= gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 	set_z(gb, gb->cpu.a == 0);
 	set_n(gb, 0);
 	set_h(gb, 0);
@@ -1043,7 +1058,8 @@ DECODE8(xor_a_imm8)
 // ------------------- OR a, imm8 ------------------
 
 void or_a_imm8 (GB *gb) {			// 0xF6
-	gb->cpu.a |= read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	gb->cpu.a |= gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 	set_z(gb, gb->cpu.a == 0);
 	set_n(gb, 0);
 	set_h(gb, 0);
@@ -1054,7 +1070,8 @@ DECODE8(or_a_imm8)
 // ------------------- CP a, imm8 ------------------
 
 void cp_a_imm8 (GB *gb) {			// 0xFE
-	uint8_t v = read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	uint8_t v = gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 	uint8_t tmp = gb->cpu.a - v;	
 	set_z(gb, tmp == 0);
 	set_n(gb, 1);
@@ -1090,19 +1107,23 @@ void check_ret_nc (GB *gb) {
 }
 
 void check_jp_z (GB *gb) {
-	gb->cpu.w = read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	gb->cpu.w = gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 	if (!(gb->cpu.f & FLAG_Z)) clear_instrs(gb);
 }
 void check_jp_c (GB *gb) {
-	gb->cpu.w = read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	gb->cpu.w = gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 	if (!(gb->cpu.f & FLAG_C)) clear_instrs(gb);
 }
 void check_jp_nz (GB *gb) {
-	gb->cpu.w = read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	gb->cpu.w = gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 	if (gb->cpu.f & FLAG_Z) clear_instrs(gb);
 }
 void check_jp_nc (GB *gb) {
-	gb->cpu.w = read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	gb->cpu.w = gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 	if (gb->cpu.f & FLAG_C) clear_instrs(gb);
 }
 
@@ -2071,7 +2092,8 @@ DEF_SET_HL(7)		// 0xFE
 // ------------------- DECODE ------------------
 
 void fetch_cb (GB *gb) {
-	uint8_t opcode = read8(gb, gb->cpu.pc++);
+	oam_bug(gb, gb->cpu.pc, 2);
+	uint8_t opcode = gb->bus.read8(gb->bus.ctx, gb->cpu.pc++);
 	if ((opcode & 7) == 6) {
 		if (opcode >= 0x40 && opcode < 0x80) {
 			push_mcycle(gb, gb->opcodes.cb[opcode]);

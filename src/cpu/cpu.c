@@ -65,10 +65,7 @@ void cpu_step (CPU *cpu) {
 			opcode = cpu->bus->read8(cpu->bus->ctx, cpu->pc++);
 		}
 
-		//if (opcode == 0xFB) cpu->bus->interrupts->ei_pending = 1;
-
 		decode_instr(gb, opcode);
-
 		return;
 	}
 
