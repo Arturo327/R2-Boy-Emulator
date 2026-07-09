@@ -15,6 +15,9 @@
 typedef struct Joypad {
 	uint8_t buttons;
 	uint8_t joyp;
+	uint8_t kb_buttons;
+	uint8_t pad_dpad;
+	uint8_t pad_stick;
 } Joypad;
 
 typedef struct Memory {
@@ -59,9 +62,11 @@ typedef struct GB {
 } GB;
 
 void init (GB *gb, const char *romfile, const char *biosfile);
-void init_test (GB *gb, const char *romfile, const char *biosfile);
+void init_test (GB *gb, const char *romfile);
 
 void cleanup (GB *gb);
+void cleanup_core (GB *gb);
+
 void gb_step (GB *gb);
 
 #endif

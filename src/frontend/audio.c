@@ -1,7 +1,10 @@
 #include "frontend/audio.h"
 #include "gb.h"
 
-void ring_push (AudioRing *r, int16_t *src, uint32_t n)
+#include <string.h>
+#include <stdio.h>
+
+static void ring_push (AudioRing *r, int16_t *src, uint32_t n)
 {
 	uint32_t wp = atomic_load_explicit(&r->write_pos, memory_order_relaxed);
 	uint32_t rp = atomic_load_explicit(&r->read_pos, memory_order_acquire);

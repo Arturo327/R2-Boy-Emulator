@@ -1,5 +1,8 @@
 #include "frontend/gamepad.h"
 
+#include <string.h>
+#include <stdio.h>
+
 void open_gamepad (Gamepad *pad, int device_index) {
 	if (pad->connected) return;
 

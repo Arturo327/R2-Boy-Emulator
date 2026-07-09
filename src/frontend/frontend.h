@@ -10,6 +10,8 @@
 
 typedef struct GB GB;
 
+int frontend_init (GB *gb);
+void frontend_shutdown (GB *gb);
 int handle_events (GB *gb);
 
 #endif

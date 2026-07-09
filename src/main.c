@@ -2,8 +2,13 @@
 
 #include <stdio.h>
 #include <getopt.h>
-#include <string.h>
+#include <signal.h>
 #include <SDL2/SDL.h>
+
+static volatile sig_atomic_t quit_requested = 0;
+static void on_signal (int sig) {
+	(void)sig; quit_requested = 1;
+}
 
 static int check_regs (GB *gb, const char *romfile)
 {
@@ -26,33 +31,37 @@ static int check_regs (GB *gb, const char *romfile)
 
 static int run_test (const char *romfile)
 {
-	GB gb = {0};
+	GB *gb = malloc(sizeof(GB));
 
-	init_test (&gb, romfile, "no_load_bios");
-	if (!gb.running) {
+	init_test (gb, romfile);
+	if (!gb->running) {
 		fprintf(stderr, "FAIL: %s (could not load ROM)\n", romfile);
+		cleanup_core(gb);
+		free(gb);
 		return 1;
 	}
 
 	const uint64_t MAX_CYCLES = 500000000ULL;
 	int truth_time = 0;
-	while (gb.clock < MAX_CYCLES) {
-		if (gb.cpu.instr_head >= gb.cpu.instr_tail && !gb.cpu.halted &&
-				gb.bus.read8(gb.bus.ctx, gb.cpu.pc) == 0x40) {
+	while (gb->clock < MAX_CYCLES) {
+		if (gb->cpu.instr_head >= gb->cpu.instr_tail && !gb->cpu.halted &&
+				gb->bus.read8(gb->bus.ctx, gb->cpu.pc) == 0x40) {
 			truth_time = 1;
 			break;
 		}
-		gb_step(&gb);
+		gb_step(gb);
 	}
 
 	if (!truth_time) {
 		printf("TIMEOUT: %s\n", romfile);
-		cleanup(&gb);
+		cleanup_core(gb);
+		free(gb);
 		return 1;
 	}
 
-	int result = check_regs(&gb, romfile);
-	cleanup(&gb);
+	int result = check_regs(gb, romfile);
+	cleanup_core(gb);
+	free(gb);
 	return result;
 }
 
@@ -187,7 +196,7 @@ static void run (GB *gb)
 	uint64_t frame_ticks = (uint64_t)(freq / frames_per_sec);
 	uint64_t next_frame = SDL_GetPerformanceCounter();
 
-	while (gb->running) {
+	while (gb->running && !quit_requested) {
 
 		if (!run_frame(gb, max_queued)) {
 			gb->running = 0;
@@ -221,12 +230,16 @@ int main (int argc, char *argv[])
 		return 1;
 	}
 
-	if (!init_emulator(gb, args.romfile, args.biosfile))
+	if (!init_emulator(gb, args.romfile, args.biosfile)) {
+		free(gb);
 		return 1;
+	}
+
+	signal(SIGINT, on_signal);
+	signal(SIGTERM, on_signal);
 
 	run(gb);
 
 	free(gb);
-	gb = NULL;
 	return 0;
 }

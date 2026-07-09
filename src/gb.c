@@ -1,11 +1,12 @@
 #include "gb.h"
 
-#include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
-#include <time.h>
 
 static int load_bios (GB *gb, const char *filename)
 {
+	if (!filename) return 0;
+
 	FILE *f = fopen(filename, "rb");
 	if (!f) return 0;
 
@@ -33,9 +34,10 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile)
 		gb->timer.tac = 0xF8;
 		gb->joypad.joyp = 0xCF;
 		gb->boot_rom_enabled = 0;
-		printf("Could not load BOOT ROM %s. Running without BIOS\n", biosfile);
+		if (biosfile != NULL)
+			printf("Could not load BOOT ROM %s. Running without BIOS\n", biosfile);
 
-	} else {
+	} else if (biosfile != NULL) {
 
 		printf("Using BOOT ROM %s\n", biosfile);
 		gb->boot_rom_enabled = 1;
@@ -63,14 +65,7 @@ void init (GB *gb, const char *romfile, const char *biosfile)
 		return;
 	}
 
-	if (!init_screen(&gb->lcd)) {
-		gb->running = 0;
-		return;
-	}
-
-	init_gamepad(&gb->pad);
-
-	if (!init_audio(&gb->audio)) {
+	if (!frontend_init(gb)) {
 		gb->running = 0;
 		return;
 	}
@@ -79,9 +74,9 @@ void init (GB *gb, const char *romfile, const char *biosfile)
 	gb->running = 1;
 }
 
-void init_test (GB *gb, const char *romfile, const char *biosfile)
+void init_test (GB *gb, const char *romfile)
 {
-	if (init_core(gb, romfile, biosfile)) {
+	if (init_core(gb, romfile, NULL)) {
 		gb->running = 0;
 		return;
 	}
@@ -89,12 +84,14 @@ void init_test (GB *gb, const char *romfile, const char *biosfile)
 	gb->running = 1;
 }
 
-void cleanup (GB *gb) {
+void cleanup_core (GB *gb) {
 	save_sram(&gb->memory.cart, gb->rom_path);
-	cleanup_audio(&gb->audio);
-	cleanup_gamepad(&gb->pad);
-	cleanup_screen(&gb->lcd);
 	free_cart(&gb->memory.cart);
+}
+
+void cleanup (GB *gb) {
+	cleanup_core(gb);
+	frontend_shutdown(gb);
 }
 
 void gb_step (GB *gb)

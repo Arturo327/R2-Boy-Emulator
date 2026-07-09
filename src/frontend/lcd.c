@@ -1,14 +1,10 @@
 #include "frontend/lcd.h"
 
 #include <time.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 int init_screen (LCD *lcd) {
-
-	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) < 0) {
-		fprintf(stderr, "SDL_Init error: %s\n", SDL_GetError());
-		return 0;
-	}
 
 	lcd->window = SDL_CreateWindow(
 		"R2-Boy",
@@ -63,7 +59,6 @@ void cleanup_screen (LCD *lcd) {
 	if (lcd->texture) { SDL_DestroyTexture(lcd->texture); lcd->texture  = NULL; }
 	if (lcd->renderer) { SDL_DestroyRenderer(lcd->renderer); lcd->renderer = NULL; }
 	if (lcd->window) { SDL_DestroyWindow(lcd->window); lcd->window = NULL; }
-	SDL_Quit();
 }
 
 void update_screen (LCD *lcd, uint32_t *framebuffer, uint8_t rumble) {
