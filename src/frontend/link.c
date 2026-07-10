@@ -185,6 +185,10 @@ void link_close (Link *link)
 	link->active = 0;
 }
 
+int link_is_connected (Link *link) {
+	return link && atomic_load_explicit(&link->connected, memory_order_acquire);
+}
+
 int link_get_byte (Link *link, uint8_t *out)
 {
 	if (!link) return 0;

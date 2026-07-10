@@ -29,11 +29,18 @@ int serial_step (Serial *serial)
 
 	if (serial->SC & 0x01) {
 
-		serial->bit_clock += 4;
-		if (serial->bit_clock < 4096) return 0;
+		if (serial->bit_clock < 4096) {
+			serial->bit_clock += 4;
+			return 0;
+		}
 
-		uint8_t incoming = 0xFF;
-		if (serial->link) link_get_byte(serial->link, &incoming);
+		uint8_t incoming;
+		if (link_is_connected(serial->link)) {
+			if (!link_get_byte(serial->link, &incoming))
+				return 0;
+		} else {
+			incoming = 0xFF;
+		}
 
 		serial->SB = incoming;
 		serial->transfer_active = 0;
