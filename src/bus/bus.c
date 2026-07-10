@@ -266,7 +266,7 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 			}
 
 			// Serial Port
-			case 0xFF01: gb->serial.SB = val; break;
+			case 0xFF01: if (!gb->serial.transfer_active) gb->serial.SB = val; break;
 			case 0xFF02: serial_write_sc(&gb->serial, val); break;
 
 			// Timer

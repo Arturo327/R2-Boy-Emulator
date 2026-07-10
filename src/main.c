@@ -1,6 +1,7 @@
 #include "gb.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <getopt.h>
 #include <signal.h>
 #include <SDL2/SDL.h>
@@ -78,29 +79,54 @@ typedef struct {
 	char *romfile;
 	char *biosfile;
 	int debug;
+	int link_host_port;
+	char *link_connect_addr;
 } Args;
 
-static inline void print_usage_err (const char *prog) {
-	fprintf(stderr, "Use: %s [-h|--help] [-v|--version] [-d|--debug] [-b|--bios bios_file] game.gb\nExecute %s --help for more info\n", prog, prog);
+static inline void print_err (const char *prog) {
+	fprintf(stderr, "Not a valid command\nExecute %s --help for more info\n", prog);
 }
-static inline void print_usage (const char *prog) {
-	printf("R2-Boy v1.0.0-beta\n\n");
-	printf("USE:\n");
-	printf("    %s [-h|--help] [-v|--version] [-d|--debug] [-b|--bios bios_file] game.gb\n\n", prog);
+
+static inline void print_usage (const char *prog)
+{
+	printf("R2-Boy v1.0.0-beta\n");
+	printf("Nintendo Game Boy (DMG) Emulator\n\n");
+
+	printf("USAGE:\n");
+	printf("    %s [OPTIONS] <game.gb>\n\n", prog);
 
 	printf("OPTIONS:\n");
-	printf("    -h, --help              Print this help message\n");
-    	printf("    -v, --version           Print version information\n");
-    	printf("    -d, --debug             Desactivates frontend and checks registers to determine weather the test passed\n");
-    	printf("    -b, --bios <BIOS_FILE>  Specify the path of the BOOT ROM. [default: 'roms/boot.bin'] If it is not found, the emulator will boot without a BIOS.\n\n");
+	printf("    -h, --help\n");
+	printf("	Display this help message and exit.\n\n");
 
-    	printf("KEYBOARD MAPPINGS:\n");
-    	printf("    Directional Arrows      D-Pad (Up, Down, Left, Right)\n");
-    	printf("    X                       A Button\n");
-    	printf("    Z                       B Button\n");
-    	printf("    Enter                   START\n");
-    	printf("    Backspace               SELECT\n");
+	printf("    -v, --version\n");
+	printf("	Display version information and exit.\n\n");
+
+	printf("    -d, --debug\n");
+	printf("	Run in headless mode and verify CPU registers after execution.\n");
+	printf("	Intended for automated test ROMs.\n\n");
+
+	printf("    -b, --bios <BIOS_FILE>\n");
+	printf("	Use the specified Game Boy Boot ROM.\n");
+	printf("	Default: roms/boot.bin\n");
+	printf("	If the file cannot be loaded, the emulator boots without a Boot ROM.\n\n");
+
+	printf("    --link-host <PORT>\n");
+	printf("	Host a Game Link session and listen for an incoming connection\n");
+	printf("	on the specified TCP port.\n\n");
+
+	printf("    --link-connect <IP:PORT>\n");
+	printf("	Connect to a remote Game Link host using the specified\n");
+	printf("	IP address and TCP port.\n\n");
+
+	printf("KEYBOARD CONTROLS:\n");
+	printf("    Arrow Keys		    D-Pad\n");
+	printf("    X			    A\n");
+	printf("    Z			    B\n");
+	printf("    Enter		    START\n");
+	printf("    Backspace		    SELECT\n");
 }
+
 static inline void print_version (void) {
 	printf("R2-Boy v1.0.0-beta\n");
 }
@@ -112,16 +138,20 @@ static Args parse_args (int argc, char *argv[])
 		{"debug", no_argument, 0, 'd'},
 		{"help", no_argument, 0, 'h'},
 		{"version", no_argument, 0, 'v'},
+		{"link-host", required_argument, 0, 'H'},
+		{"link-connect", required_argument, 0, 'C'},
 		{0, 0, 0, 0}
 	};
 
 	Args args = {
 		.biosfile = "roms/bios.bin",
 		.debug = 0,
+		.link_host_port = 0,
+		.link_connect_addr = NULL
 	};
 
 	int opt;
-	while ((opt = getopt_long(argc, argv, "hvdb:", long_options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "hvdb:H:C:", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 'd':
 			printf("DEBUG MODE active\n");
@@ -131,6 +161,12 @@ static Args parse_args (int argc, char *argv[])
 			printf("BIOS: %s\n", optarg);
 			args.biosfile = optarg;
 			break;
+		case 'C':
+			args.link_connect_addr = optarg;
+			break;
+		case 'H':
+			args.link_host_port = atoi(optarg);
+			break;
 		case 'h':
 			print_usage(argv[0]);
 			exit(0);
@@ -138,18 +174,41 @@ static Args parse_args (int argc, char *argv[])
 			print_version();
 			exit(0);
 		default:
-			print_usage_err(argv[0]);
+			print_err(argv[0]);
 			exit(1);
 		}
 	}
 
 	if (optind >= argc) {
 		fprintf(stderr, "No ROM found\n");
-		print_usage(argv[0]);
+		print_err(argv[0]);
 		exit(1);
 	}
 	args.romfile = argv[optind];
 	return args;
+}
+
+static void init_link (GB *gb, Args args)
+{
+	if (args.link_host_port > 0) {
+		if (link_host(&gb->link, (uint16_t)args.link_host_port))
+			gb->serial.link = &gb->link;
+
+	} else if (args.link_connect_addr)
+	{
+		char ip[64] = {0};
+		char *colon = strchr(args.link_connect_addr, ':');
+		if (colon) {
+			size_t len = (size_t)(colon - args.link_connect_addr);
+			if (len >= sizeof(ip)) len = sizeof(ip) - 1;
+			memcpy(ip, args.link_connect_addr, len);
+			int port = atoi(colon + 1);
+			if (link_connect(&gb->link, ip, (uint16_t)port))
+				gb->serial.link = &gb->link;
+		} else {
+			fprintf(stderr, "Expected format: --link-connect IP:PORT\n");
+		}
+	}
 }
 
 static int init_emulator (GB *gb, const char *romfile, const char *biosfile) {
@@ -234,6 +293,7 @@ int main (int argc, char *argv[])
 		free(gb);
 		return 1;
 	}
+	init_link(gb, args);
 
 	signal(SIGINT, on_signal);
 	signal(SIGTERM, on_signal);

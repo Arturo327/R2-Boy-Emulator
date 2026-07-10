@@ -1,13 +1,17 @@
 #ifndef SERIAL_H
 #define SERIAL_H
+
 #include <stdint.h>
+#include "frontend/link.h"
 
 typedef struct Serial {
 	uint8_t SB;
 	uint8_t SC;
+
 	uint8_t transfer_active;
 	uint16_t bit_clock;
-	uint8_t bits_left;
+
+	Link *link;
 } Serial;
 
 int serial_step (Serial *serial);

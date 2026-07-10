@@ -1,4 +1,5 @@
 #include "serial/serial.h"
+#include <stdio.h>
 
 void serial_write_sc (Serial *serial, uint8_t val)
 {
@@ -6,7 +7,12 @@ void serial_write_sc (Serial *serial, uint8_t val)
 
 	if ((val & 0x81) == 0x81) {
 		serial->transfer_active = 1;
-		serial->bits_left = 8;
+		serial->bit_clock = 0;
+		if (serial->link)
+			link_send_byte(serial->link, serial->SB);
+
+	} else if ((val & 0x81) == 0x80) {
+		serial->transfer_active = 1;
 		serial->bit_clock = 0;
 	}
 }
@@ -20,24 +26,30 @@ uint8_t serial_read_sc (Serial *serial)
 int serial_step (Serial *serial)
 {
 	if (!serial->transfer_active) return 0;
-	int fired = 0;
 
-	for (int i = 0; i < 4; i++) {
+	if (serial->SC & 0x01) {
 
-		serial->bit_clock++;
-		if (serial->bit_clock == 512) {
-			serial->bit_clock = 0;
+		serial->bit_clock += 4;
+		if (serial->bit_clock < 4096) return 0;
 
-			serial->SB = (serial->SB << 1) | 0x01;	// TODO: replace 0x01 by incoming bit
-			serial->bits_left--;
+		uint8_t incoming = 0xFF;
+		if (serial->link) link_get_byte(serial->link, &incoming);
 
-			if (serial->bits_left == 0) {
-				serial->transfer_active = 0;
-				serial->SC &= ~0x80;
-				fired = 1;
-				break;
-			}
-		}
+		serial->SB = incoming;
+		serial->transfer_active = 0;
+		serial->SC &= ~0x80;
+		return 1;
+
+	} else {
+
+		uint8_t incoming;
+		if (!serial->link || !link_get_byte(serial->link, &incoming))
+			return 0;
+
+		link_send_byte(serial->link, serial->SB);
+		serial->SB = incoming;
+		serial->transfer_active = 0;
+		serial->SC &= ~0x80;
+		return 1;
 	}
-	return fired;
 }
