@@ -4,7 +4,6 @@
 #include <string.h>
 #include <signal.h>
 #include <unistd.h>
-#include <errno.h>
 #include <poll.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -35,13 +34,21 @@ static void *link_thread_fn (void *arg)
 	Link *link = (Link *) arg;
 
 	if (link->listen_socket >= 0) {
-		int client = accept(link->listen_socket, NULL, NULL);
+		struct pollfd apfd = { .fd = link->listen_socket, .events = POLLIN };
+		int client = -1;
+
+		while (atomic_load_explicit(&link->running, memory_order_acquire)) {
+			int r = poll(&apfd, 1, 100);
+			if (r > 0 && (apfd.revents & POLLIN)) {
+				client = accept(link->listen_socket, NULL, NULL);
+				break;
+			}
+		}
+
 		close(link->listen_socket);
 		link->listen_socket = -1;
-		if (client < 0) {
-			perror("accept");
-			return NULL;
-		}
+
+		if (client < 0) return NULL;
 		link->socket = client;
 	}
 
@@ -55,7 +62,7 @@ static void *link_thread_fn (void *arg)
 
 	while (atomic_load_explicit(&link->running, memory_order_acquire)) {
 
-		int r = poll(&pfd, 1, 0);
+		int r = poll(&pfd, 1, 50);
 
 		if (r > 0 && (pfd.revents & (POLLIN | POLLHUP | POLLERR))) {
 			uint8_t buf[64];

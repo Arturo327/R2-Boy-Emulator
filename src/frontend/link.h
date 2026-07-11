@@ -6,6 +6,8 @@
 #include <pthread.h>
 
 #define LINK_RING_SIZE 64
+_Static_assert((LINK_RING_SIZE & (LINK_RING_SIZE - 1)) == 0,
+                 "LINK_RING_SIZE must be power of 2");
 
 typedef struct LinkRing {
 	uint8_t buffer[LINK_RING_SIZE];
