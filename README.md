@@ -18,6 +18,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 - Testing support
 - Save game support
 - M-Cycle accurate
+- Link Cable support
 
 ---
 
@@ -26,7 +27,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 This project is under active development.
 
 Planned:
-- Link Cable
+- Link Cable preccision and make it more hardwre-accurate
 - CGB support (more in the future)
 
 ---
@@ -79,14 +80,12 @@ Run a Game Boy ROM:
 R2-Boy supports the Game Boy boot ROM, just use the option:
 
 ```bash
-./build/r2boy --bios [biosfile] game.gb
+./build/r2boy --bios <biosfile> game.gb
 ```
 
 If you don't use the option, it will use the default path "roms/bios.bin".
 
-If the emulator cannot find a boot ROM, it will manually initialize the registers and directly run the game.
-
-The initialization of the registers is exacly the same you would obtain after boot in a DMG-ABC.
+If no boot ROM is available, R2-Boy initializes the hardware registers to the same state produced by the original DMG boot ROM (DMG-ABC revision), allowing commercial games to start correctly.
 
 ---
 
@@ -100,6 +99,37 @@ For running tests like mooneye, use the option:
 
 In debug mode, video output is disabled and the emulator automatically checks
 the register values used by Mooneye test ROMs to determine whether the test passed.
+
+## Link Cable
+
+R2-Boy includes experimental Link Cable support over TCP/IP, allowing two emulator instances to communicate across the network.
+
+### Host
+
+```bash
+./build/r2boy --link-host <PORT> game.gb
+```
+
+### Client
+```bash
+./build/r2boy --link-connect <IP>:<PORT> game.gb
+```
+
+### Example:
+
+Host:
+
+```bash
+./build/r2boy --link-host 5000 tetris.gb
+```
+
+Client:
+
+```bash
+./build/r2boy --link-connect 192.168.1.25:5000 tetris.gb
+```
+
+The host must be started before the client connects.
 
 ---
 

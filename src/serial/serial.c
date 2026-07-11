@@ -54,7 +54,6 @@ int serial_step (Serial *serial)
 		if (serial->link)
 			link_send_byte(serial->link, serial->SB);
 
-		printf("[SC] recv=%02X\n", incoming);
 		serial->SB = incoming;
 		serial->transfer_active = 0;
 		serial->SC &= ~0x80;
