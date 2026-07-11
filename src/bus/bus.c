@@ -156,7 +156,7 @@ static uint8_t bus_read8 (void *ctx, uint16_t addr)
 
 			// Serial Port
 			case 0xFF01: return gb->serial.SB;
-			case 0xFF02: return serial_read_sc(&gb->serial);
+			case 0xFF02: return gb->serial.SC | 0x7E;
 
 			// Timer
 			case 0xFF04: return (uint8_t)(gb->timer.div >> 8);
@@ -267,7 +267,12 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 
 			// Serial Port
 			case 0xFF01: if (!gb->serial.transfer_active) gb->serial.SB = val; break;
-			case 0xFF02: serial_write_sc(&gb->serial, val); break;
+			case 0xFF02:
+				printf("[SC] div=%04X write=%02X SB=%02X active=%d link_role=%02X\n",
+					gb->timer.div, val, gb->serial.SB, gb->serial.transfer_active,
+					gb->memory.hram[0x4B]);
+				serial_write_sc(&gb->serial, val);
+				break;
 
 			// Timer
 			case 0xFF04: {

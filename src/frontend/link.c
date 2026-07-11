@@ -55,7 +55,7 @@ static void *link_thread_fn (void *arg)
 
 	while (atomic_load_explicit(&link->running, memory_order_acquire)) {
 
-		int r = poll(&pfd, 1, 2);
+		int r = poll(&pfd, 1, 0);
 
 		if (r > 0 && (pfd.revents & (POLLIN | POLLHUP | POLLERR))) {
 			uint8_t buf[64];

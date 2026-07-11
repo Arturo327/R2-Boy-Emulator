@@ -16,6 +16,5 @@ typedef struct Serial {
 
 int serial_step (Serial *serial);
 void serial_write_sc (Serial *serial, uint8_t val);
-uint8_t serial_read_sc (Serial *serial);
 
 #endif

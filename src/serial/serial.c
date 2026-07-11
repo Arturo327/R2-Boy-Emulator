@@ -14,13 +14,10 @@ void serial_write_sc (Serial *serial, uint8_t val)
 	} else if ((val & 0x81) == 0x80) {
 		serial->transfer_active = 1;
 		serial->bit_clock = 0;
-	}
-}
 
-uint8_t serial_read_sc (Serial *serial)
-{
-	uint8_t bit7 = serial->transfer_active ? 0x80 : 0x00;
-	return bit7 | (serial->SC & 0x01) | 0x7E;
+	} else {
+		serial->transfer_active = 0;
+	}
 }
 
 int serial_step (Serial *serial)
@@ -42,6 +39,7 @@ int serial_step (Serial *serial)
 			incoming = 0xFF;
 		}
 
+		printf("[SC] recv=%02X\n", incoming);
 		serial->SB = incoming;
 		serial->transfer_active = 0;
 		serial->SC &= ~0x80;
@@ -53,7 +51,10 @@ int serial_step (Serial *serial)
 		if (!serial->link || !link_get_byte(serial->link, &incoming))
 			return 0;
 
-		link_send_byte(serial->link, serial->SB);
+		if (serial->link)
+			link_send_byte(serial->link, serial->SB);
+
+		printf("[SC] recv=%02X\n", incoming);
 		serial->SB = incoming;
 		serial->transfer_active = 0;
 		serial->SC &= ~0x80;
