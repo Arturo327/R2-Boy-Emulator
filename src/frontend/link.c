@@ -94,7 +94,6 @@ static void link_init_common (Link *link)
 	link->listen_socket = -1;
 	atomic_init(&link->running, 1);
 	atomic_init(&link->connected, 0);
-	signal(SIGPIPE, SIG_IGN);
 }
 
 int link_host (Link *link, uint16_t port)
@@ -132,6 +131,7 @@ int link_host (Link *link, uint16_t port)
 	if (pthread_create(&link->thread, NULL, link_thread_fn, link) != 0) {
 		perror("pthread_create");
 		close(s);
+		link->listen_socket = -1;
 		return 0;
 	}
 
@@ -170,6 +170,7 @@ int link_connect (Link *link, const char *ip, uint16_t port)
 	if (pthread_create(&link->thread, NULL, link_thread_fn, link) != 0) {
 		perror("pthread_create");
 		close(s);
+		link->listen_socket = -1;
 		return 0;
 	}
 

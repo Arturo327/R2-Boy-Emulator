@@ -4,11 +4,14 @@
 #include <stdlib.h>
 #include <getopt.h>
 #include <signal.h>
+#include <errno.h>
 #include <SDL2/SDL.h>
 
 static volatile sig_atomic_t quit_requested = 0;
+
 static void on_signal (int sig) {
-	(void)sig; quit_requested = 1;
+	(void)sig;
+	quit_requested = 1;
 }
 
 static int check_regs (GB *gb, const char *romfile)
@@ -131,6 +134,22 @@ static inline void print_version (void) {
 	printf("R2-Boy v1.0.0-beta\n");
 }
 
+static int parse_port (const char *str, uint16_t *out)
+{
+	if (!str || !*str) return 0;
+
+	errno = 0;
+	char *end;
+	long val = strtol(str, &end, 10);
+
+	if (errno == ERANGE || *end != '\0') return 0;
+	if (val < 1 || val > 65535) return 0;
+
+	*out = (uint16_t) val;
+	return 1;
+}
+
+
 static Args parse_args (int argc, char *argv[])
 {
 	static struct option long_options[] = {
@@ -165,7 +184,12 @@ static Args parse_args (int argc, char *argv[])
 			args.link_connect_addr = optarg;
 			break;
 		case 'H':
-			args.link_host_port = atoi(optarg);
+			uint16_t port;
+			if (!parse_port(optarg, &port)) {
+				fprintf(stderr, "Invalid port: %s\n", optarg);
+				exit(1);
+			}
+			args.link_host_port = port;
 			break;
 		case 'h':
 			print_usage(argv[0]);
@@ -190,20 +214,28 @@ static Args parse_args (int argc, char *argv[])
 
 static void init_link (GB *gb, Args args)
 {
+	if (args.link_host_port > 0 && args.link_connect_addr) {
+		fprintf(stderr, "Warning: --link-host and --link-connect are mutually exclusive; using --link-host\n");
+	}
+
 	if (args.link_host_port > 0) {
 		if (link_host(&gb->link, (uint16_t)args.link_host_port))
 			gb->serial.link = &gb->link;
 
-	} else if (args.link_connect_addr)
-	{
+	} else if (args.link_connect_addr) {
 		char ip[64] = {0};
 		char *colon = strchr(args.link_connect_addr, ':');
 		if (colon) {
 			size_t len = (size_t)(colon - args.link_connect_addr);
 			if (len >= sizeof(ip)) len = sizeof(ip) - 1;
 			memcpy(ip, args.link_connect_addr, len);
-			int port = atoi(colon + 1);
-			if (link_connect(&gb->link, ip, (uint16_t)port))
+
+			uint16_t port;
+			if (!parse_port(colon + 1, &port)) {
+				fprintf(stderr, "Invalid port in --link-connect: %s\n", colon + 1);
+				return;
+			}
+			if (link_connect(&gb->link, ip, port))
 				gb->serial.link = &gb->link;
 		} else {
 			fprintf(stderr, "Expected format: --link-connect IP:PORT\n");
@@ -278,6 +310,8 @@ static void run (GB *gb)
 
 int main (int argc, char *argv[])
 {
+	signal(SIGPIPE, SIG_IGN);
+
 	Args args = parse_args(argc, argv);
 
 	if (args.debug)
