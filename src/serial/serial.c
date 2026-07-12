@@ -61,14 +61,13 @@ static int slave (Serial *serial)
 			return 0;
 		serial->recived = 1;
 		serial->clock = 0;
+		link_send_byte(serial->link, serial->SB);
 	}
 
 	if (serial->clock < 4096) {
 		serial->clock += 4;
 		return 0;
 	}
-
-	link_send_byte(serial->link, serial->SB);
 
 	serial->SB = serial->buff;
 	serial->recived = 0;

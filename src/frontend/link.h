@@ -38,6 +38,10 @@ typedef struct Link {
 	LinkRing tx;
 } Link;
 
+static inline uint32_t link_rx_activity (Link *link) {
+	return atomic_load_explicit(&link->rx.write_pos, memory_order_acquire);
+}
+
 int link_host (Link *link, uint16_t port);
 int link_connect (Link *link, const char *ip, uint16_t port);
 

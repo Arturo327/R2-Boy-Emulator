@@ -69,15 +69,6 @@ static int run_test (const char *romfile)
 	return result;
 }
 
-static void sleep_until (uint64_t target, uint64_t freq) {
-	while (1) {
-		uint64_t now = SDL_GetPerformanceCounter();
-		if (now >= target) break;
-		uint64_t remaining_ms = (target - now) * 1000 / freq;
-		if (remaining_ms > 2) SDL_Delay(1);
-	}
-}
-
 typedef struct {
 	char *romfile;
 	char *biosfile;
@@ -268,6 +259,15 @@ static int run_frame (GB *gb, uint32_t max_queued)
 	}
 	return 1;
 }
+/*
+static void sleep_until (uint64_t target, uint64_t freq) {
+	while (1) {
+		uint64_t now = SDL_GetPerformanceCounter();
+		if (now >= target) break;
+		uint64_t remaining_ms = (target - now) * 1000 / freq;
+		if (remaining_ms > 2) SDL_Delay(1);
+	}
+}
 
 static void sync_frame (uint64_t *next_frame, uint64_t frame_ticks, uint64_t freq)
 {
@@ -275,6 +275,29 @@ static void sync_frame (uint64_t *next_frame, uint64_t frame_ticks, uint64_t fre
 	uint64_t now = SDL_GetPerformanceCounter();
 	if (*next_frame < now) *next_frame = now;
 	sleep_until(*next_frame, freq);
+}
+*/
+static void sleep_until (uint64_t target, uint64_t freq, Link *link, uint32_t rx_mark)
+{
+	while (1) {
+		uint64_t now = SDL_GetPerformanceCounter();
+		if (now >= target) break;
+		if (link && link_is_connected(link) && link_rx_activity(link) != rx_mark)
+			break;
+		uint64_t remaining_ms = (target - now) * 1000 / freq;
+		if (remaining_ms > 2) SDL_Delay(1);
+	}
+}
+
+static void sync_frame (GB *gb, uint64_t *next_frame, uint64_t frame_ticks, uint64_t freq)
+{
+	*next_frame += frame_ticks;
+	uint64_t now = SDL_GetPerformanceCounter();
+	if (*next_frame < now) *next_frame = now;
+
+	Link *link = gb->serial.link;
+	uint32_t rx_mark = link ? link_rx_activity(link) : 0;
+	sleep_until(*next_frame, freq, link, rx_mark);
 }
 
 static void run (GB *gb)
@@ -302,7 +325,7 @@ static void run (GB *gb)
 		while (ring_used(&gb->audio.ring) > max_queued)
 			SDL_Delay(1);
 
-		sync_frame(&next_frame, frame_ticks, freq);
+		sync_frame(gb, &next_frame, frame_ticks, freq);
 	}
 
 	cleanup(gb);
