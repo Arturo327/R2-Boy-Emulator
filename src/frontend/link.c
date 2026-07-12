@@ -9,6 +9,10 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
+#include <errno.h>
+
+#define LINK_CONNECT_TIMEOUT_MS 5000
 
 static void ring_push (LinkRing *r, uint8_t byte)
 {
@@ -166,12 +170,39 @@ int link_connect (Link *link, const char *ip, uint16_t port)
 		return 0;
 	}
 
+	int flags = fcntl(s, F_GETFL, 0);
+	fcntl(s, F_SETFL, flags | O_NONBLOCK);
+
 	printf("Link cable: connecting to %s:%u...\n", ip, port);
-	if (connect(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+
+	int r = connect(s, (struct sockaddr *)&addr, sizeof(addr));
+	if (r < 0 && errno != EINPROGRESS) {
 		perror("connect");
 		close(s);
 		return 0;
 	}
+
+	if (r < 0) {
+		struct pollfd pfd = { .fd = s, .events = POLLOUT };
+		int pr = poll(&pfd, 1, LINK_CONNECT_TIMEOUT_MS);
+
+		if (pr <= 0) {
+			fprintf(stderr, "Link cable: connection to %s:%u timed out\n", ip, port);
+			close(s);
+			return 0;
+		}
+
+		int sock_err = 0;
+		socklen_t len = sizeof(sock_err);
+		if (getsockopt(s, SOL_SOCKET, SO_ERROR, &sock_err, &len) < 0 || sock_err != 0) {
+			fprintf(stderr, "Link cable: connect failed: %s\n",
+				sock_err ? strerror(sock_err) : "unknown error");
+			close(s);
+			return 0;
+		}
+	}
+
+	fcntl(s, F_SETFL, flags);
 
 	link->socket = s;
 

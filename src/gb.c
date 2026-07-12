@@ -104,16 +104,16 @@ void gb_step (GB *gb)
 
 	cpu_step(&gb->cpu);
 
-	if (gb->dma_delay > 0) {
-		gb->dma_delay--;
-		if (gb->dma_delay == 0)
-			gb->dma_active = 1;
+	if (gb->dma.delay > 0) {
+		gb->dma.delay--;
+		if (gb->dma.delay == 0)
+			gb->dma.active = 1;
 
-	} else if (gb->dma_active) {
-		gb->memory.oam[gb->dma_index] = dma_read_source(gb, gb->dma_src + gb->dma_index);
-		gb->dma_index++;
-		if (gb->dma_index >= 0xA0)
-			gb->dma_active = 0;
+	} else if (gb->dma.active) {
+		gb->memory.oam[gb->dma.index] = dma_read_source(gb, gb->dma.src + gb->dma.index);
+		gb->dma.index++;
+		if (gb->dma.index >= 0xA0)
+			gb->dma.active = 0;
 	}
 
 	if (timer_step(&gb->timer)) {

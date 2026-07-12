@@ -29,6 +29,13 @@ typedef struct Memory {
 	uint8_t hram[0x7F];
 } Memory;
 
+typedef struct DMA {
+	uint8_t active;
+	uint16_t src;
+	uint8_t index;
+	uint8_t delay;
+} DMA;
+
 typedef struct GB {
 	OpcodeTable opcodes;
 
@@ -48,10 +55,7 @@ typedef struct GB {
 	Joypad joypad;
 	Serial serial;
 
-	uint8_t dma_active;
-	uint16_t dma_src;
-	uint8_t dma_index;
-	uint8_t dma_delay;
+	DMA dma;
 
 	uint8_t boot_rom_enabled;
 	uint8_t boot_rom_disable_pending;

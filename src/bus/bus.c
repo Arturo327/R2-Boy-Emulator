@@ -132,7 +132,7 @@ static uint8_t bus_read8 (void *ctx, uint16_t addr)
 	}
 
 	if (addr < 0xFEA0) {
-		if (gb->dma_active) return 0xFF;
+		if (gb->dma.active) return 0xFF;
 		if (gb->ppu.mode == OAM_SCAN || gb->ppu.mode == DRAWING || gb->ppu.oam_pre_block) return 0xFF;
 		return gb->memory.oam[addr - 0xFE00];
 	}
@@ -228,7 +228,7 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 	}
 
 	if (addr < 0xFEA0) {
-		if (gb->dma_active) return;
+		if (gb->dma.active) return;
 		if (gb->ppu.mode == DRAWING) return;
 		if (gb->ppu.mode == OAM_SCAN && gb->ppu.oam_write_blocked) return;
 		gb->memory.oam[addr - 0xFE00] = val;
@@ -334,9 +334,9 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 			}
 			case 0xFF46: {
 				gb->ppu.dma = val;
-				gb->dma_src = (uint16_t)val << 8;
-				gb->dma_index = 0;
-				gb->dma_delay = 2;
+				gb->dma.src = (uint16_t)val << 8;
+				gb->dma.index = 0;
+				gb->dma.delay = 2;
 				break;
 			}
 			case 0xFF47: gb->ppu.bgp = val; break;
