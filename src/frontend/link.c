@@ -41,6 +41,8 @@ static void *link_thread_fn (void *arg)
 			int r = poll(&apfd, 1, 100);
 			if (r > 0 && (apfd.revents & POLLIN)) {
 				client = accept(link->listen_socket, NULL, NULL);
+				if (client < 0)
+					perror("accept");
 				break;
 			}
 		}
@@ -77,11 +79,17 @@ static void *link_thread_fn (void *arg)
 		}
 
 		uint8_t out;
+		int send_fail = 0;
 		while (ring_pop(&link->tx, &out)) {
 			if (send(link->socket, &out, 1, 0) < 0) {
 				printf("Link cable: error sending\n");
+				send_fail = 1;
 				break;
 			}
+		}
+		if (send_failed) {
+			atomic_store_explicit(&link->connected, 0, memory_order_release);
+			break;
 		}
 	}
 	return NULL;
@@ -170,7 +178,7 @@ int link_connect (Link *link, const char *ip, uint16_t port)
 	if (pthread_create(&link->thread, NULL, link_thread_fn, link) != 0) {
 		perror("pthread_create");
 		close(s);
-		link->listen_socket = -1;
+		link->socket = -1;
 		return 0;
 	}
 
