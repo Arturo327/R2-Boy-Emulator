@@ -9,7 +9,10 @@ typedef struct Serial {
 	uint8_t SC;
 
 	uint8_t transfer_active;
-	uint16_t bit_clock;
+	uint16_t clock;
+
+	uint8_t recived;
+	uint8_t buff;
 
 	Link *link;
 } Serial;

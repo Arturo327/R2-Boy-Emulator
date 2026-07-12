@@ -64,7 +64,7 @@ static void *link_thread_fn (void *arg)
 
 	while (atomic_load_explicit(&link->running, memory_order_acquire)) {
 
-		int r = poll(&pfd, 1, 50);
+		int r = poll(&pfd, 1, 1);
 
 		if (r > 0 && (pfd.revents & (POLLIN | POLLHUP | POLLERR))) {
 			uint8_t buf[64];
@@ -87,7 +87,7 @@ static void *link_thread_fn (void *arg)
 				break;
 			}
 		}
-		if (send_failed) {
+		if (send_fail) {
 			atomic_store_explicit(&link->connected, 0, memory_order_release);
 			break;
 		}
