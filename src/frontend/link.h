@@ -5,9 +5,13 @@
 #include <stdatomic.h>
 #include <pthread.h>
 
-#define LINK_RING_SIZE 64
+#define LINK_RING_SIZE 256
 _Static_assert((LINK_RING_SIZE & (LINK_RING_SIZE - 1)) == 0,
-                 "LINK_RING_SIZE must be power of 2");
+		"LINK_RING_SIZE must be power of 2");
+
+#define LINK_NONE 0
+#define LINK_HOST 1
+#define LINK_CLIENT 2
 
 typedef struct LinkRing {
 	uint8_t buffer[LINK_RING_SIZE];
@@ -22,7 +26,13 @@ typedef struct Link {
 	_Atomic int running;
 	_Atomic int connected;
 
+	uint8_t mode;
+	uint16_t port;
+	char ip[64];
+
 	pthread_t thread;
+
+	int wake_fds[2];
 
 	LinkRing rx;
 	LinkRing tx;

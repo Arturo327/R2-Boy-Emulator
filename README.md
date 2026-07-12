@@ -24,11 +24,16 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 
 ## Current Status
 
+R2-Boy works correctly and runs every DMG compatible game I tested.
+
+It won't run games with rare MBC types, due to MBC6, MBC7 and some others are not yet implemented
+
 This project is under active development.
 
 Planned:
-- Link Cable preccision and make it more hardwre-accurate
-- CGB support (more in the future)
+- Link Cable: make the serial data transfer more hardware-accurate
+- Implement more MBC types
+- CGB (Game Boy Color) support (more in the future)
 
 ---
 
@@ -102,7 +107,7 @@ the register values used by Mooneye test ROMs to determine whether the test pass
 
 ## Link Cable
 
-R2-Boy includes experimental Link Cable support over TCP/IP, allowing two emulator instances to communicate across the network.
+R2-Boy includes Link Cable support over TCP/IP, allowing two emulator instances to communicate across the network.
 
 ### Host
 
@@ -129,7 +134,11 @@ Client:
 ./build/r2boy --link-connect 192.168.1.25:5000 tetris.gb
 ```
 
-The host must be started before the client connects.
+The host must be launched before the client connects.
+
+Reconnection is supported; if the process terminates on either side, restarting it will re-establish the connection.
+
+However, most games don't handle mid-game reconnection and will simply freeze.
 
 ---
 
@@ -151,6 +160,8 @@ The emulator aims to emulate the Game Boy hardware at the cycle level whenever p
 
 It currently passes all Blargg tests (including oam bug!) and dmg-acid2. It also fails cgb sound exacly like a real DMG.
 
+R2-Boy passes almost every mooneye test, except some boot ones (depend on the specific revision of the console and perfect boot timing).
+
 ---
 
 ## License
@@ -160,13 +171,16 @@ MIT
 ---
 
 ## Project Structure
+
 ```
 src/
+├── apu/
 ├── bus/
 ├── cartucho/
 ├── cpu/
 ├── frontend/
 ├── ppu/
+├── serial/
 ├── timer/
 ├── gb.c
 ├── gb.h
