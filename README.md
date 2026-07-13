@@ -101,8 +101,7 @@ For running tests like mooneye, use the option:
 ./build/r2boy -d test.gb
 ```
 
-In debug mode, video output is disabled and the emulator automatically checks
-the register values used by Mooneye test ROMs to determine whether the test passed.
+In debug mode, video output is disabled and the emulator automatically checks the register values used by Mooneye test ROMs to determine whether the test passed.
 
 ## Link Cable
 
@@ -155,7 +154,7 @@ However, most games don't handle mid-game reconnection and will simply freeze.
 
 The emulator aims to emulate the Game Boy hardware at the cycle level whenever possible.
 
-It currently passes all Blargg tests (including oam bug!) and dmg-acid2. It also fails cgb sound exacly like a real DMG.
+It currently passes all Blargg tests (including ```oam_bug```!) and dmg-acid2. It also fails ```cgb_sound``` and ```interrupt_time``` exacly like a real DMG.
 
 R2-Boy passes almost every mooneye test, except some boot ones (depend on the specific revision of the console and perfect boot timing).
 

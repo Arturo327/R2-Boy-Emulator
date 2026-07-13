@@ -27,7 +27,7 @@ void init_ppu (PPU *ppu)
 {
 	ppu->mode = OAM_SCAN;
 	ppu->bus = NULL;
-	ppu->pending_sprite = -1;
+	ppu->sp.pending = -1;
 }
 
 static void update_stat_line_ex (PPU *ppu, int force_mode2)
@@ -73,27 +73,27 @@ static void reset_drawing (PPU *ppu) {
 	ppu->x = 0;
 	ppu->fetch_x = ppu->scx & ~7;
 
-	ppu->fetcher_t = 0;
-	ppu->window_active = 0;
+	ppu->bg.fetcher_t = 0;
+	ppu->bg.window_active = 0;
 
 	int a = ppu->scx & 7;
-	ppu->bg_discard_px = a;
-	if (a == 0) ppu->bg_discard = 0;
-	else if (a <= 4) ppu->bg_discard = 4;
-	else ppu->bg_discard = 8;
+	ppu->bg.discard_px = a;
+	if (a == 0) ppu->bg.discard = 0;
+	else if (a <= 4) ppu->bg.discard = 4;
+	else ppu->bg.discard = 8;
 
-	ppu->startup_tiles = 2;
-	ppu->num_bg_fifo = 0;
+	ppu->bg.startup_tiles = 2;
+	ppu->bg.num_fifo = 0;
 
-	ppu->sprite_active = 0;
-	ppu->sprite_waiting = 0;
-	ppu->sprite_step = 0;
-	ppu->pending_sprite = -1;
-	ppu->num_sp_fifo = 0;
-	ppu->sp_tiles_touched = 0;
-	ppu->sp_delay = 0;
+	ppu->sp.sprite_active = 0;
+	ppu->sp.sprite_waiting = 0;
+	ppu->sp.step = 0;
+	ppu->sp.pending = -1;
+	ppu->sp.num_fifo = 0;
+	ppu->sp.tiles_touched = 0;
+	ppu->sp.delay = 0;
 	for (int i = 0; i < 10; i++) {
-		ppu->sp_done[i] = 0;
+		ppu->sp.done[i] = 0;
 	}
 
 	ppu->hblank_pending = 0;
@@ -110,7 +110,7 @@ static void update_stat (PPU *ppu, PPU_Mode new_mode)
 	}
 	if (new_mode == OAM_SCAN) {
 		ppu->x = 0;
-		ppu->num_sprites = 0;
+		ppu->sp.num_sprites = 0;
 		ppu->oam_write_blocked = 1;
 	}
 	if (new_mode == DRAWING) {
@@ -137,29 +137,29 @@ static uint32_t solve_priority (PPU *ppu, SpritePixel sp, uint8_t bg) {
 
 static void calc_sp_delay (PPU *ppu)
 {
-	int sprite_x = ppu->sprites[ppu->pending_sprite].x;
+	int sprite_x = ppu->sp.sprites[ppu->sp.pending].x;
 	int col = (sprite_x + ppu->scx) & 7;
 	int tile = ((sprite_x + ppu->scx) & 0xFF) >> 3;
 
-	if (ppu->sp_tiles_touched & (1 << tile)) {
-		ppu->sp_delay = 0;
+	if (ppu->sp.tiles_touched & (1 << tile)) {
+		ppu->sp.delay = 0;
 	} else {
-		ppu->sp_tiles_touched |= (1 << tile);
+		ppu->sp.tiles_touched |= (1 << tile);
 		int d = 5 - col;
-		ppu->sp_delay = (d > 0) ? (uint8_t)d : 0;
+		ppu->sp.delay = (d > 0) ? (uint8_t)d : 0;
 	}
 }
 
 static void draw_pixel (PPU *ppu)
 {
-	if (ppu->num_bg_fifo == 0 || ppu->startup_tiles > 0) return;
-	if (ppu->sprite_active || ppu->sprite_waiting) return;
-	if (ppu->bg_discard > 0 || ppu->sp_delay > 0) return;
+	if (ppu->bg.num_fifo == 0 || ppu->bg.startup_tiles > 0) return;
+	if (ppu->sp.sprite_active || ppu->sp.sprite_waiting) return;
+	if (ppu->bg.discard > 0 || ppu->sp.delay > 0) return;
 
 	uint8_t bg = bg_fifo_pop(ppu);
 	uint32_t final_pixel;
 
-	if (ppu->num_sp_fifo > 0) {
+	if (ppu->sp.num_fifo > 0) {
 		SpritePixel sp = get_sp_pixel(ppu);
 		if (!(ppu->lcdc & 1)) bg = 0;
 		final_pixel = solve_priority(ppu, sp, bg);
@@ -175,27 +175,27 @@ static void draw_pixel (PPU *ppu)
 static inline void begin_sprite_delay (PPU *ppu)
 {
 	calc_sp_delay(ppu);
-	ppu->sprite_waiting = 0;
-	if (ppu->sp_delay == 0) ppu->sprite_active = 1;
+	ppu->sp.sprite_waiting = 0;
+	if (ppu->sp.delay == 0) ppu->sp.sprite_active = 1;
 }
 
 static int handle_sprites (PPU *ppu)
 {
-	if (!ppu->sprite_active && !ppu->sprite_waiting && (ppu->lcdc & 0x02))
+	if (!ppu->sp.sprite_active && !ppu->sp.sprite_waiting && (ppu->lcdc & 0x02))
 		start_sprites(ppu);
 
-	if (ppu->sprite_waiting && ppu->num_bg_fifo > 0) {
+	if (ppu->sp.sprite_waiting && ppu->bg.num_fifo > 0) {
 		begin_sprite_delay(ppu);
 		return 1;
 	}
 
-	if (ppu->sprite_active) {
+	if (ppu->sp.sprite_active) {
 		sprite_fetch(ppu);
 
-		if (!ppu->sprite_active && !ppu->sprite_waiting && (ppu->lcdc & 0x02))
+		if (!ppu->sp.sprite_active && !ppu->sp.sprite_waiting && (ppu->lcdc & 0x02))
 			start_sprites(ppu);
 
-		if (ppu->sprite_waiting) {
+		if (ppu->sp.sprite_waiting) {
 			begin_sprite_delay(ppu);
 		}
 		return 1;
@@ -206,26 +206,26 @@ static int handle_sprites (PPU *ppu)
 
 static int dot_line_step (PPU *ppu)
 {
-	if (ppu->sp_delay > 0) {
-		ppu->sp_delay--;
-		if (ppu->sp_delay == 0) ppu->sprite_active = 1;
+	if (ppu->sp.delay > 0) {
+		ppu->sp.delay--;
+		if (ppu->sp.delay == 0) ppu->sp.sprite_active = 1;
 		ppu->mode3_cycles++;
 		return 0;
 	}
 
 	draw_pixel(ppu);
 
-	uint8_t prev_startup = ppu->startup_tiles;
-	if (!ppu->sprite_active && ppu->sp_delay == 0) bg_fetch(ppu);
+	uint8_t prev_startup = ppu->bg.startup_tiles;
+	if (!ppu->sp.sprite_active && ppu->sp.delay == 0) bg_fetch(ppu);
 
 	if (prev_startup > 0) {
 		ppu->mode3_cycles++;
 		return 0;
 	}
-	if (ppu->bg_discard > 0) {
-    		ppu->bg_discard--;
-    		if (ppu->bg_discard_px > 0) {
-        		ppu->bg_discard_px--;
+	if (ppu->bg.discard > 0) {
+    		ppu->bg.discard--;
+    		if (ppu->bg.discard_px > 0) {
+        		ppu->bg.discard_px--;
         		(void)bg_fifo_pop(ppu);
     		}
     		ppu->mode3_cycles++;
@@ -243,14 +243,14 @@ static int dot_line_step (PPU *ppu)
 
 static void scan_oam (PPU *ppu, int x) {
 	if (!(ppu->lcdc & 0x02)) return;
-	if (ppu->num_sprites >= 10) return;
+	if (ppu->sp.num_sprites >= 10) return;
 	GB *gb = (GB *)ppu->bus->ctx;
 	Sprite *sp = (Sprite *)(gb->memory.oam + (x << 2));
 
 	int sprite_y = (int)sp->y - 16;
 	int sprite_h = (ppu->lcdc & 0x04) ? 16 : 8;
 	if ((int)ppu->ly >= sprite_y && (int)ppu->ly < sprite_y + sprite_h) {
-		ppu->sprites[ppu->num_sprites++] = *sp;
+		ppu->sp.sprites[ppu->sp.num_sprites++] = *sp;
 	}
 }
 
@@ -264,7 +264,7 @@ void ppu_step (PPU *ppu) {
 			}
 		}
 		ppu->ly = 0;
-		ppu->window_line = 0;
+		ppu->bg.window_line = 0;
 		ppu->dots = 0;
 		ppu->mode = HBLANK;
 		ppu->stat = (ppu->stat & 0xFC) | HBLANK;
@@ -315,7 +315,7 @@ void ppu_step (PPU *ppu) {
 		} else if (ppu->mode == DRAWING) {
 
 			if (ppu->hblank_pending) {
-				if (ppu->window_active) ppu->window_line++;
+				if (ppu->bg.window_active) ppu->bg.window_line++;
 				update_stat(ppu, HBLANK);
 				ppu->hblank_pending = 0;
 				ppu->dots = 0;
@@ -338,7 +338,7 @@ void ppu_step (PPU *ppu) {
 
 				if (ppu->dots == 0) {
 					ppu->x = 0;
-					ppu->num_sprites = 0;
+					ppu->sp.num_sprites = 0;
 				}
 				if (ppu->dots == OAM_SCAN_DOTS - 3) {
 					ppu->oam_pre_block = 1;
@@ -391,7 +391,7 @@ void ppu_step (PPU *ppu) {
 				if (ppu->ly >= TOTAL_LINES) {
 					ppu->ly = 0;
 					update_stat(ppu, OAM_SCAN);
-					ppu->window_line = 0;
+					ppu->bg.window_line = 0;
 					ppu->oam_pre_block = 0;
 				}
 				check_lyc(ppu);
