@@ -33,7 +33,16 @@ void serial_write_sc (Serial *serial, uint8_t val)
 	}
 }
 
-static int master (Serial *serial)
+static int shift (Serial *serial)
+{
+	uint8_t bit = (serial->buff >> (7 - serial->shifted)) & 0x01;
+	serial->shifted++;
+	serial->SB = (serial->SB << 1) | bit;
+	if (serial->shifted > 7) return 1;
+	return 0;
+}
+
+static int master_step (Serial *serial)
 {
 	if (serial->clock < 4096) {
 		serial->clock += 4;
@@ -54,22 +63,24 @@ static int master (Serial *serial)
 	return 1;
 }
 
-static int slave (Serial *serial)
+static int slave_step (Serial *serial)
 {
 	if (!serial->recived) {
 		if (!link_get_byte(serial->link, &serial->buff))
 			return 0;
 		serial->recived = 1;
 		serial->clock = 0;
+		serial->shifted = 0;
 		link_send_byte(serial->link, serial->SB);
 	}
 
-	if (serial->clock < 4096) {
-		serial->clock += 4;
+	serial->clock += 4;
+	if ((serial->clock & 511) != 0)
 		return 0;
-	}
 
-	serial->SB = serial->buff;
+	if (!shift(serial))
+		return 0;
+
 	serial->recived = 0;
 	serial->transfer_active = 0;
 	serial->SC &= ~0x80;
@@ -80,6 +91,6 @@ int serial_step (Serial *serial)
 {
 	if (!serial->transfer_active) return 0;
 
-	if (serial->SC & 0x01) return master(serial);
-	else return slave(serial);
+	if (serial->SC & 0x01) return master_step(serial);
+	return slave_step(serial);
 }
