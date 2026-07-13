@@ -3,16 +3,18 @@
 
 #include <stdint.h>
 
-#define HBLANK 0
-#define VBLANK 1
-#define OAM_SCAN 2
-#define DRAWING 3
-
 #define OAM_SCAN_DOTS 80
 #define LINE_DOTS 456
 #define DRAWING_HBLANK_DOTS 376
 #define DRAWING_LINES 144
 #define TOTAL_LINES 154
+
+typedef enum {
+	HBLANK,
+	VBLANK,
+	OAM_SCAN,
+	DRAWING
+} PPU_Mode;
 
 typedef struct Sprite {
 	uint8_t y;
@@ -62,7 +64,7 @@ typedef struct PPU {
 	uint8_t oam_pre_block;
 	uint8_t vram_pre_block;
 	uint8_t oam_write_blocked;
-	uint8_t mode;
+	PPU_Mode mode;
 	uint16_t dots;
 	uint8_t ready;
 	uint8_t lcd_was_off;

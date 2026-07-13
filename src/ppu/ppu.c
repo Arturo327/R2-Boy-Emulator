@@ -99,7 +99,7 @@ static void reset_drawing (PPU *ppu) {
 	ppu->hblank_pending = 0;
 }
 
-static void update_stat (PPU *ppu, int new_mode)
+static void update_stat (PPU *ppu, PPU_Mode new_mode)
 {
 	if (ppu->mode == new_mode) return;
 	ppu->mode = new_mode;

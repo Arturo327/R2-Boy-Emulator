@@ -95,15 +95,8 @@ void cleanup (GB *gb) {
 	cleanup_core(gb);
 }
 
-void gb_step (GB *gb)
+static void dma_step (GB *gb)
 {
-	if (gb->boot_rom_disable_pending && gb->cpu.pc >= 0x0100) {
-		gb->boot_rom_enabled = 0;
-		gb->boot_rom_disable_pending = 0;
-	}
-
-	cpu_step(&gb->cpu);
-
 	if (gb->dma.delay > 0) {
 		gb->dma.delay--;
 		if (gb->dma.delay == 0)
@@ -115,6 +108,18 @@ void gb_step (GB *gb)
 		if (gb->dma.index >= 0xA0)
 			gb->dma.active = 0;
 	}
+}
+
+void gb_step (GB *gb)
+{
+	if (gb->boot_rom_disable_pending && gb->cpu.pc >= 0x100) {
+		gb->boot_rom_enabled = 0;
+		gb->boot_rom_disable_pending = 0;
+	}
+
+	cpu_step(&gb->cpu);
+
+	dma_step(gb);
 
 	if (timer_step(&gb->timer)) {
 		gb->interrupts.IF |= 0x04;

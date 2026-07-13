@@ -11,17 +11,14 @@ void serial_write_sc (Serial *serial, uint8_t val)
 
 	serial->SC = sc;
 
-	if (sc == 0x81) {
-		serial->transfer_active = 1;
-		serial->clock = 0;
-		if (link_is_connected(serial->link))
-			link_send_byte(serial->link, serial->SB);
+	if (sc == 0x81 && link_is_connected(serial->link))
+		link_send_byte(serial->link, serial->SB);
 
-	} else if (sc == 0x80) {
+	if (sc == 0x81 || sc == 0x80) {
 		serial->transfer_active = 1;
 		serial->clock = 0;
 		serial->recived = 0;
-
+		serial->shifted = 0;
 	} else {
 		serial->transfer_active = 0;
 	}
@@ -44,20 +41,27 @@ static int shift (Serial *serial)
 
 static int master_step (Serial *serial)
 {
-	if (serial->clock < 4096) {
+	if (!serial->recived) {
+		if (!link_is_connected(serial->link)) {
+			serial->buff = 0xFF;
+			serial->recived = 1;
+		} else {
+			serial->recived = link_get_byte(serial->link, &serial->buff);
+		}
+	}
+
+	if (serial->clock < 4096)
 		serial->clock += 4;
+
+	while (serial->recived && serial->shifted < 8 &&
+			serial->clock >= (serial->shifted + 1) << 9) {
+		(void)shift(serial);
+	}
+
+	if (serial->clock < 4096 || !serial->recived || serial->shifted < 8)
 		return 0;
-	}
 
-	uint8_t incoming;
-	if (link_is_connected(serial->link)) {
-		if (!link_get_byte(serial->link, &incoming))
-			return 0;
-	} else {
-		incoming = 0xFF;
-	}
-
-	serial->SB = incoming;
+	serial->recived = 0;
 	serial->transfer_active = 0;
 	serial->SC &= ~0x80;
 	return 1;

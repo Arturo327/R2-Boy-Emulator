@@ -31,7 +31,6 @@ It won't run games with rare MBC types, due to MBC6, MBC7 and some others are no
 This project is under active development.
 
 Planned:
-- Link Cable: make the serial data transfer more hardware-accurate
 - Implement more MBC types
 - CGB (Game Boy Color) support (more in the future)
 
@@ -133,8 +132,6 @@ Client:
 ```bash
 ./build/r2boy --link-connect 192.168.1.25:5000 tetris.gb
 ```
-
-The host must be launched before the client connects.
 
 Reconnection is supported; if the process terminates on either side, restarting it will re-establish the connection.
 

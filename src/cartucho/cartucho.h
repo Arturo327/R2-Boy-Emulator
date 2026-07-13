@@ -4,13 +4,15 @@
 #include <stdint.h>
 #include <time.h>
 
-#define MBC_NONE 0
-#define MBC1 1
-#define MBC2 2
-#define MBC3 3
-#define MBC5 5
-
 typedef struct GB GB;
+
+typedef enum {
+	MBC_NONE,
+	MBC1,
+	MBC2,
+	MBC3,
+	MBC5
+} MBC_Type;
 
 typedef struct RTC {
 	uint8_t s, m, h;
@@ -37,7 +39,7 @@ typedef struct Cartucho {
 	uint32_t ram_banks;
 
 	uint8_t mbc_mode;
-	uint8_t mbc_type;
+	MBC_Type mbc_type;
 	uint8_t rom_bank;
 	uint8_t ram_bank;
 	uint8_t ram_enabled;

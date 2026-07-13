@@ -9,9 +9,11 @@
 _Static_assert((LINK_RING_SIZE & (LINK_RING_SIZE - 1)) == 0,
 		"LINK_RING_SIZE must be power of 2");
 
-#define LINK_NONE 0
-#define LINK_HOST 1
-#define LINK_CLIENT 2
+typedef enum {
+	LINK_NONE,
+	LINK_HOST,
+	LINK_CLIENT
+} LinkMode;
 
 typedef struct LinkRing {
 	uint8_t buffer[LINK_RING_SIZE];
@@ -26,7 +28,7 @@ typedef struct Link {
 	_Atomic int running;
 	_Atomic int connected;
 
-	uint8_t mode;
+	LinkMode mode;
 	uint16_t port;
 	char ip[64];
 
