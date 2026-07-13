@@ -72,4 +72,6 @@ void mbc5_write_ram (GB *gb, uint16_t addr, uint8_t val)
 	uint32_t offset = (bank << 13) + (addr - 0xA000);
 	if (offset < cart->ram_size)
 		cart->ram[offset] = val;
+
+	cart->save_needed = 1;
 }

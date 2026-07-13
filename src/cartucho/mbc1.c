@@ -39,6 +39,8 @@ void mbcNone_write_ram (GB *gb, uint16_t addr, uint8_t val)
 
 	if (offset < cart->ram_size)
 		cart->ram[offset] = val;
+
+	cart->save_needed = 1;
 }
 
 static inline uint32_t mbc1_bank_number (Cartucho *cart)
@@ -137,4 +139,6 @@ void mbc1_write_ram (GB *gb, uint16_t addr, uint8_t val)
 	uint32_t offset = (ram_bank << 13) + (addr - 0xA000);
 	if (offset < cart->ram_size)
 		cart->ram[offset] = val;
+
+	cart->save_needed = 1;
 }

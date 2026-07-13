@@ -106,7 +106,7 @@ static void update_stat (PPU *ppu, PPU_Mode new_mode)
 	ppu->stat = (ppu->stat & 0xFC) | new_mode;
 
 	if (new_mode == HBLANK) {
-		ppu->mode0_cycles = 376 - ppu->mode3_cycles;
+		ppu->mode0_cycles = DRAWING_HBLANK_DOTS - ppu->mode3_cycles;
 	}
 	if (new_mode == OAM_SCAN) {
 		ppu->x = 0;

@@ -196,6 +196,24 @@ static void make_sav_path (const char *romfile, char *out, size_t outsize) {
 	memcpy(out + base_len, ".sav", 5);
 }
 
+static inline int read_int64 (FILE *f, int64_t *v) {
+	*v = 0;
+	for (int i = 0; i < 8; i++) {
+		int a = fgetc(f);
+		if (a == EOF) return 0;
+		*v |= (int64_t)((uint64_t)(uint8_t)a) << (i * 8);
+	}
+	return 1;
+}
+
+static inline int write_int64 (FILE *f, int64_t v) {
+	for (int i = 0; i < 8; i++) {
+		uint8_t a = (v >> (i * 8)) & 0xFF;
+		if (fputc(a, f) == EOF) return 0;
+	}
+	return 1;
+}
+
 int load_sram (Cartucho *cart, const char *romfile)
 {
 	if (!cart->battery) return 0;
@@ -220,7 +238,7 @@ int load_sram (Cartucho *cart, const char *romfile)
 		uint8_t buf[5];
 		int64_t base;
 
-		if (fread(buf, 1, 5, f) == 5 && fread(&base, 1, sizeof(base), f) == sizeof(base)) {
+		if (fread(buf, 1, 5, f) == 5 && read_int64(f, &base)) {
 			cart->rtc.s = buf[0] & 0x3F;
 			cart->rtc.m = buf[1] & 0x3F;
 			cart->rtc.h = buf[2] & 0x1F;
@@ -271,7 +289,7 @@ int save_sram (Cartucho *cart, const char *romfile)
 		int64_t base = (int64_t) cart->rtc.base;
 
 		fwrite(buf, 1, 5, f);
-		fwrite(&base, 1, sizeof(base), f);
+		(void)write_int64(f, base);
 	}
 
 	fclose(f);

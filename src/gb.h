@@ -62,15 +62,13 @@ typedef struct GB {
 
 	uint64_t clock;
 	int running;
-
-	char rom_path[512];
 } GB;
 
 void init (GB *gb, const char *romfile, const char *biosfile);
 void init_test (GB *gb, const char *romfile);
 
-void cleanup (GB *gb);
-void cleanup_core (GB *gb);
+void cleanup (GB *gb, const char *romfile);
+void cleanup_core (GB *gb, const char *romfile);
 
 void gb_step (GB *gb);
 

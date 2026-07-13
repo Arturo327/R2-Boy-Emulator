@@ -53,4 +53,6 @@ void mbc2_write_ram (GB *gb, uint16_t addr, uint8_t val)
 
 	uint16_t offset = (addr - 0xA000) & 0x01FF;
 	cart->ram[offset] = val & 0x0F;
+
+	cart->save_needed = 1;
 }

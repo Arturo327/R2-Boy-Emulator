@@ -7,6 +7,9 @@
 #include <errno.h>
 #include <SDL2/SDL.h>
 
+#define AUTOSAVE_RATE_MS 1800
+#define VERSION "R2-Boy v1.0.0-beta"
+
 static volatile sig_atomic_t quit_requested = 0;
 
 static void on_signal (int sig) {
@@ -36,11 +39,15 @@ static int check_regs (GB *gb, const char *romfile)
 static int run_test (const char *romfile)
 {
 	GB *gb = malloc(sizeof(GB));
+	if (gb == NULL) {
+		fprintf(stderr, "FAIL: Not enough memory. Buy more RAM.\n");
+		return 1;
+	}
 
 	init_test (gb, romfile);
 	if (!gb->running) {
 		fprintf(stderr, "FAIL: %s (could not load ROM)\n", romfile);
-		cleanup_core(gb);
+		cleanup_core(gb, romfile);
 		free(gb);
 		return 1;
 	}
@@ -58,13 +65,13 @@ static int run_test (const char *romfile)
 
 	if (!truth_time) {
 		printf("TIMEOUT: %s\n", romfile);
-		cleanup_core(gb);
+		cleanup_core(gb, romfile);
 		free(gb);
 		return 1;
 	}
 
 	int result = check_regs(gb, romfile);
-	cleanup_core(gb);
+	cleanup_core(gb, romfile);
 	free(gb);
 	return result;
 }
@@ -83,7 +90,7 @@ static inline void print_err (const char *prog) {
 
 static inline void print_usage (const char *prog)
 {
-	printf("R2-Boy v1.0.0-beta\n");
+	printf("%s\n", VERSION);
 	printf("Nintendo Game Boy (DMG) Emulator\n\n");
 
 	printf("USAGE:\n");
@@ -122,7 +129,7 @@ static inline void print_usage (const char *prog)
 }
 
 static inline void print_version (void) {
-	printf("R2-Boy v1.0.0-beta\n");
+	printf("%s\n", VERSION);
 }
 
 static int parse_port (const char *str, uint16_t *out)
@@ -238,7 +245,7 @@ static void init_link (GB *gb, Args args)
 static int init_emulator (GB *gb, const char *romfile, const char *biosfile) {
 	init(gb, romfile, biosfile);
 	if (!gb->running) {
-		cleanup(gb);
+		cleanup(gb, romfile);
 		return 0;
 	}
 	return 1;
@@ -284,7 +291,7 @@ static void sync_frame (GB *gb, uint64_t *next_frame, uint64_t frame_ticks, uint
 	sleep_until(*next_frame, freq, link, rx_mark);
 }
 
-static void run (GB *gb)
+static void run (GB *gb, const char *romfile)
 {
 	double frames_per_sec = 4194304.0 / 70224.0;
 	uint32_t samples_per_frame = (uint32_t)((double)gb->audio.sample_rate / frames_per_sec * 2.0);
@@ -293,6 +300,8 @@ static void run (GB *gb)
 	uint64_t freq = SDL_GetPerformanceFrequency();
 	uint64_t frame_ticks = (uint64_t)(freq / frames_per_sec);
 	uint64_t next_frame = SDL_GetPerformanceCounter();
+
+	uint32_t frames_since_save = 0;
 
 	while (gb->running && !quit_requested) {
 
@@ -306,13 +315,19 @@ static void run (GB *gb)
 		update_rumble(&gb->pad, gb->memory.cart.rumble_on);
 		gb->clock -= 70224;
 
+		if (gb->memory.cart.save_needed && ++frames_since_save >= AUTOSAVE_RATE_MS) {
+			save_sram(&gb->memory.cart, romfile);
+			gb->memory.cart.save_needed = 0;
+			frames_since_save = 0;
+		}
+
 		while (ring_used(&gb->audio.ring) > max_queued)
 			SDL_Delay(1);
 
 		sync_frame(gb, &next_frame, frame_ticks, freq);
 	}
 
-	cleanup(gb);
+	cleanup(gb, romfile);
 }
 
 int main (int argc, char *argv[])
@@ -339,7 +354,7 @@ int main (int argc, char *argv[])
 	signal(SIGINT, on_signal);
 	signal(SIGTERM, on_signal);
 
-	run(gb);
+	run(gb, args.romfile);
 
 	free(gb);
 	return 0;

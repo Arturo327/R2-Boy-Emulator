@@ -96,8 +96,8 @@ void ld_wzmem_sp_high (GB *gb) {
 // ------------------ ILLEGAL OPCODE ------------------
 
 void illegal_opcode (GB *gb) {
-	uint8_t opcode = gb->cpu.bus->read8(gb, gb->cpu.pc - 1);
-	printf("WARNING: ILEGAL OPCODE %#X\n", opcode);
+	uint8_t opcode = gb->cpu.bus->read8(gb->bus.ctx, gb->cpu.pc - 1);
+	fprintf(stderr, "WARNING: ILLEGAL OPCODE %#02X\n", opcode);
 }
 
 // ---------------------- BLOCK 0 --------------------------

@@ -23,6 +23,12 @@ static uint8_t joypad_calc_lo (GB *gb) {
 	return lo;
 }
 
+static void joypad_interrupt (GB *gb, uint8_t old_lo, uint8_t new_lo)
+{
+	if ((old_lo & ~new_lo) & 0x0F)
+		gb->interrupts.IF |= 0x10;
+}
+
 void joypad_update (GB *gb, uint8_t new_buttons) {
 	if (gb->joypad.buttons == new_buttons) return;
 
@@ -30,9 +36,7 @@ void joypad_update (GB *gb, uint8_t new_buttons) {
 	gb->joypad.buttons = new_buttons;
 	uint8_t new_lo = joypad_calc_lo(gb);
 
-	if ((old_lo & ~new_lo) & 0x0F) {
-		gb->interrupts.IF |= 0x10;
-	}
+	joypad_interrupt(gb, old_lo, new_lo);
 }
 
 static void oam_bug_rw (GB *gb) {
@@ -151,42 +155,42 @@ static uint8_t bus_read8 (void *ctx, uint16_t addr)
 
 		switch (addr) {
 
-			// Joypad
-			case 0xFF00: return (gb->joypad.joyp & 0x30) | joypad_calc_lo(gb) | 0xC0;
+		// Joypad
+		case 0xFF00: return (gb->joypad.joyp & 0x30) | joypad_calc_lo(gb) | 0xC0;
 
-			// Serial Port
-			case 0xFF01: return gb->serial.SB;
-			case 0xFF02: return gb->serial.SC | 0x7E;
+		// Serial Port
+		case 0xFF01: return gb->serial.SB;
+		case 0xFF02: return gb->serial.SC | 0x7E;
 
-			// Timer
-			case 0xFF04: return (uint8_t)(gb->timer.div >> 8);
-			case 0xFF05: return gb->timer.tima;
-			case 0xFF06: return gb->timer.tma;
-			case 0xFF07: return gb->timer.tac | 0xF8;
+		// Timer
+		case 0xFF04: return (uint8_t)(gb->timer.div >> 8);
+		case 0xFF05: return gb->timer.tima;
+		case 0xFF06: return gb->timer.tma;
+		case 0xFF07: return gb->timer.tac | 0xF8;
 
-			// Interrupts
-			case 0xFF0F: return gb->interrupts.IF | 0xE0;
+		// Interrupts
+		case 0xFF0F: return gb->interrupts.IF | 0xE0;
 
-			// PPU
-			case 0xFF40: return gb->ppu.lcdc;
-			case 0xFF41: {
-				gb->ppu.stat = (gb->ppu.stat & 0xFC) | gb->ppu.mode;
-				return gb->ppu.stat | 0x80;
-			}
-			case 0xFF42: return gb->ppu.scy;
-			case 0xFF43: return gb->ppu.scx;
-			case 0xFF44: return gb->ppu.ly;
-			case 0xFF45: return gb->ppu.lyc;
-			case 0xFF46: return gb->ppu.dma;
-			case 0xFF47: return gb->ppu.bgp;
-			case 0xFF48: return gb->ppu.obp0;
-			case 0xFF49: return gb->ppu.obp1;
-			case 0xFF4A: return gb->ppu.wy;
-			case 0xFF4B: return gb->ppu.wx;
+		// PPU
+		case 0xFF40: return gb->ppu.lcdc;
+		case 0xFF41: {
+			gb->ppu.stat = (gb->ppu.stat & 0xFC) | gb->ppu.mode;
+			return gb->ppu.stat | 0x80;
+		}
+		case 0xFF42: return gb->ppu.scy;
+		case 0xFF43: return gb->ppu.scx;
+		case 0xFF44: return gb->ppu.ly;
+		case 0xFF45: return gb->ppu.lyc;
+		case 0xFF46: return gb->ppu.dma;
+		case 0xFF47: return gb->ppu.bgp;
+		case 0xFF48: return gb->ppu.obp0;
+		case 0xFF49: return gb->ppu.obp1;
+		case 0xFF4A: return gb->ppu.wy;
+		case 0xFF4B: return gb->ppu.wx;
 
-			case 0xFF50: return 0xFF;
+		case 0xFF50: return 0xFF;
 
-			default: return 0xFF;
+		default: return 0xFF;
 		}
 	}
 
@@ -253,101 +257,97 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 
 		switch (addr) {
 
-			// Joypad
-			case 0xFF00: {
-				uint8_t old_lo = joypad_calc_lo(gb);
-				gb->joypad.joyp = (gb->joypad.joyp & 0xCF) | (val & 0x30);
-				uint8_t new_lo = joypad_calc_lo(gb);
+		// Joypad
+		case 0xFF00: {
+			uint8_t old_lo = joypad_calc_lo(gb);
+			gb->joypad.joyp = (gb->joypad.joyp & 0xCF) | (val & 0x30);
+			uint8_t new_lo = joypad_calc_lo(gb);
+			joypad_interrupt(gb, old_lo, new_lo);
+			break;
+		}
 
-				if ((old_lo & ~new_lo) & 0x0F) {
-					gb->interrupts.IF |= 0x10;
-				}
-				break;
-			}
+		// Serial Port
+		case 0xFF01: gb->serial.SB = val; break;
+		case 0xFF02: serial_write_sc(&gb->serial, val); break;
 
-			// Serial Port
-			case 0xFF01: gb->serial.SB = val; break;
-			case 0xFF02: serial_write_sc(&gb->serial, val); break;
+		// Timer
+		case 0xFF04: {
+			uint8_t old_div = (uint8_t)(gb->timer.div >> 8);
+			if (timer_selected_bit(gb->timer.div, gb->timer.tac) && (gb->timer.tac & 0x04)) {
+				gb->timer.tima++;
+				if (gb->timer.tima == 0)
+					gb->timer.tima_overflow = 4;
+			}
+			gb->timer.div = 0;
+			apu_div_reset(&gb->apu, old_div);
+			break;
+		}
+		case 0xFF05: {
+			if (gb->timer.reload) {
+				gb->timer.reload = 0;
+			} else if (gb->timer.tima_overflow > 1) {
+				gb->timer.tima = val;
+				gb->timer.tima_overflow = 0;
+			} else if (gb->timer.tima_overflow == 0) {
+				gb->timer.tima = val;
+			}
+			break;
+		}
+		case 0xFF06: {
+			gb->timer.tma = val;
+			if (gb->timer.tima_overflow > 0 || gb->timer.reload) gb->timer.tima = val;
+			if (gb->timer.reload) gb->timer.reload = 0;
+			break;
+		}
+		case 0xFF07: {
+			int and_before = timer_selected_bit(gb->timer.div, gb->timer.tac)
+				& ((gb->timer.tac >> 2) & 1);
+			gb->timer.tac = val;
+			int and_after = timer_selected_bit(gb->timer.div, gb->timer.tac)
+				& ((gb->timer.tac >> 2) & 1);
+			if (and_before == 1 && and_after == 0) {
+				gb->timer.tima++;
+				if (gb->timer.tima == 0)
+					gb->timer.tima_overflow = 4;
+			}
+			break;
+		}
 
-			// Timer
-			case 0xFF04: {
-				uint8_t old_div = (uint8_t)(gb->timer.div >> 8);
-				if (timer_selected_bit(gb->timer.div, gb->timer.tac) && (gb->timer.tac & 0x04)) {
-					gb->timer.tima++;
-					if (gb->timer.tima == 0)
-						gb->timer.tima_overflow = 4;
-				}
-				gb->timer.div = 0;
-				apu_div_reset(&gb->apu, old_div);
-				break;
-			}
-			case 0xFF05: {
-				if (gb->timer.reload) {
-					gb->timer.reload = 0;
-				} else if (gb->timer.tima_overflow > 1) {
-					gb->timer.tima = val;
-					gb->timer.tima_overflow = 0;
-				} else if (gb->timer.tima_overflow == 0) {
-					gb->timer.tima = val;
-				}
-				break;
-			}
-			case 0xFF06: {
-				gb->timer.tma = val;
-				if (gb->timer.tima_overflow > 0 || gb->timer.reload) gb->timer.tima = val;
-				if (gb->timer.reload) gb->timer.reload = 0;
-				break;
-			}
-			case 0xFF07: {
-				int and_before = timer_selected_bit(gb->timer.div, gb->timer.tac)
-					& ((gb->timer.tac >> 2) & 1);
-				gb->timer.tac = val;
-				int and_after = timer_selected_bit(gb->timer.div, gb->timer.tac)
-					& ((gb->timer.tac >> 2) & 1);
-				if (and_before == 1 && and_after == 0) {
-					gb->timer.tima++;
-					if (gb->timer.tima == 0)
-						gb->timer.tima_overflow = 4;
-				}
-				break;
-			}
+		// Interrupts
+		case 0xFF0F: gb->interrupts.IF = (val & 0x1F) | 0xE0; break;
 
-			// Interrupts
-			case 0xFF0F: gb->interrupts.IF = (val & 0x1F) | 0xE0; break;
+		// PPU
+		case 0xFF40: gb->ppu.lcdc = val; break;
+		case 0xFF41: {
+			gb->ppu.stat = (gb->ppu.stat & 0x07) | (val & 0x78);
+			update_stat_line(&gb->ppu);
+			break;
+		}
+		case 0xFF42: gb->ppu.scy = val; break;
+		case 0xFF43: gb->ppu.scx = val; break;
+		case 0xFF44: break;
+		case 0xFF45: {
+			gb->ppu.lyc = val;
+			if (gb->ppu.lcdc & 0x80)
+				check_lyc(&gb->ppu);
+			break;
+		}
+		case 0xFF46: {
+			gb->ppu.dma = val;
+			gb->dma.src = (uint16_t)val << 8;
+			gb->dma.index = 0;
+			gb->dma.delay = 2;
+			break;
+		}
+		case 0xFF47: gb->ppu.bgp = val; break;
+		case 0xFF48: gb->ppu.obp0 = val; break;
+		case 0xFF49: gb->ppu.obp1 = val; break;
+		case 0xFF4A: gb->ppu.wy = val; break;
+		case 0xFF4B: gb->ppu.wx = val; break;
 
-			// PPU
-			case 0xFF40: gb->ppu.lcdc = val; break;
-			case 0xFF41: {
-				gb->ppu.stat = (gb->ppu.stat & 0x07) | (val & 0x78);
-				update_stat_line(&gb->ppu);
-				break;
-			}
-			case 0xFF42: gb->ppu.scy = val; break;
-			case 0xFF43: gb->ppu.scx = val; break;
-			case 0xFF44: break;
-			case 0xFF45: {
-				gb->ppu.lyc = val;
-				gb->ppu.lyc = val;
-				if (gb->ppu.lcdc & 0x80)
-					check_lyc(&gb->ppu);
-				break;
-			}
-			case 0xFF46: {
-				gb->ppu.dma = val;
-				gb->dma.src = (uint16_t)val << 8;
-				gb->dma.index = 0;
-				gb->dma.delay = 2;
-				break;
-			}
-			case 0xFF47: gb->ppu.bgp = val; break;
-			case 0xFF48: gb->ppu.obp0 = val; break;
-			case 0xFF49: gb->ppu.obp1 = val; break;
-			case 0xFF4A: gb->ppu.wy = val; break;
-			case 0xFF4B: gb->ppu.wx = val; break;
+		case 0xFF50: gb->boot_rom_disable_pending = 1; break;
 
-			case 0xFF50: gb->boot_rom_disable_pending = 1; break;
-
-			default: break;
+		default: break;
 		}
 		return;
 	}

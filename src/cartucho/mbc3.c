@@ -122,6 +122,7 @@ void mbc3_write_ram (GB *gb, uint16_t addr, uint8_t val)
 
 	if (cart->ram_bank <= 0x07) {
 		if (!cart->ram) return;
+		cart->save_needed = 1;
 		uint32_t bank = cart->ram_bank;
 		if (cart->ram_banks) bank &= (cart->ram_banks - 1);
 		uint32_t offset = (bank << 13) + (addr - 0xA000);

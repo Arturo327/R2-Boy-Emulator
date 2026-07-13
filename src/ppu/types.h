@@ -89,7 +89,6 @@ typedef struct PPU {
 	uint8_t fetch_x;
 	uint8_t short_line;
 	uint8_t first_line;
-	uint8_t first_line_drawing;
 
 	uint16_t mode3_cycles;
 	uint16_t mode0_cycles;

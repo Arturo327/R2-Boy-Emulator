@@ -56,6 +56,7 @@ typedef struct Cartucho {
 	uint8_t rumble_on;
 
 	uint8_t battery;
+	uint8_t save_needed;
 
 	uint8_t (*read_rom) (GB *gb, uint16_t addr);
 	void (*write_rom) (GB *gb, uint16_t addr, uint8_t val);

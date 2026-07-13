@@ -45,9 +45,6 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile)
 
 	init_bus(&gb->bus, gb);
 
-	strncpy(gb->rom_path, romfile, sizeof(gb->rom_path) - 1);
-	gb->rom_path[sizeof(gb->rom_path) - 1] = '\0';
-
 	if (!load_rom(&gb->memory.cart, romfile)) {
 		fprintf(stderr, "Failed to load ROM: %s\n", romfile);
 		return 1;
@@ -84,15 +81,15 @@ void init_test (GB *gb, const char *romfile)
 	gb->running = 1;
 }
 
-void cleanup_core (GB *gb) {
-	save_sram(&gb->memory.cart, gb->rom_path);
+void cleanup_core (GB *gb, const char *romfile) {
+	save_sram(&gb->memory.cart, romfile);
 	free_cart(&gb->memory.cart);
 }
 
-void cleanup (GB *gb) {
+void cleanup (GB *gb, const char *romfile) {
 	link_close(&gb->link);
 	frontend_shutdown(gb);
-	cleanup_core(gb);
+	cleanup_core(gb, romfile);
 }
 
 static void dma_step (GB *gb)
