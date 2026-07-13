@@ -90,9 +90,9 @@ void cleanup_core (GB *gb) {
 }
 
 void cleanup (GB *gb) {
-	cleanup_core(gb);
-	frontend_shutdown(gb);
 	link_close(&gb->link);
+	frontend_shutdown(gb);
+	cleanup_core(gb);
 }
 
 void gb_step (GB *gb)

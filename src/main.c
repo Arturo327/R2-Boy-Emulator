@@ -174,7 +174,7 @@ static Args parse_args (int argc, char *argv[])
 		case 'C':
 			args.link_connect_addr = optarg;
 			break;
-		case 'H':
+		case 'H': {
 			uint16_t port;
 			if (!parse_port(optarg, &port)) {
 				fprintf(stderr, "Invalid port: %s\n", optarg);
@@ -182,6 +182,7 @@ static Args parse_args (int argc, char *argv[])
 			}
 			args.link_host_port = port;
 			break;
+		}
 		case 'h':
 			print_usage(argv[0]);
 			exit(0);
@@ -259,24 +260,7 @@ static int run_frame (GB *gb, uint32_t max_queued)
 	}
 	return 1;
 }
-/*
-static void sleep_until (uint64_t target, uint64_t freq) {
-	while (1) {
-		uint64_t now = SDL_GetPerformanceCounter();
-		if (now >= target) break;
-		uint64_t remaining_ms = (target - now) * 1000 / freq;
-		if (remaining_ms > 2) SDL_Delay(1);
-	}
-}
 
-static void sync_frame (uint64_t *next_frame, uint64_t frame_ticks, uint64_t freq)
-{
-	*next_frame += frame_ticks;
-	uint64_t now = SDL_GetPerformanceCounter();
-	if (*next_frame < now) *next_frame = now;
-	sleep_until(*next_frame, freq);
-}
-*/
 static void sleep_until (uint64_t target, uint64_t freq, Link *link, uint32_t rx_mark)
 {
 	while (1) {

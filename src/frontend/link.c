@@ -110,8 +110,10 @@ static void wait_or_wake (Link *link, int ms)
 static int try_accept (Link *link)
 {
 	struct pollfd pfds[2];
-	pfds[0].fd = link->listen_socket; pfds[0].events = POLLIN;
-	pfds[1].fd = link->wake_fds[0]; pfds[1].events = POLLIN;
+	pfds[0].fd = link->listen_socket;
+	pfds[0].events = POLLIN;
+	pfds[1].fd = link->wake_fds[0];
+	pfds[1].events = POLLIN;
 
 	while (atomic_load_explicit(&link->running, memory_order_acquire)) {
 
@@ -142,12 +144,6 @@ static int try_connect_once (Link *link)
 	struct sockaddr_in addr = {0};
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(link->port);
-	if (inet_pton(AF_INET, link->ip, &addr.sin_addr) <= 0) {
-		fprintf(stderr, "Link cable: IP '%s' is not valid\n", link->ip);
-		close(s);
-		return -1;
-	}
-
 	set_nonblocking(s);
 
 	int r = connect(s, (struct sockaddr *)&addr, sizeof(addr));
@@ -158,8 +154,10 @@ static int try_connect_once (Link *link)
 
 	if (r < 0) {
 		struct pollfd pfds[2];
-		pfds[0].fd = s; pfds[0].events = POLLOUT;
-		pfds[1].fd = link->wake_fds[0]; pfds[1].events = POLLIN;
+		pfds[0].fd = s;
+		pfds[0].events = POLLOUT;
+		pfds[1].fd = link->wake_fds[0];
+		pfds[1].events = POLLIN;
 
 		int pr = poll(pfds, 2, LINK_CONNECT_TIMEOUT_MS);
 		if (pr <= 0) {
@@ -203,11 +201,6 @@ static void run_connection_loop (Link *link)
 		if (pfds[1].revents & POLLIN)
 			drain_wake(link);
 
-		if (pfds[0].revents & (POLLHUP | POLLERR)) {
-			printf("Link cable: disconnected\n");
-			return;
-		}
-
 		if (pfds[0].revents & POLLIN) {
 			uint8_t buf[256];
 			ssize_t n = recv(link->socket, buf, sizeof(buf), 0);
@@ -216,7 +209,12 @@ static void run_connection_loop (Link *link)
 				return;
 			}
 			ring_push_bulk(&link->rx, buf, (uint32_t) n);
+
+		} else if (pfds[0].revents & (POLLHUP | POLLERR)) {
+			printf("Link cable: disconnected\n");
+			return;
 		}
+
 
 		if (pfds[0].revents & POLLOUT) {
 			uint8_t buf[256];
@@ -284,7 +282,7 @@ static void *link_thread_fn (void *arg)
 	return NULL;
 }
 
-static void link_init_common (Link *link)
+static int link_init_common (Link *link)
 {
 	memset(link, 0, sizeof(Link));
 	link->socket = -1;
@@ -294,14 +292,17 @@ static void link_init_common (Link *link)
 
 	if (pipe(link->wake_fds) == -1) {
 		fprintf(stderr, "Link cable: error creating pipe\n");
+		link->wake_fds[0] = link->wake_fds[1] = -1;
+		return 0;
 	}
 	set_nonblocking(link->wake_fds[0]);
 	set_nonblocking(link->wake_fds[1]);
+	return 1;
 }
 
 int link_host (Link *link, uint16_t port)
 {
-	link_init_common(link);
+	if (!link_init_common(link)) return 0;
 	link->mode = LINK_HOST;
 	link->port = port;
 
@@ -334,6 +335,8 @@ int link_host (Link *link, uint16_t port)
 	if (pthread_create(&link->thread, NULL, link_thread_fn, link) != 0) {
 		perror("pthread_create");
 		close(s);
+		close(link->wake_fds[0]);
+		close(link->wake_fds[1]);
 		link->listen_socket = -1;
 		return 0;
 	}
@@ -344,7 +347,13 @@ int link_host (Link *link, uint16_t port)
 
 int link_connect (Link *link, const char *ip, uint16_t port)
 {
-	link_init_common(link);
+	struct in_addr tmp;
+	if (inet_pton(AF_INET, ip, &tmp) <= 0) {
+		fprintf(stderr, "Link cable: IP '%s' is not valid\n", ip);
+		return 0;
+	}
+
+	if (!link_init_common(link)) return 0;
 	link->mode = LINK_CLIENT;
 	link->port = port;
 	strncpy(link->ip, ip, sizeof(link->ip) - 1);
@@ -353,6 +362,8 @@ int link_connect (Link *link, const char *ip, uint16_t port)
 
 	if (pthread_create(&link->thread, NULL, link_thread_fn, link) != 0) {
 		perror("pthread_create");
+		close(link->wake_fds[0]);
+		close(link->wake_fds[1]);
 		return 0;
 	}
 
