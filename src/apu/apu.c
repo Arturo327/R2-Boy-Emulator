@@ -40,6 +40,7 @@ void init_apu_reg (APU *apu) {
 	apu->nr51 = 0xF3;
  
 	apu->enabled = 1;
+	apu->ch1.ch.enabled = 1;
 }
 
 static void apu_power_off (APU *apu)
@@ -405,40 +406,41 @@ void apu_div_reset (APU *apu, uint8_t old_div)
 uint8_t apu_read_reg (APU *apu, uint16_t addr)
 {
 	switch (addr) {
-		case 0xFF10: return apu->nr10 | 0x80;
-		case 0xFF11: return apu->nr11 | 0x3F;
-		case 0xFF12: return apu->nr12;
-		case 0xFF13: return 0xFF;
-		case 0xFF14: return apu->nr14 | 0xBF;
 
-		case 0xFF16: return apu->nr21 | 0x3F;
-		case 0xFF17: return apu->nr22;
-		case 0xFF18: return 0xFF;
-		case 0xFF19: return apu->nr24 | 0xBF;
+	case 0xFF10: return apu->nr10 | 0x80;
+	case 0xFF11: return apu->nr11 | 0x3F;
+	case 0xFF12: return apu->nr12;
+	case 0xFF13: return 0xFF;
+	case 0xFF14: return apu->nr14 | 0xBF;
 
-		case 0xFF1A: return apu->nr30 | 0x7F;
-		case 0xFF1B: return 0xFF;
-		case 0xFF1C: return apu->nr32 | 0x9F;
-		case 0xFF1D: return 0xFF;
-		case 0xFF1E: return apu->nr34 | 0xBF;
+	case 0xFF16: return apu->nr21 | 0x3F;
+	case 0xFF17: return apu->nr22;
+	case 0xFF18: return 0xFF;
+	case 0xFF19: return apu->nr24 | 0xBF;
 
-		case 0xFF20: return 0xFF;
-		case 0xFF21: return apu->nr42;
-		case 0xFF22: return apu->nr43;
-		case 0xFF23: return apu->nr44 | 0xBF;
+	case 0xFF1A: return apu->nr30 | 0x7F;
+	case 0xFF1B: return 0xFF;
+	case 0xFF1C: return apu->nr32 | 0x9F;
+	case 0xFF1D: return 0xFF;
+	case 0xFF1E: return apu->nr34 | 0xBF;
 
-		case 0xFF24: return apu->nr50;
-		case 0xFF25: return apu->nr51;
-		case 0xFF26: {
-			uint8_t status = 0;
-			if (apu->ch1.ch.enabled) status |= 0x01;
-			if (apu->ch2.enabled) status |= 0x02;
-			if (apu->ch3.enabled) status |= 0x04;
-			if (apu->ch4.ch.enabled) status |= 0x08;
-			return (apu->enabled ? 0x80 : 0x00) | 0x70 | status;
-		}
+	case 0xFF20: return 0xFF;
+	case 0xFF21: return apu->nr42;
+	case 0xFF22: return apu->nr43;
+	case 0xFF23: return apu->nr44 | 0xBF;
 
-		default: return 0xFF;
+	case 0xFF24: return apu->nr50;
+	case 0xFF25: return apu->nr51;
+	case 0xFF26: {
+		uint8_t status = 0;
+		if (apu->ch1.ch.enabled) status |= 0x01;
+		if (apu->ch2.enabled) status |= 0x02;
+		if (apu->ch3.enabled) status |= 0x04;
+		if (apu->ch4.ch.enabled) status |= 0x08;
+		return (apu->enabled ? 0x80 : 0x00) | 0x70 | status;
+	}
+
+	default: return 0xFF;
 	}
 }
 
@@ -446,99 +448,100 @@ void apu_write_reg (APU *apu, uint16_t addr, uint8_t val)
 {
 	if (!apu->enabled) {
 		switch (addr) {
-			case 0xFF11: apu->ch1.ch.length_counter = 64 - (val & 0x3F); break;
-			case 0xFF16: apu->ch2.length_counter = 64 - (val & 0x3F); break;
-			case 0xFF1B: apu->ch3.length_counter = 256 - val; break;
-			case 0xFF20: apu->ch4.ch.length_counter = 64 - (val & 0x3F); break;
-			case 0xFF26: {
-				if (val & 0x80) {
-					apu->enabled = 1;
-					apu->frame_seq_step = 7;
-					apu->frame_seq_counter = 0;
-				}
-				break;
+
+		case 0xFF11: apu->ch1.ch.length_counter = 64 - (val & 0x3F); break;
+		case 0xFF16: apu->ch2.length_counter = 64 - (val & 0x3F); break;
+		case 0xFF1B: apu->ch3.length_counter = 256 - val; break;
+		case 0xFF20: apu->ch4.ch.length_counter = 64 - (val & 0x3F); break;
+		case 0xFF26: {
+			if (val & 0x80) {
+				apu->enabled = 1;
+				apu->frame_seq_step = 7;
+				apu->frame_seq_counter = 0;
 			}
-			default: break;
+			break;
+		}
+		default: break;
 		}
 		return;
 	}
 
 	switch (addr) {
-		case 0xFF10: {
-			uint8_t prev = apu->nr10;
-			apu->nr10 = val;
-			if ((prev & 0x08) && !(val & 0x08) && apu->ch1.negate_used)
-				apu->ch1.ch.enabled = 0;
+
+	case 0xFF10: {
+		uint8_t prev = apu->nr10;
+		apu->nr10 = val;
+		if ((prev & 0x08) && !(val & 0x08) && apu->ch1.negate_used)
+			apu->ch1.ch.enabled = 0;
+		break;
+	}
+	case 0xFF11: apu->nr11 = val; apu->ch1.ch.length_counter = 64 - (val & 0x3F); break;
+	case 0xFF12: apu->nr12 = val; if (!(val & 0xF8)) apu->ch1.ch.enabled = 0; break;
+	case 0xFF13: apu->nr13 = val; break;
+	case 0xFF14: {
+		uint8_t prev = apu->nr14;
+		apu->nr14 = val & 0xC7;
+
+		if (!(prev & 0x40) && (val & 0x40) && !(apu->frame_seq_step & 1))
+			clock_length(&apu->ch1.ch, apu->nr14);
+
+		if (val & 0x80) apu_trigger_ch1(apu);
+		break;
+	}
+
+	case 0xFF16: apu->nr21 = val; apu->ch2.length_counter = 64 - (val & 0x3F); break;
+	case 0xFF17: apu->nr22 = val; if (!(val & 0xF8)) apu->ch2.enabled = 0; break;
+	case 0xFF18: apu->nr23 = val; break;
+	case 0xFF19: {
+		uint8_t prev = apu->nr24;
+		apu->nr24 = val & 0xC7;
+
+		if (!(prev & 0x40) && (val & 0x40) && !(apu->frame_seq_step & 1))
+			clock_length(&apu->ch2, apu->nr24);
+
+		if (val & 0x80) apu_trigger_ch2(apu);
+		break;
+	}
+
+	case 0xFF1A: apu->nr30 = val; if (!(val & 0x80)) apu->ch3.enabled = 0; break;
+	case 0xFF1B: apu->nr31 = val; apu->ch3.length_counter = 256 - val; break;
+	case 0xFF1C: apu->nr32 = val; break;
+	case 0xFF1D: apu->nr33 = val; break;
+	case 0xFF1E: {
+		uint8_t prev = apu->nr34;
+		apu->nr34 = val & 0xC7;
+
+		if (!(prev & 0x40) && (val & 0x40) && !(apu->frame_seq_step & 1))
+			clock_length_ch3(apu);
+
+		if (val & 0x80) apu_trigger_ch3(apu);
 			break;
-		}
-		case 0xFF11: apu->nr11 = val; apu->ch1.ch.length_counter = 64 - (val & 0x3F); break;
-		case 0xFF12: apu->nr12 = val; if (!(val & 0xF8)) apu->ch1.ch.enabled = 0; break;
-		case 0xFF13: apu->nr13 = val; break;
-		case 0xFF14: {
-			uint8_t prev = apu->nr14;
-			apu->nr14 = val & 0xC7;
-			
-			if (!(prev & 0x40) && (val & 0x40) && !(apu->frame_seq_step & 1))
-				clock_length(&apu->ch1.ch, apu->nr14);
+	}
 
-			if (val & 0x80) apu_trigger_ch1(apu);
-			break;
-		}
-
-		case 0xFF16: apu->nr21 = val; apu->ch2.length_counter = 64 - (val & 0x3F); break;
-		case 0xFF17: apu->nr22 = val; if (!(val & 0xF8)) apu->ch2.enabled = 0; break;
-		case 0xFF18: apu->nr23 = val; break;
-		case 0xFF19: {
-			uint8_t prev = apu->nr24;
-			apu->nr24 = val & 0xC7;
-			
-			if (!(prev & 0x40) && (val & 0x40) && !(apu->frame_seq_step & 1))
-				clock_length(&apu->ch2, apu->nr24);
-
-			if (val & 0x80) apu_trigger_ch2(apu);
-			break;
-		}
-
-		case 0xFF1A: apu->nr30 = val; if (!(val & 0x80)) apu->ch3.enabled = 0; break;
-		case 0xFF1B: apu->nr31 = val; apu->ch3.length_counter = 256 - val; break;
-		case 0xFF1C: apu->nr32 = val; break;
-		case 0xFF1D: apu->nr33 = val; break;
-		case 0xFF1E: {
-			uint8_t prev = apu->nr34;
-			apu->nr34 = val & 0xC7;
-
-			if (!(prev & 0x40) && (val & 0x40) && !(apu->frame_seq_step & 1))
-				clock_length_ch3(apu);
-
-			if (val & 0x80) apu_trigger_ch3(apu);
-				break;
-		}
-
-		case 0xFF20: apu->nr41 = val; apu->ch4.ch.length_counter = 64 - (val & 0x3F); break;
-		case 0xFF21: apu->nr42 = val; if (!(val & 0xF8)) apu->ch4.ch.enabled = 0; break;
-		case 0xFF22: apu->nr43 = val; break;
-		case 0xFF23: {
-			uint8_t prev = apu->nr44;
-			apu->nr44 = val & 0xC7;
-			
-			if (!(prev & 0x40) && (val & 0x40) && !(apu->frame_seq_step & 1))
-				clock_length(&apu->ch4.ch, apu->nr44);
-
-			if (val & 0x80) apu_trigger_ch4(apu);
-			break;
-		}
-
-		case 0xFF24: apu->nr50 = val; break;
-		case 0xFF25: apu->nr51 = val; break;
-		case 0xFF26: {
-			if (!(val & 0x80)) {
-				apu_power_off(apu);
-			} else {
-				apu->enabled = 1;
-			}
-			break;
-		}
+	case 0xFF20: apu->nr41 = val; apu->ch4.ch.length_counter = 64 - (val & 0x3F); break;
+	case 0xFF21: apu->nr42 = val; if (!(val & 0xF8)) apu->ch4.ch.enabled = 0; break;
+	case 0xFF22: apu->nr43 = val; break;
+	case 0xFF23: {
+		uint8_t prev = apu->nr44;
+		apu->nr44 = val & 0xC7;
 		
+		if (!(prev & 0x40) && (val & 0x40) && !(apu->frame_seq_step & 1))
+			clock_length(&apu->ch4.ch, apu->nr44);
+
+		if (val & 0x80) apu_trigger_ch4(apu);
+		break;
+	}
+
+	case 0xFF24: apu->nr50 = val; break;
+	case 0xFF25: apu->nr51 = val; break;
+	case 0xFF26: {
+		if (!(val & 0x80)) {
+			apu_power_off(apu);
+		} else {
+			apu->enabled = 1;
+		}
+		break;
+	}
 	}
 }
 

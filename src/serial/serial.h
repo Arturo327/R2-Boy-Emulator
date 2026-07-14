@@ -18,7 +18,7 @@ typedef struct Serial {
 	Link *link;
 } Serial;
 
-int serial_step (Serial *serial);
+int serial_step (Serial *serial, uint16_t old_div, uint16_t div);
 void serial_write_sc (Serial *serial, uint8_t val);
 
 #endif

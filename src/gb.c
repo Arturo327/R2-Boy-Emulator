@@ -29,7 +29,7 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile)
 		init_ppu_reg(&gb->ppu);
 		init_apu_reg(&gb->apu);
 		init_cpu(&gb->cpu);
-		gb->timer.div = 0xAB34;
+		gb->timer.div = 0xABCC;
 		gb->serial.SC = 0x7E;
 		gb->timer.tac = 0xF8;
 		gb->joypad.joyp = 0xCF;
@@ -118,10 +118,11 @@ void gb_step (GB *gb)
 
 	dma_step(gb);
 
+	uint16_t old_div = gb->timer.div;
 	if (timer_step(&gb->timer)) {
 		gb->interrupts.IF |= 0x04;
 	}
-	if (serial_step(&gb->serial)) {
+	if (serial_step(&gb->serial, old_div, gb->timer.div)) {
 		gb->interrupts.IF |= 0x08;
 	}
 
