@@ -2,6 +2,7 @@
 #define TYPES_H
 
 #include <stdint.h>
+#include "frontend/config.h"
 
 #define OAM_SCAN_DOTS 80
 #define LINE_DOTS 456
@@ -94,6 +95,7 @@ typedef struct PPU {
 	uint16_t mode0_cycles;
 
 	Bus *bus;
+	DmgPalette palette;
 
 	uint8_t stat_line;
 	uint8_t lcdc, stat, scy, scx, ly, lyc, dma, bgp, obp0, obp1, wy, wx;

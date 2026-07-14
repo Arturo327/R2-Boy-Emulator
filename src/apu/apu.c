@@ -339,18 +339,13 @@ static void HPF (APU *apu, Sample *s) {
 	s->left = (int16_t) l;
 }
 
-static Sample mix_channels (APU *apu) {
-
+static Sample mix_channels_raw (APU *apu) {
 	AnalogChannels chs;
 	chs.ch1 = dac(&apu->ch1.ch, apu->nr11);
 	chs.ch2 = dac(&apu->ch2, apu->nr21);
 	chs.ch3 = dac_ch3(apu);
 	chs.ch4 = dac_ch4(apu);
-	
-	Sample s = mixer(apu, chs);
-	volume(apu, &s);
-	HPF(apu, &s);
-	return s;
+	return mixer(apu, chs);
 }
 
 static void clock_frame_seq (APU *apu)
@@ -373,20 +368,33 @@ static void clock_frame_seq (APU *apu)
  
 void apu_step (APU *apu) 
 {
-	for (int i = 0; i < 4; i++)
-	{
+	for (int i = 0; i < 4; i++) {
+
 		step_freq(&apu->ch1.ch, apu->nr13, apu->nr14);
 		step_freq(&apu->ch2, apu->nr23, apu->nr24);
 		step_wave(apu);
 		step_noise(&apu->ch4, apu->nr43);
+
+		Sample raw = mix_channels_raw(apu);
+		apu->accum_l += raw.left;
+		apu->accum_r += raw.right;
+		apu->accum_n++;
 	 
 		apu->sample_counter += apu->sample_rate;
 		if (apu->sample_counter >= APU_CPU_CLOCK) {
 			apu->sample_counter -= APU_CPU_CLOCK;
-			Sample s = mix_channels(apu);
+
+			Sample s;
+			s.left  = (int16_t)(apu->accum_l / (int32_t)apu->accum_n);
+			s.right = (int16_t)(apu->accum_r / (int32_t)apu->accum_n);
+			apu->accum_l = apu->accum_r = 0;
+			apu->accum_n = 0;
+
+			volume(apu, &s);
+			HPF(apu, &s);
 			push_sample(apu, s);
 		}
-		
+
 		if (!apu->enabled) return;
 		apu->frame_seq_counter++;
 		if (apu->frame_seq_counter >= 8192) {

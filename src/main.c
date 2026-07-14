@@ -82,9 +82,14 @@ typedef struct {
 	int debug;
 	int link_host_port;
 	char *link_connect_addr;
+
+	int volume;
+	int mute;
+	char *palette;
 } Args;
 
-static inline void print_err (const char *prog) {
+static inline void print_err (const char *prog)
+{
 	fprintf(stderr, "Not a valid command\nExecute %s --help for more info\n", prog);
 }
 
@@ -120,12 +125,29 @@ static inline void print_usage (const char *prog)
 	printf("	Connect to a remote Game Link host using the specified\n");
 	printf("	IP address and TCP port.\n\n");
 
-	printf("KEYBOARD CONTROLS:\n");
+	printf("    --volume <0..100>\n");
+	printf("	Set the audio output volume. Default: 100.\n\n");
+
+	printf("    --mute\n");
+	printf("	Start with audio muted.\n\n");
+
+	printf("    --palette <NAME>\n");
+	printf("	Select a built-in color palette. NAME is one of:\n");
+	printf("	\"DMG\", \"pocket\", \"BGB\", \"choco\", \"pocket_green\"\n\n");
+
+	printf("    --remap\n");
+	printf("	Run an interactive key-remap prompt at startup.\n");
+	printf("	The mapping is persisted to ~/.config/r2boy/config.ini\n\n");
+
+	printf("DEFAULT KEYBOARD CONTROLS:\n");
 	printf("    Arrow Keys		    D-Pad\n");
 	printf("    X			    A\n");
 	printf("    Z			    B\n");
 	printf("    Enter		    START\n");
 	printf("    Backspace		    SELECT\n");
+	printf("    Tab			    Turbo (hold)\n");
+	printf("    M / + / -		    Mute / Vol+ / Vol-\n");
+	printf("    P			    Cycle color palette\n");
 }
 
 static inline void print_version (void) {
@@ -150,13 +172,18 @@ static int parse_port (const char *str, uint16_t *out)
 
 static Args parse_args (int argc, char *argv[])
 {
-	static struct option long_options[] = {
+	static struct option long_options[] =
+	{
 		{"bios", required_argument, 0, 'b'},
 		{"debug", no_argument, 0, 'd'},
 		{"help", no_argument, 0, 'h'},
 		{"version", no_argument, 0, 'v'},
 		{"link-host", required_argument, 0, 'H'},
 		{"link-connect", required_argument, 0, 'C'},
+		{"volume", required_argument, 0, 'V'},
+		{"mute", no_argument, 0, 'M'},
+		{"palette", required_argument, 0, 'P'},
+		{"remap", no_argument, 0, 'R'},
 		{0, 0, 0, 0}
 	};
 
@@ -164,23 +191,26 @@ static Args parse_args (int argc, char *argv[])
 		.biosfile = "roms/bios.bin",
 		.debug = 0,
 		.link_host_port = 0,
-		.link_connect_addr = NULL
+		.link_connect_addr = NULL,
+		.volume = -1,
+		.mute = -1,
+		.palette = NULL,
 	};
 
 	int opt;
-	while ((opt = getopt_long(argc, argv, "hvdb:H:C:", long_options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "hvdb:H:C:V:MP:R", long_options, NULL)) != -1) {
 		switch (opt) {
-		case 'd':
+		case 'd': {
 			printf("DEBUG MODE active\n");
 			args.debug = 1;
 			break;
-		case 'b':
+		}
+		case 'b': {
 			printf("BIOS: %s\n", optarg);
 			args.biosfile = optarg;
 			break;
-		case 'C':
-			args.link_connect_addr = optarg;
-			break;
+		}
+		case 'C': args.link_connect_addr = optarg; break;
 		case 'H': {
 			uint16_t port;
 			if (!parse_port(optarg, &port)) {
@@ -190,15 +220,24 @@ static Args parse_args (int argc, char *argv[])
 			args.link_host_port = port;
 			break;
 		}
-		case 'h':
-			print_usage(argv[0]);
-			exit(0);
-		case 'v':
-			print_version();
-			exit(0);
-		default:
-			print_err(argv[0]);
-			exit(1);
+		case 'V': {
+			char *end;
+			errno = 0;
+			long v = strtol(optarg, &end, 10);
+			if (errno || *end != '\0' || v < 0 || v > 100) {
+				fprintf(stderr, "Invalid volume: %s (expected 0..100)\n", optarg);
+				exit(1);
+			}
+			args.volume = (int)v;
+			break;
+		}
+		case 'M': args.mute = 1; break;
+		case 'P': args.palette = optarg; break;
+
+		case 'R': run_remap(); exit(0);
+		case 'h': print_usage(argv[0]); exit(0);
+		case 'v': print_version(); exit(0);
+		default: print_err(argv[0]); exit(1);
 		}
 	}
 
@@ -242,6 +281,28 @@ static void init_link (GB *gb, Args args)
 	}
 }
 
+static void init_config (GB *gb, Args args)
+{
+	load_config(&gb->cfg);
+	gb->ppu.palette = gb->cfg.palette;
+
+	if (args.volume >= 0)
+		atomic_store(&gb->cfg.volume, args.volume);
+
+	if (args.mute >= 0)
+		atomic_store(&gb->cfg.muted, (uint8_t)args.mute);
+
+	if (!args.palette) return;
+	for (int i = 0; i < PAL_COUNT; i++) {
+		const char *n = palette_name((DmgPalette)i);
+		if (!strcmp(args.palette, n)) {
+			gb->cfg.palette = (DmgPalette)i;
+			gb->ppu.palette = (DmgPalette)i;
+			break;
+		}
+	}
+}
+
 static int init_emulator (GB *gb, const char *romfile, const char *biosfile) {
 	init(gb, romfile, biosfile);
 	if (!gb->running) {
@@ -256,9 +317,12 @@ static int run_frame (GB *gb, uint32_t max_queued)
 	while (gb->clock < 70224) {
 		gb_step(gb);
 
-		if (gb->apu.buffer_pos >= 256) {
+		if (gb->cfg.turbo) {
+			gb->apu.buffer_pos = 0;
+
+		} else if (gb->apu.buffer_pos >= 256) {
 			queue_audio(gb);
-			while (ring_used(&gb->audio.ring) > max_queued * 2)
+			while (ring_used(&gb->audio.ring) > max_queued << 1)
 				SDL_Delay(1);
 		}
 
@@ -282,7 +346,9 @@ static void sleep_until (uint64_t target, uint64_t freq, Link *link, uint32_t rx
 
 static void sync_frame (GB *gb, uint64_t *next_frame, uint64_t frame_ticks, uint64_t freq)
 {
-	*next_frame += frame_ticks;
+	uint64_t ticks = gb->cfg.turbo ? frame_ticks >> 1 : frame_ticks;
+
+	*next_frame += ticks;
 	uint64_t now = SDL_GetPerformanceCounter();
 	if (*next_frame < now) *next_frame = now;
 
@@ -295,7 +361,7 @@ static void run (GB *gb, const char *romfile)
 {
 	double frames_per_sec = 4194304.0 / 70224.0;
 	uint32_t samples_per_frame = (uint32_t)((double)gb->audio.sample_rate / frames_per_sec * 2.0);
-	uint32_t max_queued = (uint32_t)(samples_per_frame * 1.5);
+	uint32_t max_queued = (uint32_t)(samples_per_frame * 3.0);
 
 	uint64_t freq = SDL_GetPerformanceFrequency();
 	uint64_t frame_ticks = (uint64_t)(freq / frames_per_sec);
@@ -321,8 +387,10 @@ static void run (GB *gb, const char *romfile)
 			frames_since_save = 0;
 		}
 
-		while (ring_used(&gb->audio.ring) > max_queued)
-			SDL_Delay(1);
+		if (!gb->cfg.turbo) {
+			while (ring_used(&gb->audio.ring) > max_queued)
+				SDL_Delay(1);
+		}
 
 		sync_frame(gb, &next_frame, frame_ticks, freq);
 	}
@@ -333,11 +401,14 @@ static void run (GB *gb, const char *romfile)
 int main (int argc, char *argv[])
 {
 	signal(SIGPIPE, SIG_IGN);
+	signal(SIGINT, on_signal);
+	signal(SIGTERM, on_signal);
 
 	Args args = parse_args(argc, argv);
 
 	if (args.debug)
 		return run_test(args.romfile);
+
 
 	GB *gb = malloc(sizeof(GB));
 	if (!gb) {
@@ -349,13 +420,13 @@ int main (int argc, char *argv[])
 		free(gb);
 		return 1;
 	}
+	init_config(gb, args);
 	init_link(gb, args);
-
-	signal(SIGINT, on_signal);
-	signal(SIGTERM, on_signal);
+	SDL_PauseAudioDevice(gb->audio.dev, 0);
 
 	run(gb, args.romfile);
 
+	save_config(&gb->cfg);
 	free(gb);
 	return 0;
 }

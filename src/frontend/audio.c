@@ -26,7 +26,8 @@ static void ring_push (AudioRing *r, int16_t *src, uint32_t n)
 
 static void audio_callback (void *userdata, uint8_t *stream, int len)
 {
-	AudioRing *r = (AudioRing *)userdata;
+	Audio *audio = (Audio *)userdata;
+	AudioRing *r = &audio->ring;
 	int16_t *out = (int16_t *)stream;
 	int n = len / sizeof(int16_t);
 
@@ -35,17 +36,28 @@ static void audio_callback (void *userdata, uint8_t *stream, int len)
 	uint32_t avail = (wp - rp) & (AUDIO_RING_SIZE - 1);
 	int fill = avail < (uint32_t)n ? (int)avail : n;
 
-	for (int i = 0; i < fill; i++)
-		out[i] = r->buffer[(rp + i) & (AUDIO_RING_SIZE - 1)];
-
-	if (fill < n) {
-		memset(out + fill, 0, (n - fill) * sizeof(int16_t));
+	uint8_t target = 100;
+	uint8_t muted = 0;
+	if (audio->cfg) {
+		target = atomic_load_explicit(&audio->cfg->volume, memory_order_relaxed);
+		muted  = atomic_load_explicit(&audio->cfg->muted,  memory_order_relaxed);
 	}
+	if (muted) target = 0;
+
+	int from = audio->last_volume;
+	for (int i = 0; i < fill; i++) {
+		int v = fill > 1 ? from + (target - from) * i / (fill - 1) : target;
+		out[i] = (int16_t)((int32_t)r->buffer[(rp + i) & (AUDIO_RING_SIZE - 1)] * v / 100);
+	}
+	audio->last_volume = target;
+
+	if (fill < n)
+		memset(out + fill, 0, (size_t)(n - fill) * sizeof(int16_t));
 
 	atomic_store_explicit(&r->read_pos, rp + fill, memory_order_release);
 }
 
-int init_audio (Audio *audio) {
+int init_audio (Audio *audio, struct Config *cfg) {
 
 	SDL_AudioSpec want = {0}, have;
 	want.freq = 44100;
@@ -53,7 +65,8 @@ int init_audio (Audio *audio) {
 	want.channels = 2;
 	want.samples = 256;
 	want.callback = audio_callback;
-	want.userdata = &audio->ring;
+	want.userdata = audio;
+	audio->cfg = cfg;
 
 	audio->dev = SDL_OpenAudioDevice(NULL, 0, &want, &have,
 		SDL_AUDIO_ALLOW_FREQUENCY_CHANGE);
@@ -64,8 +77,6 @@ int init_audio (Audio *audio) {
 	}
 
 	audio->sample_rate = have.freq;
-	SDL_PauseAudioDevice(audio->dev, 0);
-
 	return 1;
 }
 

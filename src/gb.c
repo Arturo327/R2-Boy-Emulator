@@ -24,6 +24,11 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile)
 	init_apu(&gb->apu);
 	init_opcodes(&gb->opcodes);
 
+	default_keymap(&gb->cfg.keymap);
+	atomic_store(&gb->cfg.volume, 100);
+	atomic_store(&gb->cfg.muted, 0);
+	gb->cfg.palette = PAL_DEFAULT;
+
 	if (!load_bios(gb, biosfile)) {
 
 		init_ppu_reg(&gb->ppu);

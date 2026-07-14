@@ -11,6 +11,7 @@ _Static_assert((AUDIO_RING_SIZE & (AUDIO_RING_SIZE - 1)) == 0,
 	       "AUDIO_RING_SIZE must be power of 2");
 
 typedef struct GB GB;
+struct Config;
 
 typedef struct AudioRing {
 	int16_t buffer[AUDIO_RING_SIZE];
@@ -28,9 +29,11 @@ typedef struct Audio {
 	SDL_AudioDeviceID dev;
 	uint32_t sample_rate;
 	AudioRing ring;
+	struct Config *cfg;
+	int last_volume;
 } Audio;
 
-int init_audio (Audio *audio);
+int init_audio (Audio *audio, struct Config *cfg);
 void cleanup_audio (Audio *audio);
 void queue_audio (GB *gb);
 

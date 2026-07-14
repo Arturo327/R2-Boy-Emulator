@@ -76,6 +76,8 @@ typedef struct APU {
 	int16_t buffer[APU_BUFFER_LEN];
 	int buffer_pos;
 
+	int32_t accum_l, accum_r;
+	uint32_t accum_n;
 } APU;
 
 void init_apu (APU *apu);

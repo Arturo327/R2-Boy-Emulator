@@ -11,6 +11,7 @@
 #include "cartucho/cartucho.h"
 #include "cpu/opcodes.h"
 #include "frontend/frontend.h"
+#include "frontend/config.h"
 
 typedef struct Joypad {
 	uint8_t buttons;
@@ -28,6 +29,15 @@ typedef struct Memory {
 	uint8_t oam[0xA0];
 	uint8_t hram[0x7F];
 } Memory;
+
+typedef struct Config {
+	Keymap keymap;
+	uint8_t turbo;
+	_Atomic int volume;
+	_Atomic uint8_t muted;
+	DmgPalette palette;
+	uint8_t remap;
+} Config;
 
 typedef struct DMA {
 	uint8_t active;
@@ -54,7 +64,6 @@ typedef struct GB {
 	Timer timer;
 	Joypad joypad;
 	Serial serial;
-
 	DMA dma;
 
 	uint8_t boot_rom_enabled;
@@ -62,6 +71,8 @@ typedef struct GB {
 
 	uint64_t clock;
 	int running;
+
+	Config cfg;
 } GB;
 
 void init (GB *gb, const char *romfile, const char *biosfile);

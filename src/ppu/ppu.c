@@ -3,14 +3,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-static const uint32_t PALETA[5] = {
-	0xFFC6DE8C,	// blanco
-	0xFF84A563,	// gris claro
-	0xFF396139,	// gris oscuro
-	0xFF081810,	// negro
-	0xFFD2E6A6	// blanco "más blanco"
-};
-
 void init_ppu_reg (PPU *ppu)
 {
 	ppu->lcdc = 0x91;
@@ -28,6 +20,7 @@ void init_ppu (PPU *ppu)
 	ppu->mode = OAM_SCAN;
 	ppu->bus = NULL;
 	ppu->sp.pending = -1;
+	ppu->palette = PAL_DEFAULT;
 }
 
 static void update_stat_line_ex (PPU *ppu, int force_mode2)
@@ -123,16 +116,16 @@ static void update_stat (PPU *ppu, PPU_Mode new_mode)
 		update_stat_line(ppu);
 }
 
-static uint32_t decode_color (uint8_t color_id, uint8_t pal) {
+static uint32_t decode_color (PPU *ppu, uint8_t color_id, uint8_t pal) {
 	uint8_t col = (pal >> (color_id << 1)) & 0x03;
-	return PALETA[col];
+	return PALETTES[ppu->palette][col];
 }
 
 static uint32_t solve_priority (PPU *ppu, SpritePixel sp, uint8_t bg) {
-	if (sp.color == 0) return decode_color(bg, ppu->bgp);
-	if (sp.bg_prio == 0) return decode_color(sp.color, sp.pal);
-	if (bg == 0) return decode_color(sp.color, sp.pal);
-	return decode_color(bg, ppu->bgp);
+	if (sp.color == 0) return decode_color(ppu, bg, ppu->bgp);
+	if (sp.bg_prio == 0) return decode_color(ppu, sp.color, sp.pal);
+	if (bg == 0) return decode_color(ppu, sp.color, sp.pal);
+	return decode_color(ppu, bg, ppu->bgp);
 }
 
 static void calc_sp_delay (PPU *ppu)
@@ -164,8 +157,8 @@ static void draw_pixel (PPU *ppu)
 		if (!(ppu->lcdc & 1)) bg = 0;
 		final_pixel = solve_priority(ppu, sp, bg);
 	} else {
-		if (!(ppu->lcdc & 1)) final_pixel = PALETA[0];
-		else final_pixel = decode_color(bg, ppu->bgp);
+		if (!(ppu->lcdc & 1)) final_pixel = PALETTES[ppu->palette][0];
+		else final_pixel = decode_color(ppu, bg, ppu->bgp);
 	}
 
 	ppu->framebuffer[ppu->ly * 160 + ppu->x] = final_pixel;
@@ -260,7 +253,7 @@ void ppu_step (PPU *ppu) {
 		if (!ppu->lcd_was_off) {
 			int pixels = sizeof(ppu->framebuffer) / sizeof(ppu->framebuffer[0]);
 			for (int i = 0; i < pixels; i++) {
-				ppu->framebuffer[i] = PALETA[4];
+				ppu->framebuffer[i] = PALETTES[ppu->palette][4];
 			}
 		}
 		ppu->ly = 0;

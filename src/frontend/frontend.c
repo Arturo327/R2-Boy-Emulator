@@ -14,7 +14,7 @@
 
 #define GAMEPAD_DEADZONE 8000
 
-static int handle_window_event (const SDL_Event *e)
+static int handle_window_event (SDL_Event *e)
 {
 	if (e->type == SDL_QUIT) return 0;
 	if (e->type == SDL_WINDOWEVENT && e->window.event == SDL_WINDOWEVENT_CLOSE)
@@ -22,23 +22,58 @@ static int handle_window_event (const SDL_Event *e)
 	return 1;
 }
 
-static uint8_t handle_kb_event (const SDL_Event *e, uint8_t curr)
+static void handle_hotkey (GB *gb, SDL_Scancode sc, int pressed)
+{
+	if (!pressed) return;
+	Config *cfg = &gb->cfg;
+
+	if (sc == cfg->keymap.mute) {
+		uint8_t m = !atomic_load(&cfg->muted);
+		atomic_store(&cfg->muted, m);
+		fprintf(stderr, "Audio: %s\n", m ? "muted" : "unmuted");
+
+	} else if (sc == cfg->keymap.vol_up) {
+		int v = atomic_load(&cfg->volume) + 10;
+		if (v > 100) v = 100;
+		atomic_store(&cfg->volume, v);
+		fprintf(stderr, "Volume: %d%%\n", v);
+
+	} else if (sc == cfg->keymap.vol_down) {
+		int v = atomic_load(&cfg->volume) - 10;
+		if (v < 0) v = 0;
+		atomic_store(&cfg->volume, v);
+		fprintf(stderr, "Volume: %d%%\n", v);
+
+	} else if (sc == cfg->keymap.palette) {
+		DmgPalette pal = (DmgPalette)((cfg->palette + 1) % PAL_COUNT);
+		cfg->palette = pal;
+		gb->ppu.palette = pal;
+		fprintf(stderr, "Palette: %s\n", palette_name(cfg->palette));
+	}
+}
+
+static uint8_t handle_kb_event (GB *gb, const SDL_Event *e, uint8_t curr)
 {
 	if (e->type != SDL_KEYDOWN && e->type != SDL_KEYUP) return curr;
 
+	SDL_Scancode sc = e->key.keysym.scancode;
 	uint8_t pressed = (e->type == SDL_KEYDOWN);
-	uint8_t mask = 0;
 
-	switch (e->key.keysym.scancode) {
-		case SDL_SCANCODE_RIGHT: mask = JOYPAD_RIGHT; break;
-		case SDL_SCANCODE_LEFT: mask = JOYPAD_LEFT; break;
-		case SDL_SCANCODE_UP: mask = JOYPAD_UP; break;
-		case SDL_SCANCODE_DOWN: mask = JOYPAD_DOWN; break;
-		case SDL_SCANCODE_X: mask = JOYPAD_A; break;
-		case SDL_SCANCODE_Z: mask = JOYPAD_B; break;
-		case SDL_SCANCODE_RETURN: mask = JOYPAD_START; break;
-		case SDL_SCANCODE_BACKSPACE: mask = JOYPAD_SELECT; break;
-		default: break;
+	const Keymap *k = &gb->cfg.keymap;
+	uint8_t mask = 0;
+	if	(sc == k->right)	mask = JOYPAD_RIGHT;
+	else if (sc == k->left)		mask = JOYPAD_LEFT;
+	else if (sc == k->up)		mask = JOYPAD_UP;
+	else if (sc == k->down)		mask = JOYPAD_DOWN;
+	else if (sc == k->a)		mask = JOYPAD_A;
+	else if (sc == k->b)		mask = JOYPAD_B;
+	else if (sc == k->start)	mask = JOYPAD_START;
+	else if (sc == k->select)	mask = JOYPAD_SELECT;
+	else if (pressed && !e->key.repeat) handle_hotkey(gb, sc, 1);
+
+	if (sc == k->turbo) {
+		if (pressed) gb->cfg.turbo = 1;
+		else gb->cfg.turbo = 0;
 	}
 
 	return pressed ? (curr | mask) : (curr & ~mask);
@@ -108,7 +143,7 @@ int frontend_init (GB *gb)
 
 	init_gamepad(&gb->pad);
 
-	if (!init_audio(&gb->audio)) {
+	if (!init_audio(&gb->audio, &gb->cfg)) {
 		gb->running = 0;
 		return 0;
 	}
@@ -143,7 +178,7 @@ int handle_events (GB *gb)
 		uint8_t prev_kb = gb->joypad.kb_buttons;
 		uint8_t prev_pad = gb->joypad.pad_dpad | gb->joypad.pad_stick;
 
-		gb->joypad.kb_buttons = handle_kb_event(&e, gb->joypad.kb_buttons);
+		gb->joypad.kb_buttons = handle_kb_event(gb, &e, gb->joypad.kb_buttons);
 		handle_gamepad_event(gb, &e);
 
 		uint8_t new_pad = gb->joypad.pad_dpad | gb->joypad.pad_stick;
