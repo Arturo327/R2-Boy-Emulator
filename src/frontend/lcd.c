@@ -3,11 +3,15 @@
 #include <time.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-int init_screen (LCD *lcd) {
+int init_screen (LCD *lcd, const char *game_title)
+{
+	char final_title[26] = "R2-Boy - ";
+	strcat(final_title, game_title);
 
 	lcd->window = SDL_CreateWindow(
-		"R2-Boy",
+		final_title,
 		SDL_WINDOWPOS_CENTERED,
 		SDL_WINDOWPOS_CENTERED,
 		160 * 4, 144 * 4,

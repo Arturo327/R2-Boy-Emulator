@@ -57,6 +57,7 @@ typedef struct Cartucho {
 
 	uint8_t battery;
 	uint8_t save_needed;
+	char title[17];
 
 	uint8_t (*read_rom) (GB *gb, uint16_t addr);
 	void (*write_rom) (GB *gb, uint16_t addr, uint8_t val);

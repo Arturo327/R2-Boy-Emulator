@@ -147,6 +147,20 @@ static int read_rom (Cartucho *cart, const char *filename)
 	return 1;
 }
 
+static void get_title (Cartucho *cart)
+{
+	uint8_t bytes = 16;
+	if (cart->rom[0x0143] == 0x80 || cart->rom[0x0143] == 0xC0)
+		bytes--;
+
+	if (cart->rom[0x014B] == 0x33)
+		bytes -= 4;
+
+	memcpy(cart->title, cart->rom + 0x0134, bytes);
+
+	cart->title[bytes] = '\0';
+}
+
 int load_rom (Cartucho *cart, const char *filename)
 {
 	cart->rom_bank = 1;
@@ -158,6 +172,7 @@ int load_rom (Cartucho *cart, const char *filename)
 
 	normalize_mbc(cart, cart->rom[0x0147]);
 	cart->multicart = is_multicart(cart);
+	get_title(cart);
 
 	uint8_t ram_type = cart->rom[0x0149];
 	uint32_t ram_sizes[] = {0, 2*1024, 8*1024, 32*1024, 128*1024, 64*1024};

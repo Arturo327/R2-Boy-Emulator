@@ -10,7 +10,7 @@
 
 typedef struct GB GB;
 
-int frontend_init (GB *gb);
+int frontend_init (GB *gb, const char *game_title);
 void frontend_shutdown (GB *gb);
 int handle_events (GB *gb);
 

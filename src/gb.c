@@ -67,7 +67,7 @@ void init (GB *gb, const char *romfile, const char *biosfile)
 		return;
 	}
 
-	if (!frontend_init(gb)) {
+	if (!frontend_init(gb, gb->memory.cart.title)) {
 		gb->running = 0;
 		return;
 	}
