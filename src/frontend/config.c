@@ -220,12 +220,12 @@ static void load_audio (Config *cfg, const char *s)
 
 const char *palette_name (DmgPalette p) {
 	switch (p) {
-		case PAL_DEFAULT:  	return "DMG";
-		case PAL_POCKET:   	return "pocket";
-		case PAL_BGB:      	return "BGB";
-		case PAL_CHOCO: 	return "choco";
-		case PAL_POCKET_GREEN: 	return "pocket_green";
-		default:           	return "unknown";
+		case PAL_DEFAULT:	return "DMG";
+		case PAL_POCKET:	return "pocket";
+		case PAL_BGB:		return "BGB";
+		case PAL_CHOCO:		return "choco";
+		case PAL_POCKET_GREEN:	return "pocket_green";
+		default:		return "unknown";
 	}
 }
 
@@ -340,30 +340,25 @@ void save_config (Config *cfg)
 	fclose(f);
 }
 
-static const char *remap_labels[] = {
-	"RIGHT", "LEFT", "UP", "DOWN", "A", "B", "START", "SELECT",
-	"TURBO (fast-forward)", "MUTE toggle", "PALETTE cycle",
-	"VOLUME UP", "VOLUME DOWN"
-};
-
 #define KEY_NUM 13
 
-static size_t remap_offsets[KEY_NUM] = {
-	offsetof(Keymap, right),
-	offsetof(Keymap, left),
-	offsetof(Keymap, up),
-	offsetof(Keymap, down),
+static struct { char *label; size_t offset; } remap_keys[KEY_NUM] =
+{
+	{"RIGHT",	offsetof(Keymap, right)},
+	{"LEFT",	offsetof(Keymap, left)},
+	{"UP",		offsetof(Keymap, up)},
+	{"DOWN",	offsetof(Keymap, down)},
 
-	offsetof(Keymap, a),
-	offsetof(Keymap, b),
-	offsetof(Keymap, start),
-	offsetof(Keymap, select),
+	{"A",		offsetof(Keymap, a)},
+	{"B",		offsetof(Keymap, b)},
+	{"START",	offsetof(Keymap, start)},
+	{"SELECT",	offsetof(Keymap, select)},
 
-	offsetof(Keymap, turbo),
-	offsetof(Keymap, mute),
-	offsetof(Keymap, palette),
-	offsetof(Keymap, vol_up),
-	offsetof(Keymap, vol_down),
+	{"TURBO",	offsetof(Keymap, turbo)},
+	{"MUTE",	offsetof(Keymap, mute)},
+	{"PALETTE",	offsetof(Keymap, palette)},
+	{"VOLUME UP",	offsetof(Keymap, vol_up)},
+	{"VOLUME DOWN",	offsetof(Keymap, vol_down)}
 };
 
 static SDL_Scancode read_terminal_scancode (void)
@@ -454,7 +449,7 @@ void run_remap (void)
 
 	new_tio = old_tio;
 	new_tio.c_iflag &= ~(IGNBRK | BRKINT | PARMRK | ISTRIP |
-	                     INLCR | IGNCR | ICRNL | IXON);
+				INLCR | IGNCR | ICRNL | IXON);
 	new_tio.c_lflag &= ~(ECHO | ECHONL | ICANON | ISIG | IEXTEN);
 	new_tio.c_cflag &= ~(CSIZE | PARENB);
 	new_tio.c_cflag |= CS8;
@@ -465,7 +460,7 @@ void run_remap (void)
 	tcflush(STDIN_FILENO, TCIFLUSH);
 
 	for (int i = 0; i < KEY_NUM; i++) {
-		printf("%-22s : press key  ", remap_labels[i]);
+		printf("%-22s : press key  ", remap_keys[i].label);
 		fflush(stdout);
 
 		SDL_Scancode got = read_terminal_scancode();
@@ -477,7 +472,7 @@ void run_remap (void)
 
 		if (got == SDL_SCANCODE_ESCAPE) {
 			const char *curr = scancode_to_name(
-				*(SDL_Scancode*)((char*)&cfg->keymap + remap_offsets[i]));
+				*(SDL_Scancode*)((char*)&cfg->keymap + remap_keys[i].offset));
 			printf("(keep %s)\n", curr ? curr : "unknown");
 			continue;
 		}
@@ -492,7 +487,7 @@ void run_remap (void)
 			break;
 		}
 
-		*(SDL_Scancode*)((char*)&cfg->keymap + remap_offsets[i]) = got;
+		*(SDL_Scancode*)((char*)&cfg->keymap + remap_keys[i].offset) = got;
 		const char *n = scancode_to_name(got);
 		printf("%s\n", n ? n : "(unknown)");
 	}

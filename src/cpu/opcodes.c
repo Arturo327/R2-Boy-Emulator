@@ -95,9 +95,16 @@ void ld_wzmem_sp_high (GB *gb) {
 
 // ------------------ ILLEGAL OPCODE ------------------
 
-void illegal_opcode (GB *gb) {
-	uint8_t opcode = gb->cpu.bus->read8(gb->bus.ctx, gb->cpu.pc - 1);
-	fprintf(stderr, "WARNING: ILLEGAL OPCODE %#02X\n", opcode);
+void illegal_opcode (GB *gb)
+{
+	uint16_t pc = gb->cpu.pc - 1;
+	uint8_t opcode = gb->bus.read8(gb->bus.ctx, pc);
+	fprintf(stderr, "FATAL: Illegal opcode %02X at PC=%04X\n", opcode, pc);
+	fprintf(stderr, "A=%02X B=%02X C=%02X D=%02X E=%02X H=%02X L=%02X SP=%04X\n",
+		gb->cpu.a, gb->cpu.b, gb->cpu.c, gb->cpu.d,
+		gb->cpu.e, gb->cpu.h, gb->cpu.l, gb->cpu.sp);
+	gb->cpu.halted = 1;
+	gb->running = 0;	
 }
 
 // ---------------------- BLOCK 0 --------------------------

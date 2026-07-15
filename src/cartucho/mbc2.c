@@ -52,7 +52,9 @@ void mbc2_write_ram (GB *gb, uint16_t addr, uint8_t val)
 	if (!cart->ram_enabled || !cart->ram) return;
 
 	uint16_t offset = (addr - 0xA000) & 0x01FF;
-	cart->ram[offset] = val & 0x0F;
 
+	pthread_mutex_lock(&gb->save.lock);
+	cart->ram[offset] = val & 0x0F;
 	cart->save_needed = 1;
+	pthread_mutex_unlock(&gb->save.lock);
 }

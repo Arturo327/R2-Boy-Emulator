@@ -2,6 +2,8 @@
 #define GB_H
 
 #include <stdint.h>
+#include <stdatomic.h>
+
 #include "cpu/cpu.h"
 #include "bus/bus.h"
 #include "ppu/ppu.h"
@@ -12,6 +14,7 @@
 #include "cpu/opcodes.h"
 #include "frontend/frontend.h"
 #include "frontend/config.h"
+#include "cartucho/save.h"
 
 typedef struct Joypad {
 	uint8_t buttons;
@@ -36,7 +39,6 @@ typedef struct Config {
 	_Atomic int volume;
 	_Atomic uint8_t muted;
 	DmgPalette palette;
-	uint8_t remap;
 } Config;
 
 typedef struct DMA {
@@ -73,6 +75,7 @@ typedef struct GB {
 	int running;
 
 	Config cfg;
+	AutoSave save;
 } GB;
 
 void init (GB *gb, const char *romfile, const char *biosfile);

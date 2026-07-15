@@ -7,7 +7,8 @@
 #include <errno.h>
 #include <SDL2/SDL.h>
 
-#define AUTOSAVE_RATE_MS 1800
+#define AUTOSAVE_RATE_FRAMES ((uint32_t)(AUTOSAVE_INTERVAL_MS / 1000.0 * (4194304.0 / 70224.0)))
+
 #define VERSION "R2-Boy v1.0.0-beta"
 
 static volatile sig_atomic_t quit_requested = 0;
@@ -84,6 +85,7 @@ typedef struct {
 	char *link_connect_addr;
 
 	int volume;
+	int volume_set;
 	int mute;
 	char *palette;
 } Args;
@@ -193,6 +195,7 @@ static Args parse_args (int argc, char *argv[])
 		.link_host_port = 0,
 		.link_connect_addr = NULL,
 		.volume = -1,
+		.volume_set = 0,
 		.mute = -1,
 		.palette = NULL,
 	};
@@ -229,6 +232,7 @@ static Args parse_args (int argc, char *argv[])
 				exit(1);
 			}
 			args.volume = (int)v;
+			args.volume_set = 1;
 			break;
 		}
 		case 'M': args.mute = 1; break;
@@ -286,7 +290,7 @@ static void init_config (GB *gb, Args args)
 	load_config(&gb->cfg);
 	gb->ppu.palette = gb->cfg.palette;
 
-	if (args.volume >= 0)
+	if (args.volume_set)
 		atomic_store(&gb->cfg.volume, args.volume);
 
 	if (args.mute >= 0)
@@ -381,10 +385,10 @@ static void run (GB *gb, const char *romfile)
 		update_rumble(&gb->pad, gb->memory.cart.rumble_on);
 		gb->clock -= 70224;
 
-		if (gb->memory.cart.save_needed && ++frames_since_save >= AUTOSAVE_RATE_MS) {
-			save_sram(&gb->memory.cart, romfile);
+		if (gb->memory.cart.save_needed && ++frames_since_save >= AUTOSAVE_RATE_FRAMES) {
 			gb->memory.cart.save_needed = 0;
 			frames_since_save = 0;
+			request_save(gb);
 		}
 
 		if (!gb->cfg.turbo) {
@@ -423,6 +427,7 @@ int main (int argc, char *argv[])
 	init_config(gb, args);
 	init_link(gb, args);
 	SDL_PauseAudioDevice(gb->audio.dev, 0);
+	start_save_thread(gb, args.romfile);
 
 	run(gb, args.romfile);
 

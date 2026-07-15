@@ -20,6 +20,11 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile)
 {
 	memset(gb, 0, sizeof(GB));
 
+	pthread_mutex_init(&gb->save.lock, NULL);
+	pthread_cond_init(&gb->save.cond, NULL);
+	atomic_store(&gb->save.request, 0);
+	atomic_store(&gb->save.thread_run, 0);
+
 	init_ppu(&gb->ppu);
 	init_apu(&gb->apu);
 	init_opcodes(&gb->opcodes);
@@ -86,12 +91,20 @@ void init_test (GB *gb, const char *romfile)
 	gb->running = 1;
 }
 
-void cleanup_core (GB *gb, const char *romfile) {
+void cleanup_core (GB *gb, const char *romfile)
+{
+	pthread_mutex_lock(&gb->save.lock);
 	save_sram(&gb->memory.cart, romfile);
+	pthread_mutex_unlock(&gb->save.lock);
+
 	free_cart(&gb->memory.cart);
+	pthread_cond_destroy(&gb->save.cond);
+	pthread_mutex_destroy(&gb->save.lock);
 }
 
-void cleanup (GB *gb, const char *romfile) {
+void cleanup (GB *gb, const char *romfile)
+{
+	stop_save_thread(gb);
 	link_close(&gb->link);
 	frontend_shutdown(gb);
 	cleanup_core(gb, romfile);

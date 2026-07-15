@@ -37,10 +37,12 @@ void mbcNone_write_ram (GB *gb, uint16_t addr, uint8_t val)
 
 	uint16_t offset = addr - 0xA000;
 
+	pthread_mutex_lock(&gb->save.lock);
 	if (offset < cart->ram_size)
 		cart->ram[offset] = val;
 
 	cart->save_needed = 1;
+	pthread_mutex_unlock(&gb->save.lock);
 }
 
 static inline uint32_t mbc1_bank_number (Cartucho *cart)
@@ -137,8 +139,11 @@ void mbc1_write_ram (GB *gb, uint16_t addr, uint8_t val)
 	if (cart->ram_banks > 0) ram_bank &= (cart->ram_banks - 1);
 
 	uint32_t offset = (ram_bank << 13) + (addr - 0xA000);
+
+	pthread_mutex_lock(&gb->save.lock);
 	if (offset < cart->ram_size)
 		cart->ram[offset] = val;
 
 	cart->save_needed = 1;
+	pthread_mutex_unlock(&gb->save.lock);
 }

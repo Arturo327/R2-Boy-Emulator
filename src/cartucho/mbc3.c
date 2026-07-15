@@ -73,6 +73,7 @@ void mbc3_write_rom (GB *gb, uint16_t addr, uint8_t val)
 		cart->ram_bank = val;
 
 	} else {
+		pthread_mutex_lock(&gb->save.lock);
 		if (cart->has_rtc && cart->rtc.latch_prev == 0x00 && val == 0x01) {
 			mbc3_sync(cart);
 			cart->rtc.s_l = cart->rtc.s;
@@ -83,6 +84,8 @@ void mbc3_write_rom (GB *gb, uint16_t addr, uint8_t val)
 			cart->rtc.carry_l = cart->rtc.carry;
 		}
 		cart->rtc.latch_prev = val;
+		cart->save_needed = 1;
+		pthread_mutex_unlock(&gb->save.lock);
 	}
 }
 
@@ -103,15 +106,16 @@ uint8_t mbc3_read_ram (GB *gb, uint16_t addr)
 
 	if (!cart->has_rtc) return 0xFF;
 
-	switch (cart->ram_bank) {
-		case 0x08: return cart->rtc.s_l;
-		case 0x09: return cart->rtc.m_l;
-		case 0x0A: return cart->rtc.h_l;
-		case 0x0B: return (uint8_t)(cart->rtc.d_l & 0xFF);
-		case 0x0C: return (uint8_t)(((cart->rtc.d_l >> 8) & 0x01)
-				| (cart->rtc.halt_l  ? 0x40 : 0)
-				| (cart->rtc.carry_l ? 0x80 : 0));
-		default: return 0xFF;
+	switch (cart->ram_bank)
+	{
+	case 0x08: return cart->rtc.s_l;
+	case 0x09: return cart->rtc.m_l;
+	case 0x0A: return cart->rtc.h_l;
+	case 0x0B: return (uint8_t)(cart->rtc.d_l & 0xFF);
+	case 0x0C: return (uint8_t)(((cart->rtc.d_l >> 8) & 0x01)
+			| (cart->rtc.halt_l  ? 0x40 : 0)
+			| (cart->rtc.carry_l ? 0x80 : 0));
+	default: return 0xFF;
 	}
 }
 
@@ -122,28 +126,37 @@ void mbc3_write_ram (GB *gb, uint16_t addr, uint8_t val)
 
 	if (cart->ram_bank <= 0x07) {
 		if (!cart->ram) return;
-		cart->save_needed = 1;
 		uint32_t bank = cart->ram_bank;
 		if (cart->ram_banks) bank &= (cart->ram_banks - 1);
 		uint32_t offset = (bank << 13) + (addr - 0xA000);
+
+		pthread_mutex_lock(&gb->save.lock);
 		if (offset < cart->ram_size)
 			cart->ram[offset] = val;
+
+		cart->save_needed = 1;
+		pthread_mutex_unlock(&gb->save.lock);
 		return;
 	}
 
 	if (!cart->has_rtc) return;
 
+	pthread_mutex_lock(&gb->save.lock);
 	mbc3_sync(cart);
-	switch (cart->ram_bank) {
-		case 0x08: cart->rtc.s = val & 0x3F; break;
-		case 0x09: cart->rtc.m = val & 0x3F; break;
-		case 0x0A: cart->rtc.h = val & 0x1F; break;
-		case 0x0B: cart->rtc.d = (cart->rtc.d & 0x100) | val; break;
-		case 0x0C:
-			cart->rtc.d = (cart->rtc.d & 0xFF) | ((uint16_t)(val & 0x01) << 8);
-			cart->rtc.halt = (val & 0x40) != 0;
-			cart->rtc.carry = (val & 0x80) != 0;
-			break;
-		default: break;
+	switch (cart->ram_bank)
+	{
+	case 0x08: cart->rtc.s = val & 0x3F; break;
+	case 0x09: cart->rtc.m = val & 0x3F; break;
+	case 0x0A: cart->rtc.h = val & 0x1F; break;
+	case 0x0B: cart->rtc.d = (cart->rtc.d & 0x100) | val; break;
+	case 0x0C: {
+		cart->rtc.d = (cart->rtc.d & 0xFF) | ((uint16_t)(val & 0x01) << 8);
+		cart->rtc.halt = (val & 0x40) != 0;
+		cart->rtc.carry = (val & 0x80) != 0;
+		break;
 	}
+	default: break;
+	}
+	cart->save_needed = 1;
+	pthread_mutex_unlock(&gb->save.lock);
 }
