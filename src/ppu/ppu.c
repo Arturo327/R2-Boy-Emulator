@@ -255,6 +255,9 @@ static void turn_lcd_off (PPU *ppu)
 		for (int i = 0; i < pixels; i++) {
 			ppu->framebuffer[i] = PALETTES[ppu->palette][4];
 		}
+		ppu->ready = 1;
+	} else {
+		ppu->ready = 0;
 	}
 	ppu->ly = 0;
 	ppu->bg.window_line = 0;

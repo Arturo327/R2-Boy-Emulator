@@ -7,7 +7,9 @@
 #include <errno.h>
 #include <SDL2/SDL.h>
 
-#define AUTOSAVE_RATE_FRAMES ((uint32_t)(AUTOSAVE_INTERVAL_MS / 1000.0 * (4194304.0 / 70224.0)))
+#define GB_CLOCK_HZ 4194304ULL
+#define TICKS_PER_FRAME 70224
+#define AUTOSAVE_RATE_FRAMES ((uint32_t)(AUTOSAVE_INTERVAL_MS / 1000.0 * (((double)GB_CLOCK_HZ) / ((double)TICKS_PER_FRAME))))
 
 #define VERSION "R2-Boy v1.0.0-beta"
 
@@ -364,12 +366,11 @@ static void sync_frame (GB *gb, uint64_t *next_frame, uint64_t frame_ticks, uint
 
 static void run (GB *gb, const char *romfile)
 {
-	double frames_per_sec = 4194304.0 / 70224.0;
+	double frames_per_sec = ((double)GB_CLOCK_HZ) / ((double)TICKS_PER_FRAME);
 	uint32_t samples_per_frame = (uint32_t)((double)gb->audio.sample_rate / frames_per_sec * 2.0);
 	uint32_t max_queued = (uint32_t)(samples_per_frame * 3.0);
 
 	uint64_t freq = SDL_GetPerformanceFrequency();
-	uint64_t frame_ticks = (uint64_t)(freq / frames_per_sec);
 	uint64_t next_frame = SDL_GetPerformanceCounter();
 
 	uint32_t frames_since_save = 0;
@@ -380,6 +381,9 @@ static void run (GB *gb, const char *romfile)
 			gb->running = 0;
 			break;
 		}
+
+		uint64_t frame_ticks = gb->clock * freq / GB_CLOCK_HZ;
+		gb->clock = 0;
 
 		queue_audio(gb);
 		update_screen(&gb->lcd, gb->ppu.framebuffer, gb->memory.cart.rumble_on);
