@@ -24,7 +24,7 @@ int init_screen (LCD *lcd, const char *game_title)
 
 	lcd->renderer = SDL_CreateRenderer(
 		lcd->window, -1,
-		SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
+		SDL_RENDERER_ACCELERATED
 	);
 	if (!lcd->renderer) {
 		fprintf(stderr, "SDL_CreateRenderer error: %s, trying software\n", SDL_GetError());

@@ -12,7 +12,6 @@ void init_ppu_reg (PPU *ppu)
 	ppu->obp0 = 0xFF;
 	ppu->obp1 = 0xFF;
 	ppu->lyc = 0;
-
 }
 
 void init_ppu (PPU *ppu)
@@ -289,7 +288,6 @@ static void finish_hblank (PPU *ppu)
 	if (ppu->ly == DRAWING_LINES) {
 		update_stat(ppu, VBLANK);
 		ppu->bus->interrupts->IF |= 0x01;
-		ppu->ready = 1;
 	} else {
 		update_stat(ppu, OAM_SCAN);
 	}
@@ -359,6 +357,7 @@ static int handle_vblank (PPU *ppu)
 			update_stat(ppu, OAM_SCAN);
 			ppu->bg.window_line = 0;
 			ppu->oam_pre_block = 0;
+			ppu->ready = 1;
 		}
 		check_lyc(ppu);
 		return 1;

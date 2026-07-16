@@ -317,7 +317,7 @@ static int init_emulator (GB *gb, const char *romfile, const char *biosfile) {
 
 static int run_frame (GB *gb, uint32_t max_queued)
 {
-	while (gb->clock < 70224) {
+	while (1) {
 		gb_step(gb);
 
 		if (gb->cfg.turbo) {
@@ -331,6 +331,8 @@ static int run_frame (GB *gb, uint32_t max_queued)
 
 		if ((gb->clock & 511) == 0)
 			if (!handle_events(gb)) return 0;
+
+		if (gb->ppu.ready) return 1;
 	}
 	return 1;
 }
@@ -349,9 +351,9 @@ static void sleep_until (uint64_t target, uint64_t freq, Link *link, uint32_t rx
 
 static void sync_frame (GB *gb, uint64_t *next_frame, uint64_t frame_ticks, uint64_t freq)
 {
-	uint64_t ticks = gb->cfg.turbo ? frame_ticks / 3 : frame_ticks;
+	if (gb->cfg.turbo) frame_ticks /= 3;
 
-	*next_frame += ticks;
+	*next_frame += frame_ticks;
 	uint64_t now = SDL_GetPerformanceCounter();
 	if (*next_frame < now) *next_frame = now;
 
@@ -382,7 +384,6 @@ static void run (GB *gb, const char *romfile)
 		queue_audio(gb);
 		update_screen(&gb->lcd, gb->ppu.framebuffer, gb->memory.cart.rumble_on);
 		update_rumble(&gb->pad, gb->memory.cart.rumble_on);
-		gb->clock -= 70224;
 
 		if (gb->memory.cart.save_needed && ++frames_since_save >= AUTOSAVE_RATE_FRAMES) {
 			gb->memory.cart.save_needed = 0;

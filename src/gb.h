@@ -11,7 +11,6 @@
 #include "timer/timer.h"
 #include "serial/serial.h"
 #include "cartucho/cartucho.h"
-#include "cpu/opcodes.h"
 #include "frontend/frontend.h"
 #include "frontend/config.h"
 #include "cartucho/save.h"

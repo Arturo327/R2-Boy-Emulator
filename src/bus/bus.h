@@ -2,7 +2,7 @@
 #define BUS_H
 
 #include <stdint.h>
-#include "cpu/opcodes.h"
+#include "cpu/opcodes/opcodes.h"
 
 typedef struct GB GB;
 
