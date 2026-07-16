@@ -130,7 +130,7 @@ static void handle_gamepad_event (GB *gb, const SDL_Event *e)
 
 int frontend_init (GB *gb, const char *game_title)
 {
-	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
+	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) < 0) {
 		fprintf(stderr, "SDL_Init error: %s\n", SDL_GetError());
 		return 0;

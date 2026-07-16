@@ -43,11 +43,14 @@ void default_keymap (Keymap *k) {
 	k->turbo = SDL_SCANCODE_TAB;
 	k->mute = SDL_SCANCODE_M;
 	k->palette = SDL_SCANCODE_P;
-	k->vol_up = SDL_SCANCODE_EQUALS;
-	k->vol_down = SDL_SCANCODE_MINUS;
+	k->vol_up = SDL_SCANCODE_0;
+	k->vol_down = SDL_SCANCODE_9;
 }
 
-static struct { char *name; SDL_Scancode code; } SCANCODE_TABLE[] =
+static struct {
+	char *name;
+	SDL_Scancode code;
+} SCANCODE_TABLE[] =
 {
 	{"RIGHT", SDL_SCANCODE_RIGHT},
 	{"LEFT", SDL_SCANCODE_LEFT},
@@ -392,7 +395,8 @@ static SDL_Scancode read_terminal_scancode (void)
 			if (read(STDIN_FILENO, &seq[1], 1) != 1)
 				return SDL_SCANCODE_ESCAPE;
 
-			switch (seq[1]) {
+			switch (seq[1])
+			{
 			case 'A': return SDL_SCANCODE_UP;
 			case 'B': return SDL_SCANCODE_DOWN;
 			case 'C': return SDL_SCANCODE_RIGHT;

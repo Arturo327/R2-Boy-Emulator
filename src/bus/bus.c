@@ -13,7 +13,8 @@ static int timer_selected_bit (uint16_t div, uint8_t tac)
 	}
 }
 
-static uint8_t joypad_calc_lo (GB *gb) {
+static uint8_t joypad_calc_lo (GB *gb)
+{
 	uint8_t sel = gb->joypad.joyp & 0x30;
 	uint8_t lo = 0x0F;
 
@@ -29,7 +30,8 @@ static void joypad_interrupt (GB *gb, uint8_t old_lo, uint8_t new_lo)
 		gb->interrupts.IF |= 0x10;
 }
 
-void joypad_update (GB *gb, uint8_t new_buttons) {
+void joypad_update (GB *gb, uint8_t new_buttons)
+{
 	if (gb->joypad.buttons == new_buttons) return;
 
 	uint8_t old_lo = joypad_calc_lo(gb);
@@ -39,8 +41,8 @@ void joypad_update (GB *gb, uint8_t new_buttons) {
 	joypad_interrupt(gb, old_lo, new_lo);
 }
 
-static void oam_bug_rw (GB *gb) {
-
+static void oam_bug_rw (GB *gb)
+{
 	int row = gb->ppu.dots >> 2;
 	if (row < 4 || row == 19) return;
 
@@ -65,8 +67,8 @@ static void oam_bug_rw (GB *gb) {
 	}
 }
 
-void oam_bug (GB *gb, uint16_t val, int is_write) {
-
+void oam_bug (GB *gb, uint16_t val, int is_write)
+{
 	if ((val & 0xFF00) != 0xFE00) return;
 	if (gb->ppu.mode != OAM_SCAN) return;
 	if (gb->ppu.dots >= 80) return;

@@ -256,9 +256,8 @@ static Args parse_args (int argc, char *argv[])
 
 static void init_link (GB *gb, Args args)
 {
-	if (args.link_host_port > 0 && args.link_connect_addr) {
+	if (args.link_host_port > 0 && args.link_connect_addr)
 		fprintf(stderr, "Warning: --link-host and --link-connect are mutually exclusive; using --link-host\n");
-	}
 
 	if (args.link_host_port > 0) {
 		if (link_host(&gb->link, (uint16_t)args.link_host_port))
@@ -350,7 +349,7 @@ static void sleep_until (uint64_t target, uint64_t freq, Link *link, uint32_t rx
 
 static void sync_frame (GB *gb, uint64_t *next_frame, uint64_t frame_ticks, uint64_t freq)
 {
-	uint64_t ticks = gb->cfg.turbo ? frame_ticks >> 1 : frame_ticks;
+	uint64_t ticks = gb->cfg.turbo ? frame_ticks / 3 : frame_ticks;
 
 	*next_frame += ticks;
 	uint64_t now = SDL_GetPerformanceCounter();
@@ -392,8 +391,7 @@ static void run (GB *gb, const char *romfile)
 		}
 
 		if (!gb->cfg.turbo) {
-			while (ring_used(&gb->audio.ring) > max_queued)
-				SDL_Delay(1);
+			while (ring_used(&gb->audio.ring) > max_queued) SDL_Delay(1);
 		}
 
 		sync_frame(gb, &next_frame, frame_ticks, freq);

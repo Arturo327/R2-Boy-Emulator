@@ -61,7 +61,8 @@ static void check_lyc_delayed (PPU *ppu)
 	}
 }
 
-static void reset_drawing (PPU *ppu) {
+static void reset_drawing (PPU *ppu)
+{
 	ppu->mode3_cycles = 0;
 	ppu->x = 0;
 	ppu->fetch_x = ppu->scx & ~7;
@@ -216,13 +217,13 @@ static int dot_line_step (PPU *ppu)
 		return 0;
 	}
 	if (ppu->bg.discard > 0) {
-    		ppu->bg.discard--;
-    		if (ppu->bg.discard_px > 0) {
-        		ppu->bg.discard_px--;
-        		(void)bg_fifo_pop(ppu);
-    		}
-    		ppu->mode3_cycles++;
-    		return 0;
+		ppu->bg.discard--;
+		if (ppu->bg.discard_px > 0 && ppu->bg.num_fifo > 0) {
+			ppu->bg.discard_px--;
+			(void)bg_fifo_pop(ppu);
+		}
+		ppu->mode3_cycles++;
+		return 0;
 	}
 
 	if (handle_sprites(ppu)) {
@@ -234,7 +235,8 @@ static int dot_line_step (PPU *ppu)
 	return ppu->x == 160;
 }
 
-static void scan_oam (PPU *ppu, int x) {
+static void scan_oam (PPU *ppu, int x)
+{
 	if (!(ppu->lcdc & 0x02)) return;
 	if (ppu->sp.num_sprites >= 10) return;
 	GB *gb = (GB *)ppu->bus->ctx;
@@ -247,39 +249,162 @@ static void scan_oam (PPU *ppu, int x) {
 	}
 }
 
-void ppu_step (PPU *ppu) {
-
-	if (!(ppu->lcdc & 0x80)) {
-		if (!ppu->lcd_was_off) {
-			int pixels = sizeof(ppu->framebuffer) / sizeof(ppu->framebuffer[0]);
-			for (int i = 0; i < pixels; i++) {
-				ppu->framebuffer[i] = PALETTES[ppu->palette][4];
-			}
+static void turn_lcd_off (PPU *ppu)
+{
+	if (!ppu->lcd_was_off) {
+		int pixels = sizeof(ppu->framebuffer) / sizeof(ppu->framebuffer[0]);
+		for (int i = 0; i < pixels; i++) {
+			ppu->framebuffer[i] = PALETTES[ppu->palette][4];
 		}
-		ppu->ly = 0;
-		ppu->bg.window_line = 0;
-		ppu->dots = 0;
-		ppu->mode = HBLANK;
-		ppu->stat = (ppu->stat & 0xFC) | HBLANK;
-		ppu->hblank_pending = 0;
-		ppu->lcd_was_off = 1;
+	}
+	ppu->ly = 0;
+	ppu->bg.window_line = 0;
+	ppu->dots = 0;
+	ppu->mode = HBLANK;
+	ppu->stat = (ppu->stat & 0xFC) | HBLANK;
+	ppu->hblank_pending = 0;
+	ppu->lcd_was_off = 1;
+	ppu->x = 0;
+	ppu->lyc_delay = 0;
+	ppu->oam_pre_block = 0;
+	ppu->vram_pre_block = 0;
+}
+
+static void turn_lcd_on (PPU *ppu)
+{
+	ppu->lcd_was_off = 0;
+	ppu->dots = 0;
+	ppu->mode = HBLANK;
+	ppu->stat = (ppu->stat & 0xFC) | HBLANK;
+	check_lyc(ppu);
+	ppu->first_line = 1;
+	ppu->hblank_pending = 0;
+	ppu->x = 0;
+}
+
+static void finish_hblank (PPU *ppu)
+{
+	ppu->dots -= ppu->mode0_cycles;
+
+	if (ppu->ly == DRAWING_LINES) {
+		update_stat(ppu, VBLANK);
+		ppu->bus->interrupts->IF |= 0x01;
+		ppu->ready = 1;
+	} else {
+		update_stat(ppu, OAM_SCAN);
+	}
+	ppu->oam_pre_block = 0;
+}
+
+static int handle_hblank_first_line (PPU *ppu)
+{
+	if (ppu->dots == 0) {
 		ppu->x = 0;
-		ppu->lyc_delay = 0;
+		ppu->sp.num_sprites = 0;
+
+	} else if (ppu->dots == OAM_SCAN_DOTS - 3) {
+		ppu->oam_pre_block = 1;
+		ppu->vram_pre_block = 1;
+
+	} else if (ppu->dots >= OAM_SCAN_DOTS - 2) {
+		ppu->first_line = 0;
+		ppu->short_line = 1;
+		ppu->dots -= OAM_SCAN_DOTS - 2;
+		update_stat(ppu, DRAWING);
 		ppu->oam_pre_block = 0;
 		ppu->vram_pre_block = 0;
+		return 1;
+	}
+	return 0;
+}
+
+static int handle_hblank (PPU *ppu)
+{
+	if (ppu->dots == ppu->mode0_cycles - 4) {
+		ppu->ly++;
+		check_lyc_delayed(ppu);
+		if (ppu->ly != DRAWING_LINES) ppu->oam_pre_block = 1;
+	}
+
+	if (ppu->first_line) {
+		if (handle_hblank_first_line(ppu)) return 1;
+
+	} else if (ppu->short_line) {
+		if (ppu->dots == ppu->mode0_cycles - 2) {
+			ppu->short_line = 0;
+			ppu->dots = 0;
+			update_stat(ppu, OAM_SCAN);
+			ppu->oam_pre_block = 0;
+			return 1;
+		}
+
+	} else if (ppu->dots >= ppu->mode0_cycles) {
+		finish_hblank(ppu);
+		return 1;
+	}
+	return 0;
+}
+
+static int handle_vblank (PPU *ppu)
+{
+	if (ppu->dots == LINE_DOTS - 1 && ppu->ly == TOTAL_LINES - 1)
+		ppu->oam_pre_block = 1;
+
+	if (ppu->dots >= LINE_DOTS) {
+		ppu->dots -= LINE_DOTS;
+		ppu->ly++;
+
+		if (ppu->ly >= TOTAL_LINES) {
+			ppu->ly = 0;
+			update_stat(ppu, OAM_SCAN);
+			ppu->bg.window_line = 0;
+			ppu->oam_pre_block = 0;
+		}
+		check_lyc(ppu);
+		return 1;
+	}
+	return 0;
+}
+
+static int handle_drawing (PPU *ppu)
+{
+	if (ppu->hblank_pending) {
+		if (ppu->bg.window_active) ppu->bg.window_line++;
+		update_stat(ppu, HBLANK);
+		ppu->hblank_pending = 0;
+		ppu->dots = 0;
+		return 1;
+	}
+
+	if (dot_line_step(ppu))
+		ppu->hblank_pending = 1;
+
+	return 0;
+}
+
+static int handle_oam_scan (PPU *ppu)
+{
+	if (ppu->dots == OAM_SCAN_DOTS - 4) ppu->vram_pre_block = 1;
+
+	if (ppu->dots == OAM_SCAN_DOTS) {
+		ppu->dots = 0;
+		update_stat(ppu, DRAWING);
+		ppu->vram_pre_block = 0;
+		return 1;
+	}
+	if (!(ppu->dots & 1)) scan_oam(ppu, ppu->x++);
+
+	return 0;
+}
+
+void ppu_step (PPU *ppu)
+{
+	if (!(ppu->lcdc & 0x80)) {
+		turn_lcd_off(ppu);
 		return;
 	}
 
-	if (ppu->lcd_was_off) {
-		ppu->lcd_was_off = 0;
-		ppu->dots = 0;
-		ppu->mode = HBLANK;
-		ppu->stat = (ppu->stat & 0xFC) | HBLANK;
-		check_lyc(ppu);
-		ppu->first_line = 1;
-		ppu->hblank_pending = 0;
-		ppu->x = 0;
-	}
+	if (ppu->lcd_was_off) turn_lcd_on(ppu);
 
 	ppu->ready = 0;
 	int time_dots = 4;
@@ -294,102 +419,16 @@ void ppu_step (PPU *ppu) {
 		}
 
 		if (ppu->mode == OAM_SCAN) {
-
-			if (ppu->dots == OAM_SCAN_DOTS - 4) ppu->vram_pre_block = 1;
-
-			if (ppu->dots == OAM_SCAN_DOTS) {
-				ppu->dots = 0;
-				update_stat(ppu, DRAWING);
-				ppu->vram_pre_block = 0;
-				continue;
-			}
-			if (!(ppu->dots & 1)) scan_oam(ppu, ppu->x++);
+			if (handle_oam_scan(ppu)) continue;
 
 		} else if (ppu->mode == DRAWING) {
-
-			if (ppu->hblank_pending) {
-				if (ppu->bg.window_active) ppu->bg.window_line++;
-				update_stat(ppu, HBLANK);
-				ppu->hblank_pending = 0;
-				ppu->dots = 0;
-				continue;
-			}
-
-			if (dot_line_step(ppu)) {
-				ppu->hblank_pending = 1;
-			}
+			if (handle_drawing(ppu)) continue;
 
 		} else if (ppu->mode == HBLANK) {
+			if (handle_hblank(ppu)) continue;
 
-			if (ppu->dots == ppu->mode0_cycles - 4) {
-				ppu->ly++;
-				check_lyc_delayed(ppu);
-				if (ppu->ly != DRAWING_LINES) ppu->oam_pre_block = 1;
-			}
-
-			if (ppu->first_line) {
-
-				if (ppu->dots == 0) {
-					ppu->x = 0;
-					ppu->sp.num_sprites = 0;
-				}
-				if (ppu->dots == OAM_SCAN_DOTS - 3) {
-					ppu->oam_pre_block = 1;
-					ppu->vram_pre_block = 1;
-				}
-				if (ppu->dots >= OAM_SCAN_DOTS - 2) {
-					ppu->first_line = 0;
-					ppu->short_line = 1;
-					ppu->dots -= OAM_SCAN_DOTS - 2;
-					update_stat(ppu, DRAWING);
-					ppu->oam_pre_block = 0;
-					ppu->vram_pre_block = 0;
-					continue;
-				}
-
-			} else if (ppu->short_line) {
-
-				if (ppu->dots == ppu->mode0_cycles - 2) {
-					ppu->short_line = 0;
-					ppu->dots = 0;
-					update_stat(ppu, OAM_SCAN);
-					ppu->oam_pre_block = 0;
-					continue;
-				}
-
-			} else if (ppu->dots >= ppu->mode0_cycles) {
-
-				ppu->dots -= ppu->mode0_cycles;
-
-				if (ppu->ly == DRAWING_LINES) {
-					update_stat(ppu, VBLANK);
-					ppu->bus->interrupts->IF |= 0x01;
-					ppu->ready = 1;
-				} else {
-					update_stat(ppu, OAM_SCAN);
-				}
-				ppu->oam_pre_block = 0;
-				continue;
-			}
-
-		} else {
-
-			if (ppu->dots == LINE_DOTS - 1 && ppu->ly == TOTAL_LINES - 1)
-				ppu->oam_pre_block = 1;
-
-			if (ppu->dots >= LINE_DOTS) {
-				ppu->dots -= LINE_DOTS;
-				ppu->ly++;
-
-				if (ppu->ly >= TOTAL_LINES) {
-					ppu->ly = 0;
-					update_stat(ppu, OAM_SCAN);
-					ppu->bg.window_line = 0;
-					ppu->oam_pre_block = 0;
-				}
-				check_lyc(ppu);
-				continue;
-			}
+		} else if (ppu->mode == VBLANK) {
+			if (handle_vblank(ppu)) continue;
 		}
 
 		time_dots--;

@@ -24,7 +24,7 @@ int init_screen (LCD *lcd, const char *game_title)
 
 	lcd->renderer = SDL_CreateRenderer(
 		lcd->window, -1,
-		SDL_RENDERER_ACCELERATED
+		SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
 	);
 	if (!lcd->renderer) {
 		fprintf(stderr, "SDL_CreateRenderer error: %s, trying software\n", SDL_GetError());
@@ -48,7 +48,7 @@ int init_screen (LCD *lcd, const char *game_title)
 		SDL_DestroyRenderer(lcd->renderer);
 		SDL_DestroyWindow(lcd->window);
 		lcd->renderer = NULL;
-		lcd->window   = NULL;
+		lcd->window = NULL;
 		return 0;
 	}
 
@@ -59,13 +59,15 @@ int init_screen (LCD *lcd, const char *game_title)
 	return 1;
 }
 
-void cleanup_screen (LCD *lcd) {
+void cleanup_screen (LCD *lcd)
+{
 	if (lcd->texture) { SDL_DestroyTexture(lcd->texture); lcd->texture  = NULL; }
 	if (lcd->renderer) { SDL_DestroyRenderer(lcd->renderer); lcd->renderer = NULL; }
 	if (lcd->window) { SDL_DestroyWindow(lcd->window); lcd->window = NULL; }
 }
 
-void update_screen (LCD *lcd, uint32_t *framebuffer, uint8_t rumble) {
+void update_screen (LCD *lcd, uint32_t *framebuffer, uint8_t rumble)
+{
 	if (!lcd->texture || !lcd->renderer) return;
 
 	SDL_UpdateTexture(lcd->texture, NULL, framebuffer, 160 * sizeof(uint32_t));
