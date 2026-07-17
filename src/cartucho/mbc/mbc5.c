@@ -1,4 +1,4 @@
-#include "cartucho/mbc5.h"
+#include "cartucho/mbc/mbc5.h"
 #include "gb.h"
 
 uint8_t mbc5_read_rom (GB *gb, uint16_t addr)

@@ -24,12 +24,12 @@ static int check_regs (GB *gb, const char *romfile)
 {
 	uint8_t b=gb->cpu.b, c=gb->cpu.c, d=gb->cpu.d, e=gb->cpu.e, h=gb->cpu.h, l=gb->cpu.l;
 
-	if (b==3 && c==5 && d==8 && e==13 && h==21 && l==34) {
+	if (b == 3 && c == 5 && d == 8 && e == 13 && h == 21 && l == 34) {
 		printf("PASS: %s\n", romfile);
 		return 0;
 	}
 
-	if (b==0x42 && c==0x42 && d==0x42 && e==0x42 && h==0x42 && l==0x42) {
+	if (b == 0x42 && c == 0x42 && d == 0x42 && e == 0x42 && h == 0x42 && l == 0x42) {
 		printf("FAIL: %s (test reported fail, B-L = 0x42)\n", romfile);
 		return 1;
 	}
@@ -79,19 +79,6 @@ static int run_test (const char *romfile)
 	return result;
 }
 
-typedef struct {
-	char *romfile;
-	char *biosfile;
-	int debug;
-	int link_host_port;
-	char *link_connect_addr;
-
-	int volume;
-	int volume_set;
-	int mute;
-	char *palette;
-} Args;
-
 static inline void print_err (const char *prog)
 {
 	fprintf(stderr, "Not a valid command\nExecute %s --help for more info\n", prog);
@@ -118,7 +105,7 @@ static inline void print_usage (const char *prog)
 
 	printf("    -b, --bios <BIOS_FILE>\n");
 	printf("	Use the specified Game Boy Boot ROM.\n");
-	printf("	Default: roms/boot.bin\n");
+	printf("	Default: roms/bios.bin\n");
 	printf("	If the file cannot be loaded, the emulator boots without a Boot ROM.\n\n");
 
 	printf("    --link-host <PORT>\n");
@@ -173,6 +160,17 @@ static int parse_port (const char *str, uint16_t *out)
 	return 1;
 }
 
+typedef struct {
+	char *romfile;
+	char *biosfile;
+	int debug;
+	int link_host_port;
+	char *link_connect_addr;
+
+	int volume;
+	int mute;
+	char *palette;
+} Args;
 
 static Args parse_args (int argc, char *argv[])
 {
@@ -197,7 +195,6 @@ static Args parse_args (int argc, char *argv[])
 		.link_host_port = 0,
 		.link_connect_addr = NULL,
 		.volume = -1,
-		.volume_set = 0,
 		.mute = -1,
 		.palette = NULL,
 	};
@@ -234,7 +231,6 @@ static Args parse_args (int argc, char *argv[])
 				exit(1);
 			}
 			args.volume = (int)v;
-			args.volume_set = 1;
 			break;
 		}
 		case 'M': args.mute = 1; break;
@@ -291,7 +287,7 @@ static void init_config (GB *gb, Args args)
 	load_config(&gb->cfg);
 	gb->ppu.palette = gb->cfg.palette;
 
-	if (args.volume_set)
+	if (args.volume >= 0)
 		atomic_store(&gb->cfg.volume, args.volume);
 
 	if (args.mute >= 0)
@@ -306,6 +302,7 @@ static void init_config (GB *gb, Args args)
 			break;
 		}
 	}
+	fprintf(stderr, "Unknown palette: %s (ignored)\n", args.palette);
 }
 
 static int init_emulator (GB *gb, const char *romfile, const char *biosfile) {
@@ -331,12 +328,11 @@ static int run_frame (GB *gb, uint32_t max_queued)
 				SDL_Delay(1);
 		}
 
-		if ((gb->clock & 511) == 0)
-			if (!handle_events(gb)) return 0;
+		if ((gb->clock & 511) == 0 && !handle_events(gb))
+			return 0;
 
 		if (gb->ppu.ready) return 1;
 	}
-	return 1;
 }
 
 static void sleep_until (uint64_t target, uint64_t freq, Link *link, uint32_t rx_mark)

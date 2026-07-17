@@ -1,4 +1,4 @@
-#include "cartucho/mbc3.h"
+#include "cartucho/mbc/mbc3.h"
 #include "gb.h"
 
 static void mbc3_sync (Cartucho *cart)

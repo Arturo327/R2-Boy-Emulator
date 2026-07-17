@@ -9,6 +9,7 @@ typedef struct Gamepad {
 	SDL_JoystickID instance_id;
 	uint8_t connected;
 	uint8_t has_rumble;
+	uint8_t rumble_active;
 } Gamepad;
 
 int init_gamepad (Gamepad *pad);

@@ -51,13 +51,14 @@ Planned:
 - GCC
 - Make
 - SDL2
+- SDL2_ttf
 
 ### Compile
 
 Install dependencies (On Ubuntu/Debian like systems):
 
 ```bash
-sudo apt install build-essential libsdl2-dev
+sudo apt install build-essential libsdl2-dev libsdl2-ttf-dev
 ```
 
 Create the build directory:
@@ -94,7 +95,7 @@ Common options:
 | `--volume <0..100>`          | Set the audio output volume |
 | `--mute`                     | Start with audio muted |
 | `--palette <NAME>`           | Use a built-in palette: `DMG`, `pocket`, `BGB`, `choco`, `pocket_green` |
-| `--remap`                    | Run the interactive key-remap prompt at startup and exit |
+| `--remap`                    | Open the visual key-remap window and exit (saves on `S`, aborts on `ESC`/close) |
 | `--link-host <PORT>`         | Host a Game Link session on the given TCP port |
 | `--link-connect <IP>:<PORT>` | Connect to a Game Link host |
 | `-h`, `--help`               | Show help and exit |
@@ -119,7 +120,7 @@ Default keyboard mapping (rebindable, see [Configuration](#configuration)):
 | 9 | Volume down |
 | P | Cycle color palette |
 
-Gamepads are auto-detected via SDL GameController; the D-Pad, face buttons, Start/Back and analog stick map to the joypad. Rumble carts (`MBC5` with rumble) drive the controller's haptic.
+Gamepads are auto-detected via SDL GameController. The D-Pad, face buttons, Start/Back and analog stick map to the joypad by default; **all gamepad buttons are also rebindable** in the remap window. Rumble carts (`MBC5` with rumble) drive the controller's haptic.
 
 ---
 
@@ -134,12 +135,13 @@ R2-Boy ships five built-in DMG color palettes. The default reproduces the warm g
 | `BGB`           | BGB emulator palette |
 | `choco`         | Warm brown tint |
 | `pocket_green`  | Cool green pocket-like |
+| `basic`         | Pure withe, black and grey |
 
 ---
 
 ## Configuration
 
-R2-Boy keeps its config in `~/.config/r2boy/config.ini` (or `$XDG_CONFIG_HOME/r2boy/config.ini` if set). Three sections are written:
+R2-Boy keeps its config in `~/.config/r2boy/config.ini` (or `$XDG_CONFIG_HOME/r2boy/config.ini` if set). Four sections are written:
 
 ```ini
 [audio]
@@ -163,13 +165,42 @@ mute     = M
 palette  = P
 vol_up   = EQUALS
 vol_down = MINUS
+
+[gamepad]
+right    = dpright
+left     = dpleft
+up       = dpup
+down     = dpdown
+a        = a
+b        = b
+start    = start
+select   = back
+turbo    = NONE
+mute     = NONE
+palette  = NONE
+vol_up   = NONE
+vol_down = NONE
 ```
 
-The `--remap` flag enters an interactive prompt in the terminal (raw cbreak mode, no SDL window required) that walks through each key and writes the result back to `config.ini`:
+Keyboard bindings support modifier chords written as `Ctrl+Shift+X` style tokens. Any combination of the prefixes `Ctrl`, `Shift`, `Alt`, `GUI` (also accepted: `Control`, `Option`, `Cmd`, `Super`, `Meta`) may precede a scancode name. A bare token like `X` parses as `mods=0` (matches any modifier state, the legacy behaviour). Gamepad values use SDL's controller button names (`a`, `b`, `x`, `y`, `back`, `start`, `guide`, `leftstick`, `rightstick`, `leftshoulder`, `rightshoulder`, `dpup`, `dpdown`, `dpleft`, `dpright`, `misc1`, `paddle1`–`paddle4`, `touchpad`); the special value `NONE` (or `—`) means no binding for that action.
+
+The `--remap` flag opens a **visual SDL window** with a list of all 13 actions and their current keyboard + gamepad bindings. Keyboard keys are captured via SDL `SDL_KEYDOWN` (so layout-independent scancodes and modifier chords work); gamepad buttons are captured via `SDL_CONTROLLERBUTTONDOWN`.
 
 ```bash
 ./build/r2boy --remap
 ```
+
+In the remap window:
+
+| Key | Action |
+| :---: | :--- |
+| Up / Down | Select row |
+| Enter | Capture keyboard binding for selected row |
+| Tab | Capture gamepad binding for selected row |
+| D | Reset selected row to default |
+| S | Save and exit |
+| ESC | Exit without saving |
+| Window close | Exit without saving |
 
 Runtime hotkey changes (volume, mute, palette) are written back to `config.ini` when the emulator exits, so the next launch picks them up.
 

@@ -22,34 +22,62 @@ static int handle_window_event (SDL_Event *e)
 	return 1;
 }
 
-static void handle_hotkey (GB *gb, SDL_Scancode sc, int pressed)
+static int keybind_match (const Keybind *kb, SDL_Scancode sc, uint16_t mods)
+{
+	if (kb->scancode != sc) return 0;
+	if (kb->mods == 0) return 1;
+	return (mods & kb->mods) == kb->mods;
+}
+
+static void toggle_mute (Config *cfg)
+{
+	uint8_t m = !atomic_load(&cfg->muted);
+	atomic_store(&cfg->muted, m);
+	fprintf(stderr, "Audio: %s\n", m ? "muted" : "unmuted");
+}
+
+static void adjust_volume (Config *cfg, int delta)
+{
+	int v = atomic_load(&cfg->volume) + delta;
+	if (v > 100) v = 100;
+	if (v < 0) v = 0;
+	atomic_store(&cfg->volume, v);
+	fprintf(stderr, "Volume: %d%%\n", v);
+}
+
+static void cycle_palette (GB *gb)
+{
+	DmgPalette pal = (DmgPalette)((gb->cfg.palette + 1) % PAL_COUNT);
+	gb->cfg.palette = pal;
+	gb->ppu.palette = pal;
+	fprintf(stderr, "Palette: %s\n", palette_name(gb->cfg.palette));
+}
+
+static uint8_t kb_scancode_to_joypad_mask (const Keymap *k, SDL_Scancode sc, uint16_t mods)
+{
+	static const Action actions[] = {
+		ACT_RIGHT, ACT_LEFT, ACT_UP, ACT_DOWN, ACT_A, ACT_B, ACT_START, ACT_SELECT
+	};
+	static const uint8_t masks[] = {
+		JOYPAD_RIGHT, JOYPAD_LEFT, JOYPAD_UP, JOYPAD_DOWN,
+		JOYPAD_A, JOYPAD_B, JOYPAD_START, JOYPAD_SELECT
+	};
+	int n = sizeof(actions) / sizeof(actions[0]);
+	for (int i = 0; i < n; i++) {
+		Keybind kb = kb_binding(k, actions[i]);
+		if (keybind_match(&kb, sc, mods)) return masks[i];
+	}
+	return 0;
+}
+
+static void handle_hotkey (GB *gb, SDL_Scancode sc, uint16_t mods, int pressed)
 {
 	if (!pressed) return;
 	Config *cfg = &gb->cfg;
-
-	if (sc == cfg->keymap.mute) {
-		uint8_t m = !atomic_load(&cfg->muted);
-		atomic_store(&cfg->muted, m);
-		fprintf(stderr, "Audio: %s\n", m ? "muted" : "unmuted");
-
-	} else if (sc == cfg->keymap.vol_up) {
-		int v = atomic_load(&cfg->volume) + 10;
-		if (v > 100) v = 100;
-		atomic_store(&cfg->volume, v);
-		fprintf(stderr, "Volume: %d%%\n", v);
-
-	} else if (sc == cfg->keymap.vol_down) {
-		int v = atomic_load(&cfg->volume) - 10;
-		if (v < 0) v = 0;
-		atomic_store(&cfg->volume, v);
-		fprintf(stderr, "Volume: %d%%\n", v);
-
-	} else if (sc == cfg->keymap.palette) {
-		DmgPalette pal = (DmgPalette)((cfg->palette + 1) % PAL_COUNT);
-		cfg->palette = pal;
-		gb->ppu.palette = pal;
-		fprintf(stderr, "Palette: %s\n", palette_name(cfg->palette));
-	}
+	if (keybind_match(&cfg->keymap.mute, sc, mods)) toggle_mute(&gb->cfg);
+	else if (keybind_match(&cfg->keymap.vol_up, sc, mods)) adjust_volume(&gb->cfg, 10);
+	else if (keybind_match(&cfg->keymap.vol_down, sc, mods)) adjust_volume(&gb->cfg, -10);
+	else if (keybind_match(&cfg->keymap.palette, sc, mods)) cycle_palette(gb);
 }
 
 static uint8_t handle_kb_event (GB *gb, const SDL_Event *e, uint8_t curr)
@@ -57,74 +85,85 @@ static uint8_t handle_kb_event (GB *gb, const SDL_Event *e, uint8_t curr)
 	if (e->type != SDL_KEYDOWN && e->type != SDL_KEYUP) return curr;
 
 	SDL_Scancode sc = e->key.keysym.scancode;
+	uint16_t mods = e->key.keysym.mod & KBMOD_ANY;
 	uint8_t pressed = (e->type == SDL_KEYDOWN);
 
 	const Keymap *k = &gb->cfg.keymap;
-	uint8_t mask = 0;
-	if	(sc == k->right)	mask = JOYPAD_RIGHT;
-	else if (sc == k->left)		mask = JOYPAD_LEFT;
-	else if (sc == k->up)		mask = JOYPAD_UP;
-	else if (sc == k->down)		mask = JOYPAD_DOWN;
-	else if (sc == k->a)		mask = JOYPAD_A;
-	else if (sc == k->b)		mask = JOYPAD_B;
-	else if (sc == k->start)	mask = JOYPAD_START;
-	else if (sc == k->select)	mask = JOYPAD_SELECT;
-	else if (pressed && !e->key.repeat) handle_hotkey(gb, sc, 1);
+	uint8_t mask = kb_scancode_to_joypad_mask(k, sc, mods);
+	if (pressed && !e->key.repeat) handle_hotkey(gb, sc, mods, 1);
 
-	if (sc == k->turbo) {
-		if (pressed) gb->cfg.turbo = 1;
-		else gb->cfg.turbo = 0;
-	}
+	if (keybind_match(&k->turbo, sc, mods))
+		gb->cfg.turbo = pressed ? 1 : 0;
 
 	return pressed ? (curr | mask) : (curr & ~mask);
 }
 
+static uint8_t pad_button_to_joypad_mask (Padmap *p, SDL_GameControllerButton b)
+{
+	if (b == pad_binding(p, ACT_RIGHT))	return JOYPAD_RIGHT;
+	if (b == pad_binding(p, ACT_LEFT))	return JOYPAD_LEFT;
+	if (b == pad_binding(p, ACT_UP))	return JOYPAD_UP;
+	if (b == pad_binding(p, ACT_DOWN))	return JOYPAD_DOWN;
+	if (b == pad_binding(p, ACT_A))		return JOYPAD_A;
+	if (b == pad_binding(p, ACT_B))		return JOYPAD_B;
+	if (b == pad_binding(p, ACT_START))	return JOYPAD_START;
+	if (b == pad_binding(p, ACT_SELECT))	return JOYPAD_SELECT;
+	return 0;
+}
+
+static void handle_gamepad_button (GB *gb, const SDL_Event *e)
+{
+	Padmap *pad = &gb->cfg.padmap;
+	uint8_t pressed = (e->type == SDL_CONTROLLERBUTTONDOWN);
+	SDL_GameControllerButton b = e->cbutton.button;
+	uint8_t mask = pad_button_to_joypad_mask(pad, b);
+	if (mask) {
+		if (pressed) gb->joypad.pad_dpad |= mask;
+		else gb->joypad.pad_dpad &= ~mask;
+		return;
+	}
+	if (pressed) {
+		if	(b == pad_binding(pad, ACT_TURBO)) gb->cfg.turbo = 1;
+		else if (b == pad_binding(pad, ACT_MUTE)) toggle_mute(&gb->cfg);
+		else if (b == pad_binding(pad, ACT_VOL_UP)) adjust_volume(&gb->cfg, 10);
+		else if (b == pad_binding(pad, ACT_VOL_DOWN)) adjust_volume(&gb->cfg, -10);
+		else if (b == pad_binding(pad, ACT_PALETTE)) cycle_palette(gb);
+	}
+	if (!pressed && b == pad_binding(pad, ACT_TURBO)) gb->cfg.turbo = 0;
+	return;
+}
+
 static void handle_gamepad_event (GB *gb, const SDL_Event *e)
 {
-	switch (e->type) {
-		case SDL_CONTROLLERDEVICEADDED:
-			open_gamepad(&gb->pad, e->cdevice.which);
-			break;
+	switch (e->type)
+	{
+	case SDL_CONTROLLERDEVICEADDED:
+		open_gamepad(&gb->pad, e->cdevice.which);
+		break;
 
-		case SDL_CONTROLLERDEVICEREMOVED:
-			if (gb->pad.connected && e->cdevice.which == gb->pad.instance_id) {
-				cleanup_gamepad(&gb->pad);
-				gb->joypad.pad_dpad = 0;
-				gb->joypad.pad_stick = 0;
-			}
-			break;
-
-		case SDL_CONTROLLERBUTTONDOWN:
-		case SDL_CONTROLLERBUTTONUP: {
-			uint8_t pressed = (e->type == SDL_CONTROLLERBUTTONDOWN);
-			uint8_t mask = 0;
-			switch (e->cbutton.button) {
-				case SDL_CONTROLLER_BUTTON_DPAD_RIGHT: mask = JOYPAD_RIGHT; break;
-				case SDL_CONTROLLER_BUTTON_DPAD_LEFT: mask = JOYPAD_LEFT; break;
-				case SDL_CONTROLLER_BUTTON_DPAD_UP: mask = JOYPAD_UP; break;
-				case SDL_CONTROLLER_BUTTON_DPAD_DOWN: mask = JOYPAD_DOWN; break;
-				case SDL_CONTROLLER_BUTTON_A: mask = JOYPAD_A; break;
-				case SDL_CONTROLLER_BUTTON_B: mask = JOYPAD_B; break;
-				case SDL_CONTROLLER_BUTTON_START: mask = JOYPAD_START; break;
-				case SDL_CONTROLLER_BUTTON_BACK: mask = JOYPAD_SELECT; break;
-				default: return;
-			}
-			if (pressed) gb->joypad.pad_dpad |= mask;
-			else gb->joypad.pad_dpad &= ~mask;
-			break;
+	case SDL_CONTROLLERDEVICEREMOVED:
+		if (gb->pad.connected && e->cdevice.which == gb->pad.instance_id) {
+			cleanup_gamepad(&gb->pad);
+			gb->joypad.pad_dpad = 0;
+			gb->joypad.pad_stick = 0;
 		}
+		break;
 
-		case SDL_CONTROLLERAXISMOTION:
-			if (e->caxis.axis == SDL_CONTROLLER_AXIS_LEFTX) {
-				gb->joypad.pad_stick &= ~(JOYPAD_LEFT | JOYPAD_RIGHT);
-				if (e->caxis.value < -GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_LEFT;
-				else if (e->caxis.value > GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_RIGHT;
-			} else if (e->caxis.axis == SDL_CONTROLLER_AXIS_LEFTY) {
-				gb->joypad.pad_stick &= ~(JOYPAD_UP | JOYPAD_DOWN);
-				if (e->caxis.value < -GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_UP;
-				else if (e->caxis.value > GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_DOWN;
-			}
-			break;
+	case SDL_CONTROLLERBUTTONDOWN: case SDL_CONTROLLERBUTTONUP:
+		handle_gamepad_button(gb, e);
+		break;
+
+	case SDL_CONTROLLERAXISMOTION:
+		if (e->caxis.axis == SDL_CONTROLLER_AXIS_LEFTX) {
+			gb->joypad.pad_stick &= ~(JOYPAD_LEFT | JOYPAD_RIGHT);
+			if (e->caxis.value < -GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_LEFT;
+			else if (e->caxis.value > GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_RIGHT;
+		} else if (e->caxis.axis == SDL_CONTROLLER_AXIS_LEFTY) {
+			gb->joypad.pad_stick &= ~(JOYPAD_UP | JOYPAD_DOWN);
+			if (e->caxis.value < -GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_UP;
+			else if (e->caxis.value > GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_DOWN;
+		}
+		break;
 	}
 }
 

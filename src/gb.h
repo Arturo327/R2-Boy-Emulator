@@ -32,14 +32,6 @@ typedef struct Memory {
 	uint8_t hram[0x7F];
 } Memory;
 
-typedef struct Config {
-	Keymap keymap;
-	uint8_t turbo;
-	_Atomic int volume;
-	_Atomic uint8_t muted;
-	DmgPalette palette;
-} Config;
-
 typedef struct DMA {
 	uint8_t active;
 	uint16_t src;

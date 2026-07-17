@@ -1,8 +1,8 @@
 #include "cartucho/cartucho.h"
-#include "cartucho/mbc1.h"
-#include "cartucho/mbc2.h"
-#include "cartucho/mbc3.h"
-#include "cartucho/mbc5.h"
+#include "cartucho/mbc/mbc1.h"
+#include "cartucho/mbc/mbc2.h"
+#include "cartucho/mbc/mbc3.h"
+#include "cartucho/mbc/mbc5.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

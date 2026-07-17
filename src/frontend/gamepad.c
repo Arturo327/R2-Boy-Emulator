@@ -34,17 +34,22 @@ int init_gamepad (Gamepad *pad)
 	return pad->connected;
 }
 
-void cleanup_gamepad (Gamepad *pad) {
+void cleanup_gamepad (Gamepad *pad)
+{
 	if (pad->ctrl) SDL_GameControllerClose(pad->ctrl);
 	memset(pad, 0, sizeof(Gamepad));
 }
 
-void update_rumble (Gamepad *pad, uint8_t active) {
+void update_rumble (Gamepad *pad, uint8_t active)
+{
 #if SDL_VERSION_ATLEAST(2, 0, 9)
 	if (!pad->connected || !pad->has_rumble) return;
+	if (active == pad->rumble_active) return;
+	pad->rumble_active = active;
 	if (active) SDL_GameControllerRumble(pad->ctrl, 0xFFFF, 0xFFFF, 50);
 	else SDL_GameControllerRumble(pad->ctrl, 0, 0, 0);
 #else
-	(void)pad; (void)active;
+	(void)pad;
+	(void)active;
 #endif
 }
