@@ -282,6 +282,8 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 			}
 			gb->timer.div = 0;
 			apu_div_reset(&gb->apu, old_div);
+			if (serial_div_reset(&gb->serial, old_div))
+				gb->interrupts.IF |= 0x08;
 			break;
 		}
 		case 0xFF05: {

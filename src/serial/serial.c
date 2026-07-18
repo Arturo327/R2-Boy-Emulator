@@ -39,6 +39,20 @@ static int shift (Serial *serial)
 	return 0;
 }
 
+int serial_div_reset (Serial *serial, uint8_t old_div)
+{
+	if (!serial->transfer_active) return 0;
+	if (!(serial->SC & 0x01)) return 0;
+	if (!(old_div & 0x01)) return 0;
+
+	if (!shift(serial)) return 0;
+
+	serial->recived = 0;
+	serial->transfer_active = 0;
+	serial->SC &= ~0x80;
+	return 1;
+}
+
 static inline int div_bit8 (uint16_t div) {
 	return (div >> 8) & 1;
 }

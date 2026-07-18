@@ -20,5 +20,6 @@ typedef struct Serial {
 
 int serial_step (Serial *serial, uint16_t old_div, uint16_t div);
 void serial_write_sc (Serial *serial, uint8_t val);
+int serial_div_reset (Serial *serial, uint8_t old_div);
 
 #endif
