@@ -407,14 +407,15 @@ static void load_audio (Config *cfg, const char *s)
 }
 
 const char *palette_name (DmgPalette p) {
-	switch (p) {
-		case PAL_DEFAULT:	return "DMG";
-		case PAL_POCKET:	return "pocket";
-		case PAL_BGB:		return "BGB";
-		case PAL_CHOCO:		return "choco";
-		case PAL_POCKET_GREEN:	return "pocket_green";
-		case PAL_BASIC:		return "basic";
-		default:		return "unknown";
+	switch (p)
+	{
+	case PAL_DEFAULT:	return "DMG";
+	case PAL_POCKET:	return "pocket";
+	case PAL_BGB:		return "BGB";
+	case PAL_CHOCO:		return "choco";
+	case PAL_POCKET_GREEN:	return "pocket_green";
+	case PAL_BASIC:		return "basic";
+	default:		return "unknown";
 	}
 }
 

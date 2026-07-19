@@ -9,7 +9,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 - DMG (Original Game Boy) emulation
 - CPU instruction emulation (including halt-bug, OAM bug)
 - Memory bus implementation
-- Cartridge loading (MBC1, MBC2, MBC3 + RTC, MBC5 + rumble)
+- Cartridge loading (MBC1, MBC2, MBC3 + RTC, MBC5 + rumble, MBC6)
 - Timer emulation
 - PPU (Pixel Processing Unit) emulation
 - APU (Audio Processing Unit) emulation
@@ -34,13 +34,12 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 
 R2-Boy works correctly and runs every DMG compatible game I tested.
 
-It won't run games with rare MBC types, due to MBC6, MBC7 and some others are not yet implemented
+It won't run games with rare MBC types, due to MMM01, MBC7 and some others are not yet implemented
 
 This project is under active development.
 
 Planned:
 - Implement more MBC types
-- Save States
 - CGB (Game Boy Color) support (more in the future)
 
 ---
@@ -146,50 +145,11 @@ R2-Boy ships five built-in DMG color palettes. The default reproduces the warm g
 
 ## Configuration
 
-R2-Boy keeps its config in `~/.config/r2boy/config.ini` (or `$XDG_CONFIG_HOME/r2boy/config.ini` if set). Four sections are written:
+R2-Boy keeps its config in `~/.config/r2boy/config.ini` (or `$XDG_CONFIG_HOME/r2boy/config.ini` if set). Four sections are written. It includes keyboard and gamepad mappings, volume control and palette.
 
-```ini
-[audio]
-volume = 75
-muted  = 0
+Keyboard bindings support modifier chords written as `Ctrl+Shift+X` style tokens. Any combination of the prefixes `Ctrl`, `Shift`, `Alt`, `GUI` (also accepted: `Control`, `Option`, `Cmd`, `Super`, `Meta`) may precede a scancode name. A bare token like `X` parses as `mods=0` (matches any modifier state, the legacy behaviour). The special value `NONE` (or `—`) means no binding for that action.
 
-[video]
-palette = pocket
-
-[keymap]
-right    = RIGHT
-left     = LEFT
-up       = UP
-down     = DOWN
-a        = X
-b        = Z
-start    = RETURN
-select   = BACKSPACE
-turbo    = TAB
-mute     = M
-palette  = P
-vol_up   = EQUALS
-vol_down = MINUS
-
-[gamepad]
-right    = dpright
-left     = dpleft
-up       = dpup
-down     = dpdown
-a        = a
-b        = b
-start    = start
-select   = back
-turbo    = NONE
-mute     = NONE
-palette  = NONE
-vol_up   = NONE
-vol_down = NONE
-```
-
-Keyboard bindings support modifier chords written as `Ctrl+Shift+X` style tokens. Any combination of the prefixes `Ctrl`, `Shift`, `Alt`, `GUI` (also accepted: `Control`, `Option`, `Cmd`, `Super`, `Meta`) may precede a scancode name. A bare token like `X` parses as `mods=0` (matches any modifier state, the legacy behaviour). Gamepad values use SDL's controller button names (`a`, `b`, `x`, `y`, `back`, `start`, `guide`, `leftstick`, `rightstick`, `leftshoulder`, `rightshoulder`, `dpup`, `dpdown`, `dpleft`, `dpright`, `misc1`, `paddle1`–`paddle4`, `touchpad`); the special value `NONE` (or `—`) means no binding for that action.
-
-The `--remap` flag opens a **visual SDL window** with a list of all 13 actions and their current keyboard + gamepad bindings. Keyboard keys are captured via SDL `SDL_KEYDOWN` (so layout-independent scancodes and modifier chords work); gamepad buttons are captured via `SDL_CONTROLLERBUTTONDOWN`.
+The `--remap` flag opens a **visual SDL window** with a list of all 17 actions and their current keyboard + gamepad bindings. Keyboard keys are captured via SDL `SDL_KEYDOWN` (so layout-independent scancodes and modifier chords work); gamepad buttons are captured via `SDL_CONTROLLERBUTTONDOWN`.
 
 ```bash
 ./build/r2boy --remap
@@ -271,13 +231,13 @@ R2-Boy includes Link Cable support over TCP/IP, allowing two emulator instances 
 Host:
 
 ```bash
-./build/r2boy --link-host 5000 tetris.gb
+./build/r2boy --link-host 9999 tetris.gb
 ```
 
 Client:
 
 ```bash
-./build/r2boy --link-connect 192.168.1.25:5000 tetris.gb
+./build/r2boy --link-connect 192.168.1.25:9999 tetris.gb
 ```
 
 Reconnection is supported; if the process terminates on either side, restarting it will re-establish the connection.

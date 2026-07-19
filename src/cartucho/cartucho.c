@@ -1,8 +1,4 @@
 #include "cartucho/cartucho.h"
-#include "cartucho/mbc/mbc1.h"
-#include "cartucho/mbc/mbc2.h"
-#include "cartucho/mbc/mbc3.h"
-#include "cartucho/mbc/mbc5.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,83 +6,94 @@
 static void normalize_mbc (Cartucho *cart, uint8_t header_type) {
 	cart->battery = 0;
 
-	switch (header_type) {
-		case 0x00: cart->mbc_type = MBC_NONE; break;
+	switch (header_type)
+	{
+	case 0x00: cart->mbc_type = MBC_NONE; break;
 
-		case 0x01: cart->mbc_type = MBC1; break;
-		case 0x02: cart->mbc_type = MBC1; break;
-		case 0x03: cart->mbc_type = MBC1; cart->battery = 1; break;
+	case 0x01: cart->mbc_type = MBC1; break;
+	case 0x02: cart->mbc_type = MBC1; break;
+	case 0x03: cart->mbc_type = MBC1; cart->battery = 1; break;
 
-		case 0x05: cart->mbc_type = MBC2; break;
-		case 0x06: cart->mbc_type = MBC2; cart->battery = 1; break;
+	case 0x05: cart->mbc_type = MBC2; break;
+	case 0x06: cart->mbc_type = MBC2; cart->battery = 1; break;
 
-		case 0x08: cart->mbc_type = MBC_NONE; break;
-		case 0x09: cart->mbc_type = MBC_NONE; cart->battery = 1; break;
+	case 0x08: cart->mbc_type = MBC_NONE; break;
+	case 0x09: cart->mbc_type = MBC_NONE; cart->battery = 1; break;
 
-		case 0x0F: cart->mbc_type = MBC3; cart->battery = 1; cart->has_rtc = 1; break;
-		case 0x10: cart->mbc_type = MBC3; cart->battery = 1; cart->has_rtc = 1; break;
-		case 0x11: cart->mbc_type = MBC3; break;
-		case 0x12: cart->mbc_type = MBC3; break;
-		case 0x13: cart->mbc_type = MBC3; cart->battery = 1; break;
+	case 0x0F: cart->mbc_type = MBC3; cart->battery = 1; cart->has_rtc = 1; break;
+	case 0x10: cart->mbc_type = MBC3; cart->battery = 1; cart->has_rtc = 1; break;
+	case 0x11: cart->mbc_type = MBC3; break;
+	case 0x12: cart->mbc_type = MBC3; break;
+	case 0x13: cart->mbc_type = MBC3; cart->battery = 1; break;
 
-		case 0x19: cart->mbc_type = MBC5; break;
-		case 0x1A: cart->mbc_type = MBC5; break;
-		case 0x1B: cart->mbc_type = MBC5; cart->battery = 1; break;
-		case 0x1C: cart->mbc_type = MBC5; cart->has_rumble = 1; break;
-		case 0x1D: cart->mbc_type = MBC5; cart->has_rumble = 1; break;
-		case 0x1E: cart->mbc_type = MBC5; cart->has_rumble = 1; cart->battery = 1; break;
+	case 0x19: cart->mbc_type = MBC5; break;
+	case 0x1A: cart->mbc_type = MBC5; break;
+	case 0x1B: cart->mbc_type = MBC5; cart->battery = 1; break;
+	case 0x1C: cart->mbc_type = MBC5; cart->has_rumble = 1; break;
+	case 0x1D: cart->mbc_type = MBC5; cart->has_rumble = 1; break;
+	case 0x1E: cart->mbc_type = MBC5; cart->has_rumble = 1; cart->battery = 1; break;
 
-		default:
-			fprintf(stderr, "Cartucho: Unknown MBC type (0x%02X), considering as ROM only\n", header_type);
-			cart->mbc_type = MBC_NONE;
-			break;
+	case 0x20: cart->mbc_type = MBC6; break;
+
+	default:
+		fprintf(stderr, "Cartucho: Unknown MBC type (0x%02X), considering as ROM only\n", header_type);
+		cart->mbc_type = MBC_NONE;
+		break;
 	}
 }
 
 static void select_mbc_fx (Cartucho *cart) {
-	switch (cart->mbc_type) {
-		case MBC_NONE:
-			cart->read_rom = mbcNone_read_rom;
-			cart->write_rom = mbcNone_write_rom;
-			cart->read_ram = mbcNone_read_ram;
-			cart->write_ram = mbcNone_write_ram;
-			break;
+	switch (cart->mbc_type)
+	{
+	case MBC_NONE:
+		cart->read_rom = mbcNone_read_rom;
+		cart->write_rom = mbcNone_write_rom;
+		cart->read_ram = mbcNone_read_ram;
+		cart->write_ram = mbcNone_write_ram;
+		break;
 
-		case MBC1:
-			cart->read_rom = mbc1_read_rom;
-			cart->write_rom = mbc1_write_rom;
-			cart->read_ram = mbc1_read_ram;
-			cart->write_ram = mbc1_write_ram;
-			break;
-		
-		case MBC2:
-			cart->read_rom = mbc2_read_rom;
-			cart->write_rom = mbc2_write_rom;
-			cart->read_ram = mbc2_read_ram;
-			cart->write_ram = mbc2_write_ram;
-			break;
+	case MBC1:
+		cart->read_rom = mbc1_read_rom;
+		cart->write_rom = mbc1_write_rom;
+		cart->read_ram = mbc1_read_ram;
+		cart->write_ram = mbc1_write_ram;
+		break;
 
-		case MBC3:
-			cart->read_rom = mbc3_read_rom;
-			cart->write_rom = mbc3_write_rom;
-			cart->read_ram = mbc3_read_ram;
-			cart->write_ram = mbc3_write_ram;
-			break;
+	case MBC2:
+		cart->read_rom = mbc2_read_rom;
+		cart->write_rom = mbc2_write_rom;
+		cart->read_ram = mbc2_read_ram;
+		cart->write_ram = mbc2_write_ram;
+		break;
 
-		case MBC5:
-			cart->read_rom = mbc5_read_rom;
-			cart->write_rom = mbc5_write_rom;
-			cart->read_ram = mbc5_read_ram;
-			cart->write_ram = mbc5_write_ram;
-			break;
+	case MBC3:
+		cart->read_rom = mbc3_read_rom;
+		cart->write_rom = mbc3_write_rom;
+		cart->read_ram = mbc3_read_ram;
+		cart->write_ram = mbc3_write_ram;
+		break;
 
-		default:
-			fprintf(stderr, "Cartridge: MBC%d unimplemented, using ROM-only (probably incorrect banking)\n", cart->mbc_type);
-			cart->read_rom = mbcNone_read_rom;
-			cart->write_rom = mbcNone_write_rom;
-			cart->read_ram = mbcNone_read_ram;
-			cart->write_ram = mbcNone_write_ram;
-			break;
+	case MBC5:
+		cart->read_rom = mbc5_read_rom;
+		cart->write_rom = mbc5_write_rom;
+		cart->read_ram = mbc5_read_ram;
+		cart->write_ram = mbc5_write_ram;
+		break;
+
+	case MBC6:
+		cart->read_rom = mbc6_read_rom;
+		cart->write_rom = mbc6_write_rom;
+		cart->read_ram = mbc6_read_ram;
+		cart->write_ram = mbc6_write_ram;
+		break;
+
+	default:
+		fprintf(stderr, "Cartridge: MBC%d unimplemented, using ROM-only (probably incorrect banking)\n", cart->mbc_type);
+		cart->read_rom = mbcNone_read_rom;
+		cart->write_rom = mbcNone_write_rom;
+		cart->read_ram = mbcNone_read_ram;
+		cart->write_ram = mbcNone_write_ram;
+		break;
 	}
 }
 
@@ -191,6 +198,12 @@ int load_rom (Cartucho *cart, const char *filename)
 	cart->mbc30 = is_mbc30(cart);
 
 	select_mbc_fx(cart);
+
+	if (cart->mbc_type == MBC6 && !mbc6_init(cart)) {
+		fprintf(stderr, "Cartucho: not enough memory for the MBC6 flash chip\n");
+		return 0;
+	}
+
 	printf("ROM: %s\n", filename);
 	return 1;
 }
@@ -367,6 +380,7 @@ void save_sram_snapshot (Cartucho *cart, const char *romfile,
 
 void free_cart (Cartucho *cart)
 {
+	mbc6_free(cart);
 	free(cart->rom);
 	free(cart->ram);
 }

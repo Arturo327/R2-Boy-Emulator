@@ -1,8 +1,13 @@
 #ifndef CARTUCHO_H
 #define CARTUCHO_H
 
+#include "cartucho/mbc/mbc1.h"
+#include "cartucho/mbc/mbc2.h"
+#include "cartucho/mbc/mbc3.h"
+#include "cartucho/mbc/mbc5.h"
+#include "cartucho/mbc/mbc6.h"
+
 #include <stdint.h>
-#include <time.h>
 
 typedef struct GB GB;
 
@@ -11,23 +16,9 @@ typedef enum {
 	MBC1,
 	MBC2,
 	MBC3,
-	MBC5
+	MBC5,
+	MBC6
 } MBC_Type;
-
-typedef struct RTC {
-	uint8_t s, m, h;
-	uint16_t d;
-	uint8_t halt;
-	uint8_t carry;
-
-	uint8_t s_l, m_l, h_l;
-	uint16_t d_l;
-	uint8_t halt_l;
-	uint8_t carry_l;
-
-	uint8_t latch_prev;
-	time_t base;
-} RTC;
 
 typedef struct Cartucho {
 	uint8_t *rom;
@@ -48,9 +39,10 @@ typedef struct Cartucho {
 	uint8_t bank2;
 	uint8_t multicart;
 	uint8_t mbc30;
-
 	uint8_t has_rtc;
+
 	RTC rtc;
+	MBC6State mbc6;
 
 	uint8_t has_rumble;
 	uint8_t rumble_on;
@@ -69,9 +61,8 @@ int load_rom (Cartucho *cart, const char *filename);
 
 int load_sram (Cartucho *cart, const char *romfile);
 int save_sram (Cartucho *cart, const char *romfile);
-void save_sram_snapshot (Cartucho *cart, const char *romfile,
-			const uint8_t *ram_snap, uint32_t ram_size,
-			const RTC *rtc_snap);
+void save_sram_snapshot (Cartucho *cart, const char *romfile, const uint8_t *ram_snap,
+			uint32_t ram_size, const RTC *rtc_snap);
 
 void free_cart (Cartucho *cart);
 
