@@ -11,14 +11,13 @@ void serial_write_sc (Serial *serial, uint8_t val)
 
 	serial->SC = sc;
 
-	if (sc == 0x81 && link_is_connected(serial->link))
-		link_send_byte(serial->link, serial->SB);
-
 	if (sc == 0x81 || sc == 0x80) {
 		serial->transfer_active = 1;
-		serial->clock = 0;
 		serial->recived = 0;
 		serial->shifted = 0;
+		serial->sent = 0;
+		serial->buff = 0xFF;
+		serial->clock = 0;
 	} else {
 		serial->transfer_active = 0;
 	}
@@ -30,39 +29,24 @@ void serial_write_sc (Serial *serial, uint8_t val)
 	}
 }
 
-static int shift (Serial *serial)
+static void shift (Serial *serial)
 {
 	uint8_t bit = (serial->buff >> (7 - serial->shifted)) & 0x01;
 	serial->shifted++;
 	serial->SB = (serial->SB << 1) | bit;
-	if (serial->shifted > 7) return 1;
-	return 0;
-}
-
-int serial_div_reset (Serial *serial, uint8_t old_div)
-{
-	if (!serial->transfer_active) return 0;
-	if (!(serial->SC & 0x01)) return 0;
-	if (!(old_div & 0x01)) return 0;
-
-	if (!shift(serial)) return 0;
-
-	serial->recived = 0;
-	serial->transfer_active = 0;
-	serial->SC &= ~0x80;
-	return 1;
 }
 
 static inline int div_bit8 (uint16_t div) {
 	return (div >> 8) & 1;
 }
 
-static int step_common (Serial *serial, uint16_t old_div, uint16_t div)
+static int catchup_shift (Serial *serial)
 {
-	if (!(div_bit8(old_div) == 1 && div_bit8(div) == 0))
-		return 0;
+	do {
+		shift(serial);
+	} while (serial->clock > serial->shifted && serial->shifted < 8);
 
-	if (!shift(serial)) return 0;
+	if (serial->shifted < 8) return 0;
 
 	serial->recived = 0;
 	serial->transfer_active = 0;
@@ -72,6 +56,16 @@ static int step_common (Serial *serial, uint16_t old_div, uint16_t div)
 
 static int master_step (Serial *serial, uint16_t old_div, uint16_t div)
 {
+	if (!serial->sent) {
+		if (link_is_connected(serial->link)) {
+			link_send_byte(serial->link, serial->SB);
+		}
+		serial->sent = 1;
+	}
+
+	uint8_t div_bit = div_bit8(old_div) == 1 && div_bit8(div) == 0;
+	if (div_bit) serial->clock++;
+
 	if (!serial->recived) {
 		if (!link_is_connected(serial->link)) {
 			serial->buff = 0xFF;
@@ -82,22 +76,35 @@ static int master_step (Serial *serial, uint16_t old_div, uint16_t div)
 	}
 
 	if (!serial->recived) return 0;
+	if (!div_bit) return 0;
 
-	return step_common(serial, old_div, div);
+	return catchup_shift(serial);
 }
 
 static int slave_step (Serial *serial, uint16_t old_div, uint16_t div)
 {
+	uint8_t div_bit = (div_bit8(old_div) == 1 && div_bit8(div) == 0);
+	if (div_bit) serial->clock++;
+
 	if (!serial->recived) {
 		if (!link_get_byte(serial->link, &serial->buff))
 			return 0;
+
 		serial->recived = 1;
-		serial->clock = 0;
 		serial->shifted = 0;
 		link_send_byte(serial->link, serial->SB);
 	}
 
-	return step_common(serial, old_div, div);
+	if (!div_bit) return 0;
+
+	return catchup_shift(serial);
+}
+
+int serial_div_reset (Serial *serial, uint8_t old_div)
+{
+	if (!serial->transfer_active) return 0;
+	if (!(serial->SC & 0x01)) return 0;
+	return master_step(serial, ((uint16_t)old_div) << 8, 0);
 }
 
 int serial_step (Serial *serial, uint16_t old_div, uint16_t div)
