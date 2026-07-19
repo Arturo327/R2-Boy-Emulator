@@ -19,6 +19,7 @@ static int load_bios (GB *gb, const char *filename)
 static int init_core (GB *gb, const char *romfile, const char *biosfile)
 {
 	memset(gb, 0, sizeof(GB));
+	gb->romfile = romfile;
 
 	pthread_mutex_init(&gb->save.lock, NULL);
 	pthread_cond_init(&gb->save.cond, NULL);
@@ -122,6 +123,18 @@ static void dma_step (GB *gb)
 	}
 }
 
+static void save_state_step (GB *gb)
+{
+	if (gb->state_save_pending) {
+		save_state(gb);
+		gb->state_save_pending = 0;
+	}
+	if (gb->state_load_pending) {
+		load_state(gb);
+		gb->state_load_pending = 0;
+	}
+}
+
 void gb_step (GB *gb)
 {
 	if (gb->boot_rom_disable_pending && gb->cpu.pc >= 0x100) {
@@ -130,7 +143,7 @@ void gb_step (GB *gb)
 	}
 
 	cpu_step(&gb->cpu);
-
+	save_state_step(gb);
 	dma_step(gb);
 
 	uint16_t old_div = gb->timer.div;

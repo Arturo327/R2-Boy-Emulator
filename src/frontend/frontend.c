@@ -53,6 +53,23 @@ static void cycle_palette (GB *gb)
 	fprintf(stderr, "Palette: %s\n", palette_name(gb->cfg.palette));
 }
 
+static inline void save_state_1 (GB *gb) {
+	gb->state_save_pending = 1;
+	gb->state_num = 1;
+}
+static inline void load_state_1 (GB *gb) {
+	gb->state_load_pending = 1;
+	gb->state_num = 1;
+}
+static inline void save_state_2 (GB *gb) {
+	gb->state_save_pending = 1;
+	gb->state_num = 2;
+}
+static inline void load_state_2 (GB *gb) {
+	gb->state_load_pending = 1;
+	gb->state_num = 2;
+}
+
 static uint8_t kb_scancode_to_joypad_mask (const Keymap *k, SDL_Scancode sc, uint16_t mods)
 {
 	static const Action actions[] = {
@@ -78,6 +95,10 @@ static void handle_hotkey (GB *gb, SDL_Scancode sc, uint16_t mods, int pressed)
 	else if (keybind_match(&cfg->keymap.vol_up, sc, mods)) adjust_volume(&gb->cfg, 10);
 	else if (keybind_match(&cfg->keymap.vol_down, sc, mods)) adjust_volume(&gb->cfg, -10);
 	else if (keybind_match(&cfg->keymap.palette, sc, mods)) cycle_palette(gb);
+	else if (keybind_match(&cfg->keymap.save_1, sc, mods)) save_state_1(gb);
+	else if (keybind_match(&cfg->keymap.load_1, sc, mods)) load_state_1(gb);
+	else if (keybind_match(&cfg->keymap.save_2, sc, mods)) save_state_2(gb);
+	else if (keybind_match(&cfg->keymap.load_2, sc, mods)) load_state_2(gb);
 }
 
 static uint8_t handle_kb_event (GB *gb, const SDL_Event *e, uint8_t curr)
@@ -128,6 +149,10 @@ static void handle_gamepad_button (GB *gb, const SDL_Event *e)
 		else if (b == pad_binding(pad, ACT_VOL_UP)) adjust_volume(&gb->cfg, 10);
 		else if (b == pad_binding(pad, ACT_VOL_DOWN)) adjust_volume(&gb->cfg, -10);
 		else if (b == pad_binding(pad, ACT_PALETTE)) cycle_palette(gb);
+		else if (b == pad_binding(pad, ACT_SAVE1)) save_state_1(gb);
+		else if (b == pad_binding(pad, ACT_LOAD1)) load_state_1(gb);
+		else if (b == pad_binding(pad, ACT_SAVE2)) save_state_2(gb);
+		else if (b == pad_binding(pad, ACT_LOAD2)) load_state_2(gb);
 	}
 	if (!pressed && b == pad_binding(pad, ACT_TURBO)) gb->cfg.turbo = 0;
 	return;
@@ -158,6 +183,7 @@ static void handle_gamepad_event (GB *gb, const SDL_Event *e)
 			gb->joypad.pad_stick &= ~(JOYPAD_LEFT | JOYPAD_RIGHT);
 			if (e->caxis.value < -GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_LEFT;
 			else if (e->caxis.value > GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_RIGHT;
+
 		} else if (e->caxis.axis == SDL_CONTROLLER_AXIS_LEFTY) {
 			gb->joypad.pad_stick &= ~(JOYPAD_UP | JOYPAD_DOWN);
 			if (e->caxis.value < -GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_UP;

@@ -42,6 +42,10 @@ const ActionMeta ACTIONS[ACT_COUNT] =
 	[ACT_START]	= { "START",	"start",	offsetof(Keymap, start),	offsetof(Padmap, start)	},
 	[ACT_SELECT]	= { "SELECT",	"select",	offsetof(Keymap, select),	offsetof(Padmap, select)},
 	[ACT_TURBO]	= { "TURBO",	"turbo",	offsetof(Keymap, turbo),	offsetof(Padmap, turbo)	},
+	[ACT_SAVE1]	= { "SAVE 1",	"save_1",	offsetof(Keymap, save_1),	offsetof(Padmap, save_1)},
+	[ACT_LOAD1]	= { "LOAD 1",	"load_1",	offsetof(Keymap, load_1),	offsetof(Padmap, load_1)},
+	[ACT_SAVE2]	= { "SAVE 2",	"save_2",	offsetof(Keymap, save_2),	offsetof(Padmap, save_2)},
+	[ACT_LOAD2]	= { "LOAD 2",	"load_2",	offsetof(Keymap, load_2),	offsetof(Padmap, load_2)},
 	[ACT_MUTE]	= { "MUTE",	"mute",		offsetof(Keymap, mute),		offsetof(Padmap, mute)	},
 	[ACT_PALETTE]	= { "PALETTE",	"palette",	offsetof(Keymap, palette),	offsetof(Padmap, palette)},
 	[ACT_VOL_UP]	= { "VOLUME UP","vol_up",	offsetof(Keymap, vol_up),	offsetof(Padmap, vol_up)},
@@ -122,6 +126,18 @@ static struct {
 	{"7",		SDL_SCANCODE_7},
 	{"8",		SDL_SCANCODE_8},
 	{"9",		SDL_SCANCODE_9},
+	{"F1",		SDL_SCANCODE_F1},
+	{"F2",		SDL_SCANCODE_F2},
+	{"F3",		SDL_SCANCODE_F3},
+	{"F4",		SDL_SCANCODE_F4},
+	{"F5",		SDL_SCANCODE_F5},
+	{"F6",		SDL_SCANCODE_F6},
+	{"F7",		SDL_SCANCODE_F7},
+	{"F8",		SDL_SCANCODE_F8},
+	{"F9",		SDL_SCANCODE_F9},
+	{"F10",		SDL_SCANCODE_F10},
+	{"F11",		SDL_SCANCODE_F11},
+	{"F12",		SDL_SCANCODE_F12},
 	{"RETURN",	SDL_SCANCODE_RETURN},
 	{"ENTER",	SDL_SCANCODE_RETURN},
 	{"SPACE",	SDL_SCANCODE_SPACE},
@@ -278,7 +294,10 @@ const char *pad_button_name (SDL_GameControllerButton b)
 
 void default_keymap (Keymap *k)
 {
-	static const struct { Action a; SDL_Scancode sc; } defs[] = {
+	static const struct {
+		Action a;
+		SDL_Scancode sc;
+	} defs[] = {
 		{ ACT_RIGHT,	SDL_SCANCODE_RIGHT	},
 		{ ACT_LEFT,	SDL_SCANCODE_LEFT	},
 		{ ACT_UP,	SDL_SCANCODE_UP		},
@@ -288,6 +307,10 @@ void default_keymap (Keymap *k)
 		{ ACT_START,	SDL_SCANCODE_RETURN	},
 		{ ACT_SELECT,	SDL_SCANCODE_BACKSPACE	},
 		{ ACT_TURBO,	SDL_SCANCODE_TAB	},
+		{ ACT_SAVE1,	SDL_SCANCODE_F1		},
+		{ ACT_LOAD1,	SDL_SCANCODE_1		},
+		{ ACT_SAVE2,	SDL_SCANCODE_F2		},
+		{ ACT_LOAD2,	SDL_SCANCODE_2		},
 		{ ACT_MUTE,	SDL_SCANCODE_M		},
 		{ ACT_PALETTE,	SDL_SCANCODE_P		},
 		{ ACT_VOL_UP,	SDL_SCANCODE_EQUALS	},
@@ -318,6 +341,10 @@ void default_padmap (Padmap *p)
 		{ ACT_START,	SDL_CONTROLLER_BUTTON_START	},
 		{ ACT_SELECT,	SDL_CONTROLLER_BUTTON_BACK	},
 		{ ACT_TURBO,	SDL_CONTROLLER_BUTTON_INVALID	},
+		{ ACT_SAVE1,	SDL_CONTROLLER_BUTTON_INVALID	},
+		{ ACT_LOAD1,	SDL_CONTROLLER_BUTTON_INVALID	},
+		{ ACT_SAVE2,	SDL_CONTROLLER_BUTTON_INVALID	},
+		{ ACT_LOAD2,	SDL_CONTROLLER_BUTTON_INVALID	},
 		{ ACT_MUTE,	SDL_CONTROLLER_BUTTON_INVALID	},
 		{ ACT_PALETTE,	SDL_CONTROLLER_BUTTON_INVALID	},
 		{ ACT_VOL_UP,	SDL_CONTROLLER_BUTTON_INVALID	},

@@ -150,6 +150,35 @@ static void init_consts (SdlFrontend *sdl)
 	sdl->col_label = sdl->list_x;
 	sdl->col_kb = sdl->list_x + 180;
 	sdl->col_pad = sdl->list_x + 380;
+
+	sdl->scroll_offset = 0;
+}
+
+static void layout_update (SdlFrontend *sdl)
+{
+	int win_h = REMAP_WINDOW_H;
+	SDL_GetWindowSize(sdl->win, NULL, &win_h);
+
+	sdl->footer_y = win_h - REMAP_FOOTER_H;
+
+	int available = sdl->footer_y - sdl->list_y;
+	int rows = available / sdl->row_h;
+	sdl->visible_rows = (rows < 1) ? 1 : rows;
+}
+
+static void clamp_scroll (SdlFrontend *sdl)
+{
+	if (sdl->selected < sdl->scroll_offset)
+		sdl->scroll_offset = sdl->selected;
+
+	if (sdl->selected >= sdl->scroll_offset + sdl->visible_rows)
+		sdl->scroll_offset = sdl->selected - sdl->visible_rows + 1;
+
+	int max_offset = ACT_COUNT - sdl->visible_rows;
+	if (max_offset < 0) max_offset = 0;
+
+	if (sdl->scroll_offset > max_offset) sdl->scroll_offset = max_offset;
+	if (sdl->scroll_offset < 0) sdl->scroll_offset = 0;
 }
 
 static void handle_key (SdlFrontend *sdl, Config *cfg, SDL_Event *e)
@@ -243,6 +272,9 @@ static void handle_event (SdlFrontend *sdl, Config *cfg, SDL_Event *e)
 
 static void draw (SdlFrontend *sdl, Config *cfg)
 {
+	layout_update(sdl);
+	clamp_scroll(sdl);
+
 	SDL_SetRenderDrawColor(sdl->ren, 0x18, 0x18, 0x1E, 0xFF);
 	SDL_RenderClear(sdl->ren);
 
@@ -252,8 +284,13 @@ static void draw (SdlFrontend *sdl, Config *cfg)
 	blit_text(sdl->ren, sdl->font, "KEYBOARD", sdl->col_kb, sdl->list_y - 28, sdl->dim);
 	blit_text(sdl->ren, sdl->font, "GAMEPAD",  sdl->col_pad, sdl->list_y - 28, sdl->dim);
 
-	for (int i = 0; i < ACT_COUNT; i++) {
-		int y = sdl->list_y + i * sdl->row_h;
+	int first = sdl->scroll_offset;
+	int last = first + sdl->visible_rows;
+	if (last > ACT_COUNT) last = ACT_COUNT;
+
+	for (int i = first; i < last; i++) {
+		int y = sdl->list_y + (i - first) * sdl->row_h;
+
 		if (i == sdl->selected) {
 			SDL_Rect hlrow = { sdl->list_x - 6, y - 2, REMAP_WINDOW_W - 36, sdl->row_h };
 			SDL_SetRenderDrawColor(sdl->ren, 0x2A, 0x2A, 0x34, 0xFF);
@@ -286,11 +323,15 @@ static void draw (SdlFrontend *sdl, Config *cfg)
 		}
 	}
 
-	int fy = sdl->list_y + ACT_COUNT * sdl->row_h + 12;
+	if (sdl->scroll_offset > 0)
+		blit_text(sdl->ren, sdl->font, "^ more above", sdl->col_pad + 60, sdl->list_y - 28, sdl->accent);
+	if (last < ACT_COUNT)
+		blit_text(sdl->ren, sdl->font, "v more below", sdl->col_pad + 60, sdl->footer_y - 20, sdl->accent);
+
 	blit_text(sdl->ren, sdl->font,
-		"Up/Down: select  -  Enter: capture keyboard  -  Tab: capture gamepad", sdl->list_x, fy, sdl->dim);
+		"Up/Down: select  -  Enter: capture keyboard  -  Tab: capture gamepad", sdl->list_x, sdl->footer_y, sdl->dim);
 	blit_text(sdl->ren, sdl->font,
-		"D: reset row  -  S: save & exit  -  ESC: exit without saving", sdl->list_x, fy + 22, sdl->dim);
+		"D: reset row  -  S: save & exit  -  ESC: exit without saving", sdl->list_x, sdl->footer_y + 22, sdl->dim);
 
 	SDL_RenderPresent(sdl->ren);
 }

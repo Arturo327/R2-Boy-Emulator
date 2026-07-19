@@ -5,6 +5,7 @@
 
 #define REMAP_WINDOW_W 720
 #define REMAP_WINDOW_H 580
+#define REMAP_FOOTER_H 106
 
 typedef struct SdlFrontend {
 	SDL_Window *win;
@@ -34,6 +35,10 @@ typedef struct SdlFrontend {
 	int col_label;
 	int col_kb;
 	int col_pad;
+
+	int scroll_offset;
+	int visible_rows;
+	int footer_y;
 } SdlFrontend;
 
 void run_remap (void);

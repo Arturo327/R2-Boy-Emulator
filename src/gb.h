@@ -11,9 +11,10 @@
 #include "timer/timer.h"
 #include "serial/serial.h"
 #include "cartucho/cartucho.h"
+#include "cartucho/save.h"
+#include "cartucho/savestate.h"
 #include "frontend/frontend.h"
 #include "frontend/config.h"
-#include "cartucho/save.h"
 
 typedef struct Joypad {
 	uint8_t buttons;
@@ -64,6 +65,11 @@ typedef struct GB {
 
 	uint64_t clock;
 	int running;
+
+	const char *romfile;
+	uint8_t state_save_pending;
+	uint8_t state_load_pending;
+	uint8_t state_num;
 
 	Config cfg;
 	AutoSave save;

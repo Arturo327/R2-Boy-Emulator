@@ -9,7 +9,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 - DMG (Original Game Boy) emulation
 - CPU instruction emulation (including halt-bug, OAM bug)
 - Memory bus implementation
-- Cartridge loading (MBC1, MBC2, MBC3 + RTC, MBC5, rumble)
+- Cartridge loading (MBC1, MBC2, MBC3 + RTC, MBC5 + rumble)
 - Timer emulation
 - PPU (Pixel Processing Unit) emulation
 - APU (Audio Processing Unit) emulation
@@ -26,6 +26,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
   - Turbo / fast-forward (hold `Tab`; audio is muted while active)
   - Alternative color palettes (`--palette`, hotkey `P` to cycle)
 - Thread-safe autosave: SRAM/RTC writes are mutex-protected so the background saver never observes a torn snapshot
+- 2 Save State slots: save or load the Game Boy state just pressing a key
 
 ---
 
@@ -115,6 +116,10 @@ Default keyboard mapping (rebindable, see [Configuration](#configuration)):
 | Enter | Start |
 | Backspace | Select |
 | Tab | Turbo (hold) |
+| F1  | Save State 1 |
+| 1 | Load State 1 |
+| F2 | Save State 2 |
+| 2 | Load State 2 |
 | M | Mute toggle |
 | 0 | Volume up |
 | 9 | Volume down |

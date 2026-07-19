@@ -36,12 +36,14 @@ typedef struct {
 	Keybind a, b, start, select;
 	Keybind turbo, mute, palette;
 	Keybind vol_up, vol_down;
+	Keybind save_1, load_1, save_2, load_2;
 } Keymap;
 
 typedef struct {
 	SDL_GameControllerButton right, left, up, down;
 	SDL_GameControllerButton a, b, start, select;
 	SDL_GameControllerButton turbo, mute, palette, vol_up, vol_down;
+	SDL_GameControllerButton save_1, load_1, save_2, load_2;
 } Padmap;
 
 typedef enum {
@@ -54,6 +56,10 @@ typedef enum {
 	ACT_START,
 	ACT_SELECT,
 	ACT_TURBO,
+	ACT_SAVE1,
+	ACT_LOAD1,
+	ACT_SAVE2,
+	ACT_LOAD2,
 	ACT_MUTE,
 	ACT_PALETTE,
 	ACT_VOL_UP,
