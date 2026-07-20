@@ -2,19 +2,23 @@ CC = gcc
 CFLAGS = -Isrc -Wall -Wextra -O2 -march=native -pthread
 LDLIBS = -lSDL2 -lSDL2_ttf -pthread
 
-SRC = $(shell find src -name '*.c')
-OBJ = $(patsubst src/%.c,build/%.o,$(SRC))
-
-all: build/r2boy
+SRC := $(shell find src -name '*.c')
+OBJ := $(patsubst src/%.c,build/%.o,$(SRC))
+DEP := $(OBJ:.o=.d)
 
 .PHONY: all test clean clean_sav
 
-build/r2boy: $(OBJ) build/
+all: build/r2boy
+
+build/r2boy: $(OBJ)
+	@mkdir -p $(dir $@)
 	$(CC) $(OBJ) $(LDLIBS) -o $@
 
 build/%.o: src/%.c
 	@mkdir -p $(dir $@)
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
+
+-include $(DEP)
 
 test: build/r2boy
 	@find tests/mooneye/acceptance/ -name "*.gb" | while read rom; do \

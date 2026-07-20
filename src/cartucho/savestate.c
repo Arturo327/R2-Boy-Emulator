@@ -95,6 +95,7 @@ static void io_cart (SaveState *s, GB *gb)
 	if (cart->has_rtc) io_buf(s, (RTC *)cart->state, sizeof(RTC));
 	if (cart->mbc_type == MBC6) io_mbc6(s, (MBC6State *)cart->state);
 	if (cart->mbc_type == MBC7) io_mbc7(s, (MBC7State *)cart->state);
+	if (cart->mbc_type == MMM01) io_buf(s, (MMM01Regs *)cart->state, sizeof(MMM01Regs));
 	uint32_t ram_size = cart->ram_size;
 	io_num(s, &ram_size);
 	pthread_mutex_unlock(&gb->save.lock);

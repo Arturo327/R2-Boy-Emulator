@@ -38,6 +38,16 @@ static void mbc3_sync (Cartucho *cart)
 	rtc->base = now;
 }
 
+int rtc_init (Cartucho *cart)
+{
+	cart->state = malloc(sizeof(RTC));
+	if (!cart->state) return 0;
+	RTC *rtc = (RTC *)cart->state;
+	rtc->latch_prev = 0xFF;
+	rtc->base = time(NULL);
+	return 1;
+}	
+
 void rtc_free (Cartucho *cart)
 {
 	free(cart->state);

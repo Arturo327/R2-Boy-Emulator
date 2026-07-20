@@ -7,6 +7,7 @@
 #include "cartucho/mbc/mbc5.h"
 #include "cartucho/mbc/mbc6.h"
 #include "cartucho/mbc/mbc7.h"
+#include "cartucho/mbc/mmm01.h"
 
 #include <stdint.h>
 
@@ -19,7 +20,8 @@ typedef enum {
 	MBC3,
 	MBC5,
 	MBC6,
-	MBC7
+	MBC7,
+	MMM01
 } MBC_Type;
 
 typedef struct Cartucho {

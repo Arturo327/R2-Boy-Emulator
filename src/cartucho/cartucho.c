@@ -36,6 +36,10 @@ static void normalize_mbc (Cartucho *cart, uint8_t header_type) {
 	case 0x20: cart->mbc_type = MBC6; break;
 	case 0x22: cart->mbc_type = MBC7; cart->battery = 1; break;
 
+	case 0x0B: cart->mbc_type = MMM01; break;
+	case 0x0C: cart->mbc_type = MMM01; break;
+	case 0x0D: cart->mbc_type = MMM01; cart->battery = 1; break;
+
 	default:
 		fprintf(stderr, "Cartucho: Unknown MBC type (0x%02X), considering as ROM only\n", header_type);
 		cart->mbc_type = MBC_NONE;
@@ -60,6 +64,7 @@ static void select_mbc_fx (Cartucho *cart) {
 	case MBC5:	LOAD_FX(mbc5)
 	case MBC6:	LOAD_FX(mbc6)
 	case MBC7:	LOAD_FX(mbc7)
+	case MMM01:	LOAD_FX(mmm01)
 	default:
 		fprintf(stderr, "Cartridge: MBC%d unimplemented, using ROM-only (probably incorrect banking)\n", cart->mbc_type);
 		LOAD_FX(mbcNone)
@@ -68,26 +73,40 @@ static void select_mbc_fx (Cartucho *cart) {
 
 #undef LOAD_FX
 
+const uint8_t NINTENDO_LOGO[48] = {
+	0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B,
+	0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D,
+	0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E,
+	0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
+	0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC,
+	0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E
+};
+
+static int valid_logo (Cartucho *cart, uint32_t header_offset)
+{
+	uint32_t logo_off = header_offset + 0x0104;
+	if (logo_off + sizeof(NINTENDO_LOGO) > cart->rom_size) return 0;
+	return memcmp(cart->rom + logo_off, NINTENDO_LOGO, sizeof(NINTENDO_LOGO)) == 0;
+}
+
+static uint32_t find_header_base (Cartucho *cart)
+{
+	if (cart->rom_size <= 0x8000) return 0;
+
+	uint32_t candidate = cart->rom_size - 0x8000;
+	uint8_t type = cart->rom[candidate + 0x0147];
+
+	if ((type == 0x0B || type == 0x0C || type == 0x0D) && valid_logo(cart, candidate))
+		return candidate;
+
+	return 0;
+}
+
 static int is_multicart (Cartucho *cart)
 {
 	if (cart->mbc_type != MBC1 || cart->rom_size != 0x100000)
 		return 0;
-
-	// Logo de Nintendo
-	const uint8_t logo[48] = {
-		0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B,
-		0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D,
-		0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E,
-		0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
-		0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC,
-		0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E
-	};
-
-	uint32_t offset = (0x10 * 0x4000) + 0x0104;
-	if (offset + sizeof(logo) <= cart->rom_size)
-		return memcmp(cart->rom + offset, logo, sizeof(logo)) == 0;
-
-	return 0;
+	return valid_logo(cart, 0x40000);
 }
 
 static int is_mbc30 (Cartucho *cart) {
@@ -125,31 +144,28 @@ static int read_rom (Cartucho *cart, const char *filename)
 	return 1;
 }
 
-static void get_title (Cartucho *cart)
+static void get_title (Cartucho *cart, uint32_t header_base)
 {
 	uint8_t bytes = 16;
-	if (cart->rom[0x0143] == 0x80 || cart->rom[0x0143] == 0xC0)
+	if (cart->rom[header_base + 0x0143] == 0x80 || cart->rom[header_base + 0x0143] == 0xC0)
 		bytes--;
 
-	if (cart->rom[0x014B] == 0x33)
+	if (cart->rom[header_base + 0x014B] == 0x33)
 		bytes -= 4;
 
-	memcpy(cart->title, cart->rom + 0x0134, bytes);
-
+	memcpy(cart->title, cart->rom + header_base + 0x0134, bytes);
 	cart->title[bytes] = '\0';
 }
 
-int load_rom (Cartucho *cart, const char *filename)
+static void parse_cart_header (Cartucho *cart, uint32_t header_base)
 {
-	cart->rom_bank = 1;
-	cart->bank1 = 1;
-
-	if (!read_rom(cart, filename)) return 0;
-
-	normalize_mbc(cart, cart->rom[0x0147]);
+	normalize_mbc(cart, cart->rom[0x0147 + header_base]);
 	cart->multicart = is_multicart(cart);
-	get_title(cart);
+	get_title(cart, header_base);
+}
 
+static void get_cart_ram_size (Cartucho *cart)
+{
 	uint8_t ram_type = cart->rom[0x0149];
 	uint32_t ram_sizes[] = {0, 2*1024, 8*1024, 32*1024, 128*1024, 64*1024};
 	cart->ram_size = (ram_type < 6) ? ram_sizes[ram_type] : 0;
@@ -159,34 +175,31 @@ int load_rom (Cartucho *cart, const char *filename)
 
 	if (cart->mbc_type == MBC7)
 		cart->ram_size = 256;
+}
 
-	if (cart->has_rtc) {
-		cart->state = malloc(sizeof(RTC));
-		if (!cart->state) {
-			fprintf(stderr, "Cartucho: not enough memory for RTC\n");
-			return 0;
-		}
-		RTC *rtc = (RTC *)cart->state;
-		rtc->latch_prev = 0xFF;
-		rtc->base = time(NULL);
+static int cart_alloc_ram (Cartucho *cart)
+{
+	if (!cart->ram_size) return 1;
+
+	cart->ram = calloc(1, cart->ram_size);
+	if (!cart->ram) {
+		fprintf(stderr, "Cartucho: not enough memory for the cartridge RAM\n");
+		return 0;
 	}
 
 	cart->ram_banks = cart->ram_size / 0x2000;
-	if (cart->ram_size) {
-		cart->ram = calloc(1, cart->ram_size);
-		if (!cart->ram) {
-			fprintf(stderr, "Cartucho: not enough memory for the cartridge RAM\n");
-			return 0;
-		}
-		if (cart->mbc_type == MBC_NONE)
-			cart->ram_enabled = 1;
-		if (cart->mbc_type == MBC7 && cart->ram)
-			memset(cart->ram, 0xFF, cart->ram_size);
-	}
 
-	cart->mbc30 = is_mbc30(cart);
-	select_mbc_fx(cart);
+	if (cart->mbc_type == MBC_NONE)
+		cart->ram_enabled = 1;
 
+	if (cart->mbc_type == MBC7 && cart->ram)
+		memset(cart->ram, 0xFF, cart->ram_size);
+
+	return 1;
+}
+
+static int init_special_mbcs (Cartucho *cart)
+{
 	if (cart->mbc_type == MBC6 && !mbc6_init(cart)) {
 		fprintf(stderr, "Cartucho: not enough memory for the MBC6\n");
 		return 0;
@@ -195,6 +208,33 @@ int load_rom (Cartucho *cart, const char *filename)
 		fprintf(stderr, "Cartucho: not enough memory for the MBC7\n");
 		return 0;
 	}
+	if (cart->mbc_type == MMM01 && !mmm01_init(cart)) {
+		fprintf(stderr, "Cartucho: not enough memory for the MMM01\n");
+		return 0;
+	}
+	if (cart->has_rtc && !rtc_init(cart)) {
+		fprintf(stderr, "Cartucho: not enough memory for the RTC\n");
+		return 0;
+	}
+	return 1;
+}
+
+int load_rom (Cartucho *cart, const char *filename)
+{
+	cart->rom_bank = 1;
+	cart->bank1 = 1;
+
+	if (!read_rom(cart, filename)) return 0;
+	uint32_t header_base = find_header_base(cart);
+	parse_cart_header(cart, header_base);
+
+	get_cart_ram_size(cart);
+	if (!cart_alloc_ram(cart)) return 0;
+
+	cart->mbc30 = is_mbc30(cart);
+	select_mbc_fx(cart);
+
+	if (!init_special_mbcs(cart)) return 0;
 
 	printf("ROM: %s\n", filename);
 	return 1;
@@ -374,6 +414,7 @@ void free_cart (Cartucho *cart)
 {
 	if (cart->mbc_type == MBC6) mbc6_free(cart);
 	if (cart->mbc_type == MBC7) mbc7_free(cart);
+	if (cart->mbc_type == MMM01) mmm01_free(cart);
 	if (cart->has_rtc) rtc_free(cart);
 	free(cart->rom);
 	free(cart->ram);

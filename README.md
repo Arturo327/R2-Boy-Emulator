@@ -16,6 +16,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
   - MBC5 + rumble
   - MBC6
   - MBC7 + acceleromter
+  - MMM01
 - Timer emulation
 - PPU (Pixel Processing Unit) emulation
 - APU (Audio Processing Unit) emulation
@@ -40,7 +41,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 
 R2-Boy works correctly and runs every DMG compatible game I tested.
 
-It won't run games with rare MBC types, due to MMM01, M161 and some others are not yet implemented
+It won't run games with rare MBC types, due to M161, HuC1 and HuC-3 are not yet implemented
 
 This project is under active development.
 
