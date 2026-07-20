@@ -43,9 +43,7 @@ typedef struct Cartucho {
 	uint8_t mbc30;
 	uint8_t has_rtc;
 
-	RTC rtc;
-	MBC6State mbc6;
-	MBC7State mbc7;
+	void *state;
 
 	uint8_t has_rumble;
 	uint8_t rumble_on;

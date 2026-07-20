@@ -26,7 +26,8 @@ typedef struct MBC7State {
 	uint8_t ee_state;
 } MBC7State;
 
-void mbc7_init (Cartucho *cart);
+int mbc7_init (Cartucho *cart);
+void mbc7_free (Cartucho *cart);
 
 uint8_t mbc7_read_rom (GB *gb, uint16_t addr);
 void mbc7_write_rom (GB *gb, uint16_t addr, uint8_t val);

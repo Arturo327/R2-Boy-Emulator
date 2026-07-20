@@ -41,7 +41,7 @@ static void sample_accelerometer (GB *gb, uint16_t *x, uint16_t *y)
 	Joypad *j = &gb->joypad;
 
 	int16_t vx = combine_axis(j->kb_tilt & TILT_LEFT, j->kb_tilt & TILT_RIGHT, j->pad_tilt_x);
-	int16_t vy = combine_axis(j->kb_tilt & TILT_UP,   j->kb_tilt & TILT_DOWN,  j->pad_tilt_y);
+	int16_t vy = combine_axis(j->kb_tilt & TILT_UP, j->kb_tilt & TILT_DOWN, j->pad_tilt_y);
 
 	*x = sim_axis_v(vx);
 	*y = sim_axis_v(vy);
@@ -71,7 +71,7 @@ static void eeprom_idle (MBC7State *m)
 static void eeprom_decode (GB *gb)
 {
 	Cartucho *cart = &gb->memory.cart;
-	MBC7State *m = &cart->mbc7;
+	MBC7State *m = (MBC7State *)cart->state;
 	uint16_t instr = m->shift_reg & 0x3FF;
 	uint8_t op = (instr >> 8) & 0x03;
 	uint8_t addr = instr & 0x7F;
@@ -130,10 +130,14 @@ static void eeprom_decode (GB *gb)
 
 static void eeprom_bit_in (GB *gb)
 {
-	MBC7State *m = &gb->memory.cart.mbc7;
+	MBC7State *m = (MBC7State *)gb->memory.cart.state;
 
 	if (!m->start_seen) {
-		if (m->di) { m->start_seen = 1; m->shift_reg = 0; m->bit_count = 0; }
+		if (m->di) {
+			m->start_seen = 1;
+			m->shift_reg = 0;
+			m->bit_count = 0;
+		}
 		return;
 	}
 	m->shift_reg = (uint16_t)((m->shift_reg << 1) | m->di);
@@ -143,7 +147,7 @@ static void eeprom_bit_in (GB *gb)
 static void eeprom_clock_rise (GB *gb)
 {
 	Cartucho *cart = &gb->memory.cart;
-	MBC7State *m = &cart->mbc7;
+	MBC7State *m = (MBC7State *)cart->state;
 
 	switch (m->ee_state)
 	{
@@ -178,7 +182,7 @@ static void eeprom_clock_rise (GB *gb)
 
 static void eeprom_pin_write (GB *gb, uint8_t val)
 {
-	MBC7State *m = &gb->memory.cart.mbc7;
+	MBC7State *m = (MBC7State *)gb->memory.cart.state;
 	uint8_t new_cs = (val >> 7) & 1;
 	uint8_t new_clk = (val >> 6) & 1;
 	uint8_t new_di = (val >> 1) & 1;
@@ -201,10 +205,21 @@ static uint8_t eeprom_pin_read (MBC7State *m)
 	return (uint8_t)((m->cs << 7) | (m->clk << 6) | (m->di << 1) | (m->do_bit & 1));
 }
 
-void mbc7_init (Cartucho *cart)
+int mbc7_init (Cartucho *cart)
 {
-	cart->mbc7.latch_x = 0x8000;
-	cart->mbc7.latch_y = 0x8000;
+	cart->state = malloc(sizeof(MBC7State));
+	if (!cart->state) return 0;
+	memset(cart->state, 0, sizeof(MBC7State));
+	MBC7State *m = (MBC7State *)cart->state;
+	m->latch_x = 0x8000;
+	m->latch_y = 0x8000;
+	return 1;
+}
+
+void mbc7_free (Cartucho *cart)
+{
+	free(cart->state);
+	cart->state = NULL;
 }
 
 uint8_t mbc7_read_rom (GB *gb, uint16_t addr)
@@ -226,15 +241,16 @@ uint8_t mbc7_read_rom (GB *gb, uint16_t addr)
 void mbc7_write_rom (GB *gb, uint16_t addr, uint8_t val)
 {
 	Cartucho *cart = &gb->memory.cart;
+	MBC7State *m = (MBC7State *)cart->state;
 
 	if (addr < 0x2000) {
-		cart->mbc7.ram_enable1 = ((val & 0x0F) == 0x0A);
+		m->ram_enable1 = ((val & 0x0F) == 0x0A);
 
 	} else if (addr < 0x4000) {
 		cart->rom_bank = val & 0x7F;
 
 	} else if (addr < 0x6000) {
-		cart->mbc7.ram_enable2 = (val == 0x40);
+		m->ram_enable2 = (val == 0x40);
 	}
 }
 
@@ -245,7 +261,7 @@ static inline uint8_t reg_index (uint16_t addr) {
 uint8_t mbc7_read_ram (GB *gb, uint16_t addr)
 {
 	Cartucho *cart = &gb->memory.cart;
-	MBC7State *m = &cart->mbc7;
+	MBC7State *m = (MBC7State *)cart->state;
 
 	if (!m->ram_enable1 || !m->ram_enable2) return 0xFF;
 	if (addr >= 0xB000) return 0xFF;
@@ -267,7 +283,7 @@ uint8_t mbc7_read_ram (GB *gb, uint16_t addr)
 void mbc7_write_ram (GB *gb, uint16_t addr, uint8_t val)
 {
 	Cartucho *cart = &gb->memory.cart;
-	MBC7State *m = &cart->mbc7;
+	MBC7State *m = (MBC7State *)cart->state;
 
 	if (!m->ram_enable1 || !m->ram_enable2) return;
 	if (addr >= 0xB000) return;

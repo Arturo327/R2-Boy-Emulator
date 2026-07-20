@@ -5,6 +5,7 @@
 #include <time.h>
 
 typedef struct GB GB;
+typedef struct Cartucho Cartucho;
 
 typedef struct RTC {
 	uint8_t s, m, h;
@@ -21,6 +22,7 @@ typedef struct RTC {
 	time_t base;
 } RTC;
 
+void rtc_free (Cartucho *cart);
 uint8_t mbc3_read_rom (GB *gb, uint16_t addr);
 void mbc3_write_rom (GB *gb, uint16_t addr, uint8_t val);
 uint8_t mbc3_read_ram (GB *gb, uint16_t addr);

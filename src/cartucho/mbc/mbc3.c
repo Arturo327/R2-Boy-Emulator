@@ -3,38 +3,45 @@
 
 static void mbc3_sync (Cartucho *cart)
 {
-	if (cart->rtc.halt) {
-		cart->rtc.base = time(NULL);
+	RTC *rtc = (RTC *)cart->state;
+	if (rtc->halt) {
+		rtc->base = time(NULL);
 		return;
 	}
 
 	time_t now = time(NULL);
-	long elapsed = (long) difftime(now, cart->rtc.base);
+	long elapsed = (long) difftime(now, rtc->base);
 	if (elapsed <= 0) {
-		cart->rtc.base = now;
+		rtc->base = now;
 		return;
 	}
 
-	uint32_t total = (uint32_t)cart->rtc.s
-			+ (uint32_t)cart->rtc.m * 60
-			+ (uint32_t)cart->rtc.h * 3600
-			+ (uint32_t)cart->rtc.d * 86400;
+	uint32_t total = (uint32_t)rtc->s
+			+ (uint32_t)rtc->m * 60
+			+ (uint32_t)rtc->h * 3600
+			+ (uint32_t)rtc->d * 86400;
 	total += (uint32_t) elapsed;
 
 	uint32_t days = total / 86400;
 	uint32_t rem = total % 86400;
 
-	cart->rtc.h = rem / 3600; rem %= 3600;
-	cart->rtc.m = rem / 60;
-	cart->rtc.s = rem % 60;
+	rtc->h = rem / 3600; rem %= 3600;
+	rtc->m = rem / 60;
+	rtc->s = rem % 60;
 
 	if (days > 511) {
-		cart->rtc.carry = 1;
+		rtc->carry = 1;
 		days &= 0x1FF;
 	}
-	cart->rtc.d = (uint16_t) days;
+	rtc->d = (uint16_t) days;
 
-	cart->rtc.base = now;
+	rtc->base = now;
+}
+
+void rtc_free (Cartucho *cart)
+{
+	free(cart->state);
+	cart->state = NULL;
 }
 
 uint8_t mbc3_read_rom (GB *gb, uint16_t addr)
@@ -74,16 +81,17 @@ void mbc3_write_rom (GB *gb, uint16_t addr, uint8_t val)
 
 	} else {
 		pthread_mutex_lock(&gb->save.lock);
-		if (cart->has_rtc && cart->rtc.latch_prev == 0x00 && val == 0x01) {
+		RTC *rtc = (RTC *)cart->state;
+		if (cart->has_rtc && rtc->latch_prev == 0x00 && val == 0x01) {
 			mbc3_sync(cart);
-			cart->rtc.s_l = cart->rtc.s;
-			cart->rtc.m_l = cart->rtc.m;
-			cart->rtc.h_l = cart->rtc.h;
-			cart->rtc.d_l = cart->rtc.d;
-			cart->rtc.halt_l = cart->rtc.halt;
-			cart->rtc.carry_l = cart->rtc.carry;
+			rtc->s_l = rtc->s;
+			rtc->m_l = rtc->m;
+			rtc->h_l = rtc->h;
+			rtc->d_l = rtc->d;
+			rtc->halt_l = rtc->halt;
+			rtc->carry_l = rtc->carry;
 		}
-		cart->rtc.latch_prev = val;
+		rtc->latch_prev = val;
 		cart->save_needed = 1;
 		pthread_mutex_unlock(&gb->save.lock);
 	}
@@ -106,15 +114,16 @@ uint8_t mbc3_read_ram (GB *gb, uint16_t addr)
 
 	if (!cart->has_rtc) return 0xFF;
 
+	RTC *rtc = (RTC *)cart->state;
 	switch (cart->ram_bank)
 	{
-	case 0x08: return cart->rtc.s_l;
-	case 0x09: return cart->rtc.m_l;
-	case 0x0A: return cart->rtc.h_l;
-	case 0x0B: return (uint8_t)(cart->rtc.d_l & 0xFF);
-	case 0x0C: return (uint8_t)(((cart->rtc.d_l >> 8) & 0x01)
-			| (cart->rtc.halt_l  ? 0x40 : 0)
-			| (cart->rtc.carry_l ? 0x80 : 0));
+	case 0x08: return rtc->s_l;
+	case 0x09: return rtc->m_l;
+	case 0x0A: return rtc->h_l;
+	case 0x0B: return (uint8_t)(rtc->d_l & 0xFF);
+	case 0x0C: return (uint8_t)(((rtc->d_l >> 8) & 0x01)
+			| (rtc->halt_l  ? 0x40 : 0)
+			| (rtc->carry_l ? 0x80 : 0));
 	default: return 0xFF;
 	}
 }
@@ -143,16 +152,17 @@ void mbc3_write_ram (GB *gb, uint16_t addr, uint8_t val)
 
 	pthread_mutex_lock(&gb->save.lock);
 	mbc3_sync(cart);
+	RTC *rtc = (RTC *)cart->state;
 	switch (cart->ram_bank)
 	{
-	case 0x08: cart->rtc.s = val & 0x3F; break;
-	case 0x09: cart->rtc.m = val & 0x3F; break;
-	case 0x0A: cart->rtc.h = val & 0x1F; break;
-	case 0x0B: cart->rtc.d = (cart->rtc.d & 0x100) | val; break;
+	case 0x08: rtc->s = val & 0x3F; break;
+	case 0x09: rtc->m = val & 0x3F; break;
+	case 0x0A: rtc->h = val & 0x1F; break;
+	case 0x0B: rtc->d = (rtc->d & 0x100) | val; break;
 	case 0x0C: {
-		cart->rtc.d = (cart->rtc.d & 0xFF) | ((uint16_t)(val & 0x01) << 8);
-		cart->rtc.halt = (val & 0x40) != 0;
-		cart->rtc.carry = (val & 0x80) != 0;
+		rtc->d = (rtc->d & 0xFF) | ((uint16_t)(val & 0x01) << 8);
+		rtc->halt = (val & 0x40) != 0;
+		rtc->carry = (val & 0x80) != 0;
 		break;
 	}
 	default: break;

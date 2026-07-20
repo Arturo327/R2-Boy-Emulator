@@ -38,29 +38,51 @@ static void io_ppu (SaveState *s, PPU *ppu)
 
 static void io_mbc6 (SaveState *s, MBC6State *m)
 {
-	io_num(s, &m->rom_bank_a); io_num(s, &m->rom_bank_b);
-	io_num(s, &m->flash_sel_a); io_num(s, &m->flash_sel_b);
-	io_num(s, &m->ram_bank_a); io_num(s, &m->ram_bank_b);
-	io_num(s, &m->ram_enabled); io_num(s, &m->flash_enabled);
+	io_num(s, &m->rom_bank_a);
+	io_num(s, &m->rom_bank_b);
+	io_num(s, &m->flash_sel_a);
+	io_num(s, &m->flash_sel_b);
+	io_num(s, &m->ram_bank_a);
+	io_num(s, &m->ram_bank_b);
+	io_num(s, &m->ram_enabled);
+	io_num(s, &m->flash_enabled);
 	io_num(s, &m->flash_write_enabled);
-	io_num(s, &m->flash.sector0_locked); io_num(s, &m->flash.write_enable);
-	io_num(s, &m->flash.state); io_num(s, &m->flash.status);
+	io_num(s, &m->flash.sector0_locked);
+	io_num(s, &m->flash.write_enable);
+	io_num(s, &m->flash.program_addr);
+	io_buf(s, m->flash.program_buf, sizeof(m->flash.program_buf));
+	io_num(s, &m->flash.program_len);
+	io_num(s, &m->flash.program_hidden);
+	io_num(s, &m->flash.state);
+	io_num(s, &m->flash.status);
 	io_buf(s, m->flash.hidden, sizeof(m->flash.hidden));
 	if (m->flash.data) io_buf(s, m->flash.data, MBC6_FLASH_SIZE);
 }
 
 static void io_mbc7 (SaveState *s, MBC7State *m)
 {
-	io_num(s, &m->ram_enable1); io_num(s, &m->ram_enable2);
-	io_num(s, &m->latch_x); io_num(s, &m->latch_y); io_num(s, &m->latched);
+	io_num(s, &m->ram_enable1);
+	io_num(s, &m->ram_enable2);
+	io_num(s, &m->latch_x);
+	io_num(s, &m->latch_y);
+	io_num(s, &m->latched);
 	io_num(s, &m->eeprom_enabled);
-	io_num(s, &m->cs); io_num(s, &m->clk); io_num(s, &m->di); io_num(s, &m->do_bit);
-	io_num(s, &m->start_seen); io_num(s, &m->shift_reg); io_num(s, &m->bit_count);
-	io_num(s, &m->op_addr); io_num(s, &m->write_all); io_num(s, &m->ee_state);
+	io_num(s, &m->cs);
+	io_num(s, &m->clk);
+	io_num(s, &m->di);
+	io_num(s, &m->do_bit);
+	io_num(s, &m->start_seen);
+	io_num(s, &m->shift_reg);
+	io_num(s, &m->bit_count);
+	io_num(s, &m->op_addr);
+	io_num(s, &m->write_all);
+	io_num(s, &m->ee_state);
 }
 
-static void io_cart (SaveState *s, Cartucho *cart)
+static void io_cart (SaveState *s, GB *gb)
 {
+	Cartucho *cart = &gb->memory.cart;
+
 	io_num(s, &cart->mbc_mode);
 	io_num(s, &cart->rom_bank);
 	io_num(s, &cart->ram_bank);
@@ -69,12 +91,13 @@ static void io_cart (SaveState *s, Cartucho *cart)
 	io_num(s, &cart->bank2);
 	io_num(s, &cart->rumble_on);
  
-	if (cart->mbc_type == MBC3) io_buf(s, &cart->rtc, sizeof(RTC));
-	if (cart->mbc_type == MBC6) io_mbc6(s, &cart->mbc6);
-	if (cart->mbc_type == MBC7) io_mbc7(s, &cart->mbc7);
-
+	pthread_mutex_lock(&gb->save.lock);
+	if (cart->has_rtc) io_buf(s, (RTC *)cart->state, sizeof(RTC));
+	if (cart->mbc_type == MBC6) io_mbc6(s, (MBC6State *)cart->state);
+	if (cart->mbc_type == MBC7) io_mbc7(s, (MBC7State *)cart->state);
 	uint32_t ram_size = cart->ram_size;
 	io_num(s, &ram_size);
+	pthread_mutex_unlock(&gb->save.lock);
 
 	if (!s->saving && s->ok && ram_size != cart->ram_size) {
 		fprintf(stderr, "SaveState: Cart RAM size doesn't match (state=%u, rom=%u); ¿wrong ROM?\n",
@@ -86,9 +109,10 @@ static void io_cart (SaveState *s, Cartucho *cart)
 		io_buf(s, cart->ram, cart->ram_size);
 }
 
-static void io_memory (SaveState *s, Memory *mem)
+static void io_memory (SaveState *s, GB *gb)
 {
-	io_cart(s, &mem->cart);
+	Memory *mem = &gb->memory;
+	io_cart(s, gb);
 	io_buf(s, mem->bios, sizeof(mem->bios));
 	io_buf(s, mem->vram, sizeof(mem->vram));
 	io_buf(s, mem->wram, sizeof(mem->wram));
@@ -103,6 +127,7 @@ static void io_serial (SaveState *s, Serial *serial)
 	io_num(s, &serial->transfer_active);
 	io_num(s, &serial->clock);
 	io_num(s, &serial->recived);
+	io_num(s, &serial->sent);
 	io_num(s, &serial->shifted);
 	io_num(s, &serial->buff);
 }
@@ -125,7 +150,7 @@ static int state_io (GB *gb, FILE *f, int saving)
 	io_num(&ss, &gb->boot_rom_enabled);
 	io_num(&ss, &gb->boot_rom_disable_pending);
 	io_num(&ss, &gb->clock);
-	io_memory(&ss, &gb->memory);
+	io_memory(&ss, gb);
  
 	return ss.ok;
 }
@@ -149,14 +174,12 @@ static void state_path (const char *romfile, char *out, size_t outsize, int save
 	memcpy(out + base_len, extension, (size_t)ext_len + 1);
 }
  
-static int can_save_state (GB *gb) {
+int can_save_state (GB *gb) {
 	return gb->cpu.instr_head >= gb->cpu.instr_tail;
 }
 
 int save_state (GB *gb)
 {
-	if (!can_save_state(gb)) return 0;
- 
 	char path[600];
 	char tmp_path[608];
 	state_path(gb->romfile, path, sizeof(path), gb->state_num);
@@ -197,8 +220,6 @@ int save_state (GB *gb)
  
 int load_state (GB *gb)
 {
-	if (!can_save_state(gb)) return 0;
- 
 	char path[600];
 	state_path(gb->romfile, path, sizeof(path), gb->state_num);
  

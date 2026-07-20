@@ -6,18 +6,27 @@
 
 int mbc6_init (Cartucho *cart)
 {
-	cart->mbc6.flash.data = malloc(MBC6_FLASH_SIZE);
-	if (!cart->mbc6.flash.data) return 0;
+	cart->state = malloc(sizeof(MBC6State));
+	if (!cart->state) return 0;
+	memset(cart->state, 0, sizeof(MBC6State));
 
-	memset(cart->mbc6.flash.data, 0xFF, MBC6_FLASH_SIZE);
-	memset(cart->mbc6.flash.hidden, 0xFF, sizeof(cart->mbc6.flash.hidden));
+	MBC6State *mbc6 = (MBC6State *)cart->state;
+	mbc6->flash.data = malloc(MBC6_FLASH_SIZE);
+	if (!mbc6->flash.data) return 0;
+
+	memset(mbc6->flash.data, 0xFF, MBC6_FLASH_SIZE);
+	memset(mbc6->flash.hidden, 0xFF, sizeof(mbc6->flash.hidden));
 	return 1;
 }
 
 void mbc6_free (Cartucho *cart)
 {
-	free(cart->mbc6.flash.data);
-	cart->mbc6.flash.data = NULL;
+	if (!cart->state) return;
+	MBC6State *mbc6 = (MBC6State *)cart->state;
+	free(mbc6->flash.data);
+	mbc6->flash.data = NULL;
+	free(mbc6);
+	cart->state = NULL;
 }
 
 static inline uint32_t rom_offset (Cartucho *cart, uint8_t bank, uint16_t addr, uint16_t base)
@@ -194,7 +203,7 @@ static uint8_t flash_read (MBC6Flash *f, uint32_t addr)
 uint8_t mbc6_read_rom (GB *gb, uint16_t addr)
 {
 	Cartucho *cart = &gb->memory.cart;
-	MBC6State *m = &cart->mbc6;
+	MBC6State *m = (MBC6State *)cart->state;
 
 	if (addr < 0x4000)
 		return (addr < cart->rom_size) ? cart->rom[addr] : 0xFF;
@@ -219,7 +228,7 @@ uint8_t mbc6_read_rom (GB *gb, uint16_t addr)
 void mbc6_write_rom (GB *gb, uint16_t addr, uint8_t val)
 {
 	Cartucho *cart = &gb->memory.cart;
-	MBC6State *m = &cart->mbc6;
+	MBC6State *m = (MBC6State *)cart->state;
 
 	if (addr < 0x0400) {
 		m->ram_enabled = ((val & 0x0F) == 0x0A);
@@ -280,7 +289,7 @@ static uint32_t ram_offset (Cartucho *cart, uint8_t bank, uint16_t addr, uint16_
 uint8_t mbc6_read_ram (GB *gb, uint16_t addr)
 {
 	Cartucho *cart = &gb->memory.cart;
-	MBC6State *m = &cart->mbc6;
+	MBC6State *m = (MBC6State *)cart->state;
 	if (!m->ram_enabled || !cart->ram) return 0xFF;
 
 	uint8_t bank = (addr < 0xB000) ? m->ram_bank_a : m->ram_bank_b;
@@ -293,7 +302,7 @@ uint8_t mbc6_read_ram (GB *gb, uint16_t addr)
 void mbc6_write_ram (GB *gb, uint16_t addr, uint8_t val)
 {
 	Cartucho *cart = &gb->memory.cart;
-	MBC6State *m = &cart->mbc6;
+	MBC6State *m = (MBC6State *)cart->state;
 	if (!m->ram_enabled || !cart->ram) return;
 
 	uint8_t bank = (addr < 0xB000) ? m->ram_bank_a : m->ram_bank_b;

@@ -43,67 +43,30 @@ static void normalize_mbc (Cartucho *cart, uint8_t header_type) {
 	}
 }
 
+#define LOAD_FX(type)			\
+cart->read_rom = type##_read_rom;	\
+cart->write_rom = type##_write_rom;	\
+cart->read_ram = type##_read_ram;	\
+cart->write_ram = type##_write_ram;	\
+break;
+
 static void select_mbc_fx (Cartucho *cart) {
 	switch (cart->mbc_type)
 	{
-	case MBC_NONE:
-		cart->read_rom = mbcNone_read_rom;
-		cart->write_rom = mbcNone_write_rom;
-		cart->read_ram = mbcNone_read_ram;
-		cart->write_ram = mbcNone_write_ram;
-		break;
-
-	case MBC1:
-		cart->read_rom = mbc1_read_rom;
-		cart->write_rom = mbc1_write_rom;
-		cart->read_ram = mbc1_read_ram;
-		cart->write_ram = mbc1_write_ram;
-		break;
-
-	case MBC2:
-		cart->read_rom = mbc2_read_rom;
-		cart->write_rom = mbc2_write_rom;
-		cart->read_ram = mbc2_read_ram;
-		cart->write_ram = mbc2_write_ram;
-		break;
-
-	case MBC3:
-		cart->read_rom = mbc3_read_rom;
-		cart->write_rom = mbc3_write_rom;
-		cart->read_ram = mbc3_read_ram;
-		cart->write_ram = mbc3_write_ram;
-		break;
-
-	case MBC5:
-		cart->read_rom = mbc5_read_rom;
-		cart->write_rom = mbc5_write_rom;
-		cart->read_ram = mbc5_read_ram;
-		cart->write_ram = mbc5_write_ram;
-		break;
-
-	case MBC6:
-		cart->read_rom = mbc6_read_rom;
-		cart->write_rom = mbc6_write_rom;
-		cart->read_ram = mbc6_read_ram;
-		cart->write_ram = mbc6_write_ram;
-		break;
-
-	case MBC7:
-		cart->read_rom = mbc7_read_rom;
-		cart->write_rom = mbc7_write_rom;
-		cart->read_ram = mbc7_read_ram;
-		cart->write_ram = mbc7_write_ram;
-		break;
-
+	case MBC_NONE: 	LOAD_FX(mbcNone)
+	case MBC1:	LOAD_FX(mbc1)
+	case MBC2:	LOAD_FX(mbc2)
+	case MBC3:	LOAD_FX(mbc3)
+	case MBC5:	LOAD_FX(mbc5)
+	case MBC6:	LOAD_FX(mbc6)
+	case MBC7:	LOAD_FX(mbc7)
 	default:
 		fprintf(stderr, "Cartridge: MBC%d unimplemented, using ROM-only (probably incorrect banking)\n", cart->mbc_type);
-		cart->read_rom = mbcNone_read_rom;
-		cart->write_rom = mbcNone_write_rom;
-		cart->read_ram = mbcNone_read_ram;
-		cart->write_ram = mbcNone_write_ram;
-		break;
+		LOAD_FX(mbcNone)
 	}
 }
+
+#undef LOAD_FX
 
 static int is_multicart (Cartucho *cart)
 {
@@ -180,8 +143,6 @@ int load_rom (Cartucho *cart, const char *filename)
 {
 	cart->rom_bank = 1;
 	cart->bank1 = 1;
-	cart->rtc.latch_prev = 0xFF;
-	cart->rtc.base = time(NULL);
 
 	if (!read_rom(cart, filename)) return 0;
 
@@ -199,9 +160,24 @@ int load_rom (Cartucho *cart, const char *filename)
 	if (cart->mbc_type == MBC7)
 		cart->ram_size = 256;
 
+	if (cart->has_rtc) {
+		cart->state = malloc(sizeof(RTC));
+		if (!cart->state) {
+			fprintf(stderr, "Cartucho: not enough memory for RTC\n");
+			return 0;
+		}
+		RTC *rtc = (RTC *)cart->state;
+		rtc->latch_prev = 0xFF;
+		rtc->base = time(NULL);
+	}
+
 	cart->ram_banks = cart->ram_size / 0x2000;
 	if (cart->ram_size) {
 		cart->ram = calloc(1, cart->ram_size);
+		if (!cart->ram) {
+			fprintf(stderr, "Cartucho: not enough memory for the cartridge RAM\n");
+			return 0;
+		}
 		if (cart->mbc_type == MBC_NONE)
 			cart->ram_enabled = 1;
 		if (cart->mbc_type == MBC7 && cart->ram)
@@ -209,15 +185,16 @@ int load_rom (Cartucho *cart, const char *filename)
 	}
 
 	cart->mbc30 = is_mbc30(cart);
-
 	select_mbc_fx(cart);
 
 	if (cart->mbc_type == MBC6 && !mbc6_init(cart)) {
-		fprintf(stderr, "Cartucho: not enough memory for the MBC6 flash chip\n");
+		fprintf(stderr, "Cartucho: not enough memory for the MBC6\n");
 		return 0;
 	}
-	if (cart->mbc_type == MBC7)
-		mbc7_init(cart);
+	if (cart->mbc_type == MBC7 && !mbc7_init(cart)) {
+		fprintf(stderr, "Cartucho: not enough memory for the MBC7\n");
+		return 0;
+	}
 
 	printf("ROM: %s\n", filename);
 	return 1;
@@ -300,7 +277,7 @@ int load_sram (Cartucho *cart, const char *romfile)
 		int64_t base;
 
 		if (fread(buf, 1, 5, f) == 5 && read_int64(f, &base)) {
-			load_rtc_data(&cart->rtc, buf, base);
+			load_rtc_data((RTC *)cart->state, buf, base);
 		} else {
 			printf("No RTC data in %s, starting clock fresh\n", path);
 		}
@@ -312,7 +289,7 @@ int load_sram (Cartucho *cart, const char *romfile)
 }
 
 static int write_sav_file (const char *savefile, const uint8_t *ram,
-			uint32_t ram_size, const RTC *rtc, uint8_t has_rtc)
+			uint32_t ram_size, const RTC *rtc)
 {
 	char tmp_path[520];
 	int n = snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", savefile);
@@ -330,7 +307,7 @@ static int write_sav_file (const char *savefile, const uint8_t *ram,
 	if (ram && ram_size > 0)
 		if (fwrite(ram, 1, ram_size, f) != ram_size) goto fail;
 
-	if (has_rtc && rtc) {
+	if (rtc) {
 		uint8_t dh = ((rtc->d >> 8) & 0x01)
 			| (rtc->halt  ? 0x40 : 0)
 			| (rtc->carry ? 0x80 : 0);
@@ -371,7 +348,7 @@ int save_sram (Cartucho *cart, const char *romfile)
 	make_sav_path(romfile, savefile, sizeof(savefile));
 
 	int save_success = write_sav_file(savefile, cart->ram, cart->ram_size,
-					&cart->rtc, cart->has_rtc);
+					cart->has_rtc ? cart->state : NULL);
 
 	if (save_success) {
 		printf("Saved game: %s\n", savefile);
@@ -390,12 +367,14 @@ void save_sram_snapshot (Cartucho *cart, const char *romfile,
 	char path[512];
 	make_sav_path(romfile, path, sizeof(path));
 	write_sav_file(path, ram_snap, ram_size,
-			rtc_snap, cart->has_rtc);
+			cart->has_rtc ? rtc_snap : NULL);
 }
 
 void free_cart (Cartucho *cart)
 {
-	mbc6_free(cart);
+	if (cart->mbc_type == MBC6) mbc6_free(cart);
+	if (cart->mbc_type == MBC7) mbc7_free(cart);
+	if (cart->has_rtc) rtc_free(cart);
 	free(cart->rom);
 	free(cart->ram);
 }

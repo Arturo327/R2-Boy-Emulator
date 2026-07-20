@@ -20,7 +20,8 @@ typedef struct {
 	int ok;
 } SaveState;
 
-int save_state(GB *gb);
-int load_state(GB *gb);
+int can_save_state (GB *gb);
+int save_state (GB *gb);
+int load_state (GB *gb);
 
 #endif

@@ -125,6 +125,7 @@ static void dma_step (GB *gb)
 
 static void save_state_step (GB *gb)
 {
+	if (!can_save_state(gb)) return;
 	if (gb->state_save_pending) {
 		save_state(gb);
 		gb->state_save_pending = 0;

@@ -44,7 +44,7 @@ static void *save_thread_fn (void *arg)
 
 		uint8_t has_rtc = gb->memory.cart.has_rtc;
 		RTC rtc_snap;
-		if (has_rtc) rtc_snap = cart->rtc;
+		if (has_rtc) rtc_snap = *((RTC *)cart->state);
 
 		pthread_mutex_unlock(&gb->save.lock);
 		save_sram_snapshot(cart, romfile, have_ram ? snap : NULL,
