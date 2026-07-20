@@ -16,12 +16,21 @@
 #include "frontend/frontend.h"
 #include "frontend/config.h"
 
+#define TILT_RIGHT 0x01
+#define TILT_LEFT 0x02
+#define TILT_UP 0x04
+#define TILT_DOWN 0x08
+
 typedef struct Joypad {
 	uint8_t buttons;
 	uint8_t joyp;
 	uint8_t kb_buttons;
 	uint8_t pad_dpad;
 	uint8_t pad_stick;
+
+	uint8_t kb_tilt;
+	int16_t pad_tilt_x;
+	int16_t pad_tilt_y;
 } Joypad;
 
 typedef struct Memory {

@@ -17,7 +17,28 @@ void open_gamepad (Gamepad *pad, int device_index) {
 	pad->has_rumble = (SDL_GameControllerRumble(ctrl, 0, 0, 1) == 0);
 #endif
 
-	printf("Connected Gamepad: %s\n", SDL_GameControllerName(ctrl));
+
+#if SDL_VERSION_ATLEAST(2, 0, 14)
+	pad->has_acel = SDL_GameControllerHasSensor(ctrl, SDL_SENSOR_ACCEL);
+	if (pad->has_acel && SDL_GameControllerSetSensorEnabled(ctrl, SDL_SENSOR_ACCEL, SDL_TRUE) != 0)
+		pad->has_acel = 0;
+#endif
+
+	printf("Connected Gamepad: %s%s%s\n", SDL_GameControllerName(ctrl),
+		pad->has_rumble ? " [rumble]" : "",
+		pad->has_acel  ? " [acelerometer]" : "");
+}
+
+int gamepad_get_acel (Gamepad *pad, float out[3])
+{
+#if SDL_VERSION_ATLEAST(2, 0, 14)
+	if (!pad->connected || !pad->has_acel) return 0;
+	return SDL_GameControllerGetSensorData(pad->ctrl, SDL_SENSOR_ACCEL, out, 3) == 0;
+#else
+	(void)pad;
+	(void)out;
+	return 0;
+#endif
 }
 
 int init_gamepad (Gamepad *pad)
@@ -36,6 +57,10 @@ int init_gamepad (Gamepad *pad)
 
 void cleanup_gamepad (Gamepad *pad)
 {
+#if SDL_VERSION_ATLEAST(2, 0, 14)
+	if (pad->connected && pad->has_acel)
+		SDL_GameControllerSetSensorEnabled(pad->ctrl, SDL_SENSOR_ACCEL, SDL_FALSE);
+#endif
 	if (pad->ctrl) SDL_GameControllerClose(pad->ctrl);
 	memset(pad, 0, sizeof(Gamepad));
 }

@@ -34,6 +34,7 @@ static void normalize_mbc (Cartucho *cart, uint8_t header_type) {
 	case 0x1E: cart->mbc_type = MBC5; cart->has_rumble = 1; cart->battery = 1; break;
 
 	case 0x20: cart->mbc_type = MBC6; break;
+	case 0x22: cart->mbc_type = MBC7; cart->battery = 1; break;
 
 	default:
 		fprintf(stderr, "Cartucho: Unknown MBC type (0x%02X), considering as ROM only\n", header_type);
@@ -85,6 +86,13 @@ static void select_mbc_fx (Cartucho *cart) {
 		cart->write_rom = mbc6_write_rom;
 		cart->read_ram = mbc6_read_ram;
 		cart->write_ram = mbc6_write_ram;
+		break;
+
+	case MBC7:
+		cart->read_rom = mbc7_read_rom;
+		cart->write_rom = mbc7_write_rom;
+		cart->read_ram = mbc7_read_ram;
+		cart->write_ram = mbc7_write_ram;
 		break;
 
 	default:
@@ -188,11 +196,16 @@ int load_rom (Cartucho *cart, const char *filename)
 	if (cart->mbc_type == MBC2)
 		cart->ram_size = 512;
 
+	if (cart->mbc_type == MBC7)
+		cart->ram_size = 256;
+
 	cart->ram_banks = cart->ram_size / 0x2000;
 	if (cart->ram_size) {
 		cart->ram = calloc(1, cart->ram_size);
 		if (cart->mbc_type == MBC_NONE)
 			cart->ram_enabled = 1;
+		if (cart->mbc_type == MBC7 && cart->ram)
+			memset(cart->ram, 0xFF, cart->ram_size);
 	}
 
 	cart->mbc30 = is_mbc30(cart);
@@ -203,6 +216,8 @@ int load_rom (Cartucho *cart, const char *filename)
 		fprintf(stderr, "Cartucho: not enough memory for the MBC6 flash chip\n");
 		return 0;
 	}
+	if (cart->mbc_type == MBC7)
+		mbc7_init(cart);
 
 	printf("ROM: %s\n", filename);
 	return 1;

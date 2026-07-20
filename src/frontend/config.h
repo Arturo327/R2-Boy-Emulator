@@ -37,6 +37,7 @@ typedef struct {
 	Keybind turbo, mute, palette;
 	Keybind vol_up, vol_down;
 	Keybind save_1, load_1, save_2, load_2;
+	Keybind tilt_right, tilt_left, tilt_up, tilt_down;
 } Keymap;
 
 typedef struct {
@@ -44,26 +45,15 @@ typedef struct {
 	SDL_GameControllerButton a, b, start, select;
 	SDL_GameControllerButton turbo, mute, palette, vol_up, vol_down;
 	SDL_GameControllerButton save_1, load_1, save_2, load_2;
+	SDL_GameControllerButton tilt_right, tilt_left, tilt_up, tilt_down;
 } Padmap;
 
 typedef enum {
-	ACT_RIGHT = 0,
-	ACT_LEFT,
-	ACT_UP,
-	ACT_DOWN,
-	ACT_A,
-	ACT_B,
-	ACT_START,
-	ACT_SELECT,
-	ACT_TURBO,
-	ACT_SAVE1,
-	ACT_LOAD1,
-	ACT_SAVE2,
-	ACT_LOAD2,
-	ACT_MUTE,
-	ACT_PALETTE,
-	ACT_VOL_UP,
-	ACT_VOL_DOWN,
+	ACT_RIGHT = 0, ACT_LEFT, ACT_UP, ACT_DOWN,
+	ACT_A, ACT_B, ACT_START, ACT_SELECT,
+	ACT_TURBO, ACT_SAVE1, ACT_LOAD1, ACT_SAVE2, ACT_LOAD2,
+	ACT_MUTE, ACT_PALETTE, ACT_VOL_UP, ACT_VOL_DOWN,
+	ACT_TILT_RIGHT, ACT_TILT_LEFT, ACT_TILT_UP, ACT_TILT_DOWN,
 	ACT_COUNT
 } Action;
 
@@ -83,6 +73,7 @@ typedef struct Config {
 	_Atomic int volume;
 	_Atomic uint8_t muted;
 	DmgPalette palette;
+	uint8_t use_acel;
 } Config;
 
 void default_keymap (Keymap *k);

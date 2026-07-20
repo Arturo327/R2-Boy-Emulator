@@ -36,6 +36,29 @@ static void io_ppu (SaveState *s, PPU *ppu)
 	       sizeof(PPU) - offsetof(PPU, palette));
 }
 
+static void io_mbc6 (SaveState *s, MBC6State *m)
+{
+	io_num(s, &m->rom_bank_a); io_num(s, &m->rom_bank_b);
+	io_num(s, &m->flash_sel_a); io_num(s, &m->flash_sel_b);
+	io_num(s, &m->ram_bank_a); io_num(s, &m->ram_bank_b);
+	io_num(s, &m->ram_enabled); io_num(s, &m->flash_enabled);
+	io_num(s, &m->flash_write_enabled);
+	io_num(s, &m->flash.sector0_locked); io_num(s, &m->flash.write_enable);
+	io_num(s, &m->flash.state); io_num(s, &m->flash.status);
+	io_buf(s, m->flash.hidden, sizeof(m->flash.hidden));
+	if (m->flash.data) io_buf(s, m->flash.data, MBC6_FLASH_SIZE);
+}
+
+static void io_mbc7 (SaveState *s, MBC7State *m)
+{
+	io_num(s, &m->ram_enable1); io_num(s, &m->ram_enable2);
+	io_num(s, &m->latch_x); io_num(s, &m->latch_y); io_num(s, &m->latched);
+	io_num(s, &m->eeprom_enabled);
+	io_num(s, &m->cs); io_num(s, &m->clk); io_num(s, &m->di); io_num(s, &m->do_bit);
+	io_num(s, &m->start_seen); io_num(s, &m->shift_reg); io_num(s, &m->bit_count);
+	io_num(s, &m->op_addr); io_num(s, &m->write_all); io_num(s, &m->ee_state);
+}
+
 static void io_cart (SaveState *s, Cartucho *cart)
 {
 	io_num(s, &cart->mbc_mode);
@@ -46,7 +69,10 @@ static void io_cart (SaveState *s, Cartucho *cart)
 	io_num(s, &cart->bank2);
 	io_num(s, &cart->rumble_on);
  
-	io_buf(s, &cart->rtc, sizeof(RTC));
+	if (cart->mbc_type == MBC3) io_buf(s, &cart->rtc, sizeof(RTC));
+	if (cart->mbc_type == MBC6) io_mbc6(s, &cart->mbc6);
+	if (cart->mbc_type == MBC7) io_mbc7(s, &cart->mbc7);
+
 	uint32_t ram_size = cart->ram_size;
 	io_num(s, &ram_size);
 

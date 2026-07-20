@@ -120,11 +120,13 @@ static void flash_write (MBC6Flash *f, uint32_t addr, uint8_t val)
 		case 0xE0: flash_start_program(f, 1); return;
 		case 0x40:
 			if (f->write_enable) f->sector0_locked = 0;
-			f->status = 0x82; f->state = MF_STATUS;
+			f->status = 0x80 | (f->sector0_locked ? 0x02 : 0x00);
+			f->state = MF_STATUS;
 			return;
 		case 0x20:
-			f->sector0_locked = 1;
-			f->status = 0x82; f->state = MF_STATUS;
+			if (f->write_enable) f->sector0_locked = 1;
+			f->status = 0x80 | (f->sector0_locked ? 0x02 : 0x00);
+			f->state = MF_STATUS;
 			return;
 		default: flash_idle(f); return;
 		}

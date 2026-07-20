@@ -49,7 +49,11 @@ const ActionMeta ACTIONS[ACT_COUNT] =
 	[ACT_MUTE]	= { "MUTE",	"mute",		offsetof(Keymap, mute),		offsetof(Padmap, mute)	},
 	[ACT_PALETTE]	= { "PALETTE",	"palette",	offsetof(Keymap, palette),	offsetof(Padmap, palette)},
 	[ACT_VOL_UP]	= { "VOLUME UP","vol_up",	offsetof(Keymap, vol_up),	offsetof(Padmap, vol_up)},
-	[ACT_VOL_DOWN]	= { "VOLUME DOWN","vol_down",	offsetof(Keymap, vol_down),	offsetof(Padmap, vol_down)}
+	[ACT_VOL_DOWN]	= { "VOLUME DOWN","vol_down",	offsetof(Keymap, vol_down),	offsetof(Padmap, vol_down)},
+	[ACT_TILT_RIGHT]= { "TILT RIGHT", "tilt_right",offsetof(Keymap, tilt_right),	offsetof(Padmap, tilt_right)},
+	[ACT_TILT_LEFT] = { "TILT LEFT", "tilt_left",	offsetof(Keymap, tilt_left),	offsetof(Padmap, tilt_left)},
+	[ACT_TILT_UP]	= { "TILT UP", "tilt_up",	offsetof(Keymap, tilt_up),	offsetof(Padmap, tilt_up)},
+	[ACT_TILT_DOWN] = { "TILT DOWN", "tilt_down",	offsetof(Keymap, tilt_down),	offsetof(Padmap, tilt_down)},
 };
 
 Keybind kb_binding (const Keymap *k, Action a)
@@ -80,6 +84,7 @@ void init_config_defaults (Config *cfg)
 	atomic_store(&cfg->volume, 100);
 	atomic_store(&cfg->muted, 0);
 	cfg->palette = PAL_DEFAULT;
+	cfg->use_acel = 1;
 }
 
 static struct {
@@ -315,6 +320,10 @@ void default_keymap (Keymap *k)
 		{ ACT_PALETTE,	SDL_SCANCODE_P		},
 		{ ACT_VOL_UP,	SDL_SCANCODE_EQUALS	},
 		{ ACT_VOL_DOWN,	SDL_SCANCODE_MINUS	},
+		{ ACT_TILT_UP,	SDL_SCANCODE_W		},
+		{ ACT_TILT_LEFT,SDL_SCANCODE_A		},
+		{ ACT_TILT_DOWN,SDL_SCANCODE_S		},
+		{ ACT_TILT_RIGHT,SDL_SCANCODE_D		},
 	};
 	int n = sizeof(defs) / sizeof(defs[0]);
 	for (int i = 0; i < n; i++) {
@@ -349,6 +358,10 @@ void default_padmap (Padmap *p)
 		{ ACT_PALETTE,	SDL_CONTROLLER_BUTTON_INVALID	},
 		{ ACT_VOL_UP,	SDL_CONTROLLER_BUTTON_INVALID	},
 		{ ACT_VOL_DOWN,	SDL_CONTROLLER_BUTTON_INVALID	},
+		{ ACT_TILT_RIGHT,SDL_CONTROLLER_BUTTON_INVALID	},
+		{ ACT_TILT_LEFT,SDL_CONTROLLER_BUTTON_INVALID	},
+		{ ACT_TILT_UP,	SDL_CONTROLLER_BUTTON_INVALID	},
+		{ ACT_TILT_DOWN,SDL_CONTROLLER_BUTTON_INVALID	},
 	};
 	int n = sizeof(defs)/sizeof(defs[0]);
 	for (int i = 0; i < n; i++)
@@ -435,6 +448,16 @@ static void load_video (Config *cfg, const char *s)
 	}
 }
 
+static void load_input (Config *cfg, const char *s)
+{
+	char field[32];
+	char value[32];
+	if (sscanf(s, " %31[^= ] = %31s", field, value) != 2) return;
+
+	if (!strcmp(field, "use_accelerometer"))
+		cfg->use_acel = (uint8_t)(value[0]=='1' || value[0]=='t' || value[0]=='T');
+}
+
 static int action_ini_name (const char *name)
 {
 	if (!name || !*name) return -1;
@@ -509,10 +532,11 @@ void load_config (Config *cfg)
 			continue;
 		}
 
-		if	(!strcmp(section, "keymap"))  parse_keymap_line  (&cfg->keymap, s);
-		else if (!strcmp(section, "gamepad")) parse_gamepad_line (&cfg->padmap, s);
-		else if (!strcmp(section, "audio"))  load_audio (cfg, s);
-		else if (!strcmp(section, "video"))  load_video (cfg, s);
+		if	(!strcmp(section, "keymap"))	parse_keymap_line  (&cfg->keymap, s);
+		else if (!strcmp(section, "gamepad"))	parse_gamepad_line (&cfg->padmap, s);
+		else if (!strcmp(section, "audio"))	load_audio (cfg, s);
+		else if (!strcmp(section, "video"))	load_video (cfg, s);
+		else if (!strcmp(section, "input"))	load_input (cfg, s);
 	}
 	fclose(f);
 }
@@ -527,6 +551,9 @@ static void write_cfg_file (Config *cfg, FILE *f)
 
 	fprintf(f, "[video]\n");
 	fprintf(f, "palette = %s\n\n", palette_name(cfg->palette));
+
+	fprintf(f, "[input]\n");
+	fprintf(f, "use_accelerometer = %d\n\n", cfg->use_acel);
 
 	fprintf(f, "[keymap]\n");
 	for (int i = 0; i < ACT_COUNT; i++) {

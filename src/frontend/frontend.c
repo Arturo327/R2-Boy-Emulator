@@ -22,11 +22,18 @@ static int handle_window_event (SDL_Event *e)
 	return 1;
 }
 
-static int keybind_match (const Keybind *kb, SDL_Scancode sc, uint16_t mods)
+static int keybind_match (const Keybind *kb, SDL_Scancode sc, uint16_t mods, int is_release)
 {
 	if (kb->scancode != sc) return 0;
-	if (kb->mods == 0) return 1;
-	return (mods & kb->mods) == kb->mods;
+	if (kb->mods == 0 || is_release) return 1;
+
+	uint16_t norm = 0;
+	if (mods & KBMOD_CTRL) norm |= KBMOD_CTRL;
+	if (mods & KBMOD_SHIFT) norm |= KBMOD_SHIFT;
+	if (mods & KBMOD_ALT) norm |= KBMOD_ALT;
+	if (mods & KBMOD_GUI) norm |= KBMOD_GUI;
+
+	return (norm & kb->mods) == kb->mods;
 }
 
 static void toggle_mute (Config *cfg)
@@ -70,7 +77,19 @@ static inline void load_state_2 (GB *gb) {
 	gb->state_num = 2;
 }
 
-static uint8_t kb_scancode_to_joypad_mask (const Keymap *k, SDL_Scancode sc, uint16_t mods)
+static uint8_t kb_scancode_to_tilt_mask (const Keymap *k, SDL_Scancode sc, uint16_t mods, int is_release)
+{
+	static const Action actions[] = { ACT_TILT_RIGHT, ACT_TILT_LEFT, ACT_TILT_UP, ACT_TILT_DOWN };
+	static const uint8_t masks[]  = { TILT_RIGHT, TILT_LEFT, TILT_UP, TILT_DOWN };
+	int n = sizeof(actions) / sizeof(actions[0]);
+	for (int i = 0; i < n; i++) {
+		Keybind kb = kb_binding(k, actions[i]);
+		if (keybind_match(&kb, sc, mods, is_release)) return masks[i];
+	}
+	return 0;
+}
+
+static uint8_t kb_scancode_to_joypad_mask (const Keymap *k, SDL_Scancode sc, uint16_t mods, int is_release)
 {
 	static const Action actions[] = {
 		ACT_RIGHT, ACT_LEFT, ACT_UP, ACT_DOWN, ACT_A, ACT_B, ACT_START, ACT_SELECT
@@ -82,7 +101,7 @@ static uint8_t kb_scancode_to_joypad_mask (const Keymap *k, SDL_Scancode sc, uin
 	int n = sizeof(actions) / sizeof(actions[0]);
 	for (int i = 0; i < n; i++) {
 		Keybind kb = kb_binding(k, actions[i]);
-		if (keybind_match(&kb, sc, mods)) return masks[i];
+		if (keybind_match(&kb, sc, mods, is_release)) return masks[i];
 	}
 	return 0;
 }
@@ -91,14 +110,14 @@ static void handle_hotkey (GB *gb, SDL_Scancode sc, uint16_t mods, int pressed)
 {
 	if (!pressed) return;
 	Config *cfg = &gb->cfg;
-	if (keybind_match(&cfg->keymap.mute, sc, mods)) toggle_mute(&gb->cfg);
-	else if (keybind_match(&cfg->keymap.vol_up, sc, mods)) adjust_volume(&gb->cfg, 10);
-	else if (keybind_match(&cfg->keymap.vol_down, sc, mods)) adjust_volume(&gb->cfg, -10);
-	else if (keybind_match(&cfg->keymap.palette, sc, mods)) cycle_palette(gb);
-	else if (keybind_match(&cfg->keymap.save_1, sc, mods)) save_state_1(gb);
-	else if (keybind_match(&cfg->keymap.load_1, sc, mods)) load_state_1(gb);
-	else if (keybind_match(&cfg->keymap.save_2, sc, mods)) save_state_2(gb);
-	else if (keybind_match(&cfg->keymap.load_2, sc, mods)) load_state_2(gb);
+	if (keybind_match(&cfg->keymap.mute, sc, mods, 0))		toggle_mute(&gb->cfg);
+	else if (keybind_match(&cfg->keymap.vol_up, sc, mods, 0))	adjust_volume(&gb->cfg, 10);
+	else if (keybind_match(&cfg->keymap.vol_down, sc, mods, 0))	adjust_volume(&gb->cfg, -10);
+	else if (keybind_match(&cfg->keymap.palette, sc, mods, 0))	cycle_palette(gb);
+	else if (keybind_match(&cfg->keymap.save_1, sc, mods, 0))	save_state_1(gb);
+	else if (keybind_match(&cfg->keymap.load_1, sc, mods, 0))	load_state_1(gb);
+	else if (keybind_match(&cfg->keymap.save_2, sc, mods, 0))	save_state_2(gb);
+	else if (keybind_match(&cfg->keymap.load_2, sc, mods, 0))	load_state_2(gb);
 }
 
 static uint8_t handle_kb_event (GB *gb, const SDL_Event *e, uint8_t curr)
@@ -108,13 +127,20 @@ static uint8_t handle_kb_event (GB *gb, const SDL_Event *e, uint8_t curr)
 	SDL_Scancode sc = e->key.keysym.scancode;
 	uint16_t mods = e->key.keysym.mod & KBMOD_ANY;
 	uint8_t pressed = (e->type == SDL_KEYDOWN);
+	int released = !pressed;
 
 	const Keymap *k = &gb->cfg.keymap;
-	uint8_t mask = kb_scancode_to_joypad_mask(k, sc, mods);
+	uint8_t mask = kb_scancode_to_joypad_mask(k, sc, mods, released);
 	if (pressed && !e->key.repeat) handle_hotkey(gb, sc, mods, 1);
 
-	if (keybind_match(&k->turbo, sc, mods))
+	if (keybind_match(&k->turbo, sc, mods, released))
 		gb->cfg.turbo = pressed ? 1 : 0;
+
+	uint8_t tilt_mask = kb_scancode_to_tilt_mask(k, sc, mods, released);
+	if (tilt_mask) {
+		if (pressed) gb->joypad.kb_tilt |= tilt_mask;
+		else gb->joypad.kb_tilt &= ~tilt_mask;
+	}
 
 	return pressed ? (curr | mask) : (curr & ~mask);
 }
@@ -158,6 +184,28 @@ static void handle_gamepad_button (GB *gb, const SDL_Event *e)
 	return;
 }
 
+static void handle_gamepad_joypad (GB *gb, const SDL_Event *e)
+{
+	if (e->caxis.axis == SDL_CONTROLLER_AXIS_LEFTX) {
+		gb->joypad.pad_stick &= ~(JOYPAD_LEFT | JOYPAD_RIGHT);
+		if (e->caxis.value < -GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_LEFT;
+		else if (e->caxis.value > GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_RIGHT;
+
+	} else if (e->caxis.axis == SDL_CONTROLLER_AXIS_LEFTY) {
+		gb->joypad.pad_stick &= ~(JOYPAD_UP | JOYPAD_DOWN);
+		if (e->caxis.value < -GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_UP;
+		else if (e->caxis.value > GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_DOWN;
+
+	} else if (e->caxis.axis == SDL_CONTROLLER_AXIS_RIGHTX) {
+		gb->joypad.pad_tilt_x = (e->caxis.value > -GAMEPAD_DEADZONE && e->caxis.value < GAMEPAD_DEADZONE)
+			? 0 : e->caxis.value;
+
+	} else if (e->caxis.axis == SDL_CONTROLLER_AXIS_RIGHTY) {
+		gb->joypad.pad_tilt_y = (e->caxis.value > -GAMEPAD_DEADZONE && e->caxis.value < GAMEPAD_DEADZONE)
+			? 0 : e->caxis.value;
+	}
+}
+
 static void handle_gamepad_event (GB *gb, const SDL_Event *e)
 {
 	switch (e->type)
@@ -171,6 +219,8 @@ static void handle_gamepad_event (GB *gb, const SDL_Event *e)
 			cleanup_gamepad(&gb->pad);
 			gb->joypad.pad_dpad = 0;
 			gb->joypad.pad_stick = 0;
+			gb->joypad.pad_tilt_x = 0;
+			gb->joypad.pad_tilt_y = 0;
 		}
 		break;
 
@@ -179,16 +229,7 @@ static void handle_gamepad_event (GB *gb, const SDL_Event *e)
 		break;
 
 	case SDL_CONTROLLERAXISMOTION:
-		if (e->caxis.axis == SDL_CONTROLLER_AXIS_LEFTX) {
-			gb->joypad.pad_stick &= ~(JOYPAD_LEFT | JOYPAD_RIGHT);
-			if (e->caxis.value < -GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_LEFT;
-			else if (e->caxis.value > GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_RIGHT;
-
-		} else if (e->caxis.axis == SDL_CONTROLLER_AXIS_LEFTY) {
-			gb->joypad.pad_stick &= ~(JOYPAD_UP | JOYPAD_DOWN);
-			if (e->caxis.value < -GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_UP;
-			else if (e->caxis.value > GAMEPAD_DEADZONE) gb->joypad.pad_stick |= JOYPAD_DOWN;
-		}
+		handle_gamepad_joypad(gb, e);
 		break;
 	}
 }
@@ -196,7 +237,8 @@ static void handle_gamepad_event (GB *gb, const SDL_Event *e)
 int frontend_init (GB *gb, const char *game_title)
 {
 	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
-	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) < 0) {
+	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO
+				| SDL_INIT_GAMECONTROLLER | SDL_INIT_SENSOR) < 0) {
 		fprintf(stderr, "SDL_Init error: %s\n", SDL_GetError());
 		return 0;
 	}
@@ -207,6 +249,11 @@ int frontend_init (GB *gb, const char *game_title)
 	}
 
 	init_gamepad(&gb->pad);
+	if (gb->memory.cart.mbc_type == MBC7) {
+		printf("MBC7: %s\n", gb->pad.has_acel
+			? "using real gamepad accelerometer"
+			: "using accelerometer simulation via keyboard / right Joystick");
+	}
 
 	if (!init_audio(&gb->audio, &gb->cfg)) {
 		gb->running = 0;
@@ -236,6 +283,8 @@ int handle_events (GB *gb)
 			if (gb->joypad.kb_buttons) {
 				gb->joypad.kb_buttons = 0;
 				joypad_update(gb, gb->joypad.pad_dpad | gb->joypad.pad_stick);
+				gb->cfg.turbo = 0;
+				gb->joypad.kb_tilt = 0;
 			}
 			continue;
 		}

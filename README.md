@@ -9,7 +9,13 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 - DMG (Original Game Boy) emulation
 - CPU instruction emulation (including halt-bug, OAM bug)
 - Memory bus implementation
-- Cartridge loading (MBC1, MBC2, MBC3 + RTC, MBC5 + rumble, MBC6)
+- Cartridge loading. Supported mappings:
+  - MBC1
+  - MBC2
+  - MBC3 + RTC
+  - MBC5 + rumble
+  - MBC6
+  - MBC7 + acceleromter
 - Timer emulation
 - PPU (Pixel Processing Unit) emulation
 - APU (Audio Processing Unit) emulation
@@ -34,7 +40,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 
 R2-Boy works correctly and runs every DMG compatible game I tested.
 
-It won't run games with rare MBC types, due to MMM01, MBC7 and some others are not yet implemented
+It won't run games with rare MBC types, due to MMM01, M161 and some others are not yet implemented
 
 This project is under active development.
 
@@ -124,7 +130,7 @@ Default keyboard mapping (rebindable, see [Configuration](#configuration)):
 | 9 | Volume down |
 | P | Cycle color palette |
 
-Gamepads are auto-detected via SDL GameController. The D-Pad, face buttons, Start/Back and analog stick map to the joypad by default; **all gamepad buttons are also rebindable** in the remap window. Rumble carts (`MBC5` with rumble) drive the controller's haptic.
+Gamepads are auto-detected via SDL GameController. The D-Pad, face buttons, Start/Back and analog stick map to the joypad by default; **all gamepad buttons are also rebindable** in the remap window. Rumble carts (`MBC5` with rumble) drive the controller's haptic. For the MBC7 cartridges with accelerometer, the controller's one will be used. In the case is not an accelerometer present, the right joystick or the WASD keys (also configurable) will simulate it.
 
 ---
 
@@ -183,7 +189,7 @@ Saves run on a **dedicated background thread**:
 - A battery-less cart (MBC0, ROM only) skips starting the saver thread entirely.
 - On shutdown, the saver thread is `pthread_join`ed and `cleanup_core` performs one final synchronous flush as a safety net.
 
-Save games are interchangeable with other DMG emulators that follow the standard `.sav` layout (RAM followed by 5 bytes of RTC + 8-byte base timestamp for RTC carts).
+Save games are interchangeable with other DMG emulators that follow the standard `.sav` layout.
 
 ---
 

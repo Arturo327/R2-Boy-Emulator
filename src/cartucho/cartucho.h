@@ -6,6 +6,7 @@
 #include "cartucho/mbc/mbc3.h"
 #include "cartucho/mbc/mbc5.h"
 #include "cartucho/mbc/mbc6.h"
+#include "cartucho/mbc/mbc7.h"
 
 #include <stdint.h>
 
@@ -17,7 +18,8 @@ typedef enum {
 	MBC2,
 	MBC3,
 	MBC5,
-	MBC6
+	MBC6,
+	MBC7
 } MBC_Type;
 
 typedef struct Cartucho {
@@ -43,6 +45,7 @@ typedef struct Cartucho {
 
 	RTC rtc;
 	MBC6State mbc6;
+	MBC7State mbc7;
 
 	uint8_t has_rumble;
 	uint8_t rumble_on;
