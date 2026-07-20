@@ -1,12 +1,14 @@
 #ifndef CARTUCHO_H
 #define CARTUCHO_H
 
+#include "cartucho/mbc/none.h"
 #include "cartucho/mbc/mbc1.h"
 #include "cartucho/mbc/mbc2.h"
 #include "cartucho/mbc/mbc3.h"
 #include "cartucho/mbc/mbc5.h"
 #include "cartucho/mbc/mbc6.h"
 #include "cartucho/mbc/mbc7.h"
+#include "cartucho/mbc/m161.h"
 #include "cartucho/mbc/mmm01.h"
 
 #include <stdint.h>
@@ -14,13 +16,14 @@
 typedef struct GB GB;
 
 typedef enum {
-	MBC_NONE,
+	MBC_NONE = 0,
 	MBC1,
 	MBC2,
 	MBC3,
 	MBC5,
 	MBC6,
 	MBC7,
+	M161,
 	MMM01
 } MBC_Type;
 

@@ -42,6 +42,7 @@ int rtc_init (Cartucho *cart)
 {
 	cart->state = malloc(sizeof(RTC));
 	if (!cart->state) return 0;
+	memset(cart->state, 0, sizeof(RTC));
 	RTC *rtc = (RTC *)cart->state;
 	rtc->latch_prev = 0xFF;
 	rtc->base = time(NULL);

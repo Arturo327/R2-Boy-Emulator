@@ -20,6 +20,10 @@ static void normalize_mbc (Cartucho *cart, uint8_t header_type) {
 	case 0x08: cart->mbc_type = MBC_NONE; break;
 	case 0x09: cart->mbc_type = MBC_NONE; cart->battery = 1; break;
 
+	case 0x0B: cart->mbc_type = MMM01; break;
+	case 0x0C: cart->mbc_type = MMM01; break;
+	case 0x0D: cart->mbc_type = MMM01; cart->battery = 1; break;
+
 	case 0x0F: cart->mbc_type = MBC3; cart->battery = 1; cart->has_rtc = 1; break;
 	case 0x10: cart->mbc_type = MBC3; cart->battery = 1; cart->has_rtc = 1; break;
 	case 0x11: cart->mbc_type = MBC3; break;
@@ -35,10 +39,6 @@ static void normalize_mbc (Cartucho *cart, uint8_t header_type) {
 
 	case 0x20: cart->mbc_type = MBC6; break;
 	case 0x22: cart->mbc_type = MBC7; cart->battery = 1; break;
-
-	case 0x0B: cart->mbc_type = MMM01; break;
-	case 0x0C: cart->mbc_type = MMM01; break;
-	case 0x0D: cart->mbc_type = MMM01; cart->battery = 1; break;
 
 	default:
 		fprintf(stderr, "Cartucho: Unknown MBC type (0x%02X), considering as ROM only\n", header_type);
@@ -57,16 +57,17 @@ break;
 static void select_mbc_fx (Cartucho *cart) {
 	switch (cart->mbc_type)
 	{
-	case MBC_NONE: 	LOAD_FX(mbcNone)
+	case MBC_NONE:	LOAD_FX(mbcNone)
 	case MBC1:	LOAD_FX(mbc1)
 	case MBC2:	LOAD_FX(mbc2)
 	case MBC3:	LOAD_FX(mbc3)
 	case MBC5:	LOAD_FX(mbc5)
 	case MBC6:	LOAD_FX(mbc6)
 	case MBC7:	LOAD_FX(mbc7)
+	case M161:	LOAD_FX(m161)
 	case MMM01:	LOAD_FX(mmm01)
 	default:
-		fprintf(stderr, "Cartridge: MBC%d unimplemented, using ROM-only (probably incorrect banking)\n", cart->mbc_type);
+		fprintf(stderr, "Cartridge: Current MBC unimplemented, using ROM-only (probably incorrect banking)\n");
 		LOAD_FX(mbcNone)
 	}
 }
@@ -121,6 +122,10 @@ static int read_rom (Cartucho *cart, const char *filename)
 
 	fseek(f, 0, SEEK_END);
 	cart->rom_size = ftell(f);
+	if (cart->rom_size <= 0) {
+		fclose(f);
+		return 0;
+	}
 	rewind(f);
 
 	cart->rom = malloc(cart->rom_size);
@@ -157,16 +162,39 @@ static void get_title (Cartucho *cart, uint32_t header_base)
 	cart->title[bytes] = '\0';
 }
 
+static void detect_m161 (Cartucho *cart)
+{
+	if ((cart->mbc_type != MBC1 && cart->mbc_type != MBC3) || cart->rom_size != 0x40000)
+		return;
+
+	int game_count = 0;
+	uint32_t offset = 0x8000;
+	for (int i = 1; i < 8; i++) {
+		if (valid_logo(cart, offset))
+			game_count++;
+		offset += 0x8000;
+	}
+	if (game_count == 0) return;
+
+	cart->mbc_type = M161;
+	cart->rom_bank = 0;
+	cart->mbc_mode = 0;
+
+	cart->battery = 0;
+	cart->has_rtc = 0;
+}
+
 static void parse_cart_header (Cartucho *cart, uint32_t header_base)
 {
 	normalize_mbc(cart, cart->rom[0x0147 + header_base]);
 	cart->multicart = is_multicart(cart);
 	get_title(cart, header_base);
+	detect_m161(cart);
 }
 
-static void get_cart_ram_size (Cartucho *cart)
+static void get_cart_ram_size (Cartucho *cart, uint32_t header_base)
 {
-	uint8_t ram_type = cart->rom[0x0149];
+	uint8_t ram_type = cart->rom[header_base + 0x0149];
 	uint32_t ram_sizes[] = {0, 2*1024, 8*1024, 32*1024, 128*1024, 64*1024};
 	cart->ram_size = (ram_type < 6) ? ram_sizes[ram_type] : 0;
 
@@ -175,6 +203,9 @@ static void get_cart_ram_size (Cartucho *cart)
 
 	if (cart->mbc_type == MBC7)
 		cart->ram_size = 256;
+
+	if (cart->mbc_type == M161)
+		cart->ram_size = 0;
 }
 
 static int cart_alloc_ram (Cartucho *cart)
@@ -228,7 +259,7 @@ int load_rom (Cartucho *cart, const char *filename)
 	uint32_t header_base = find_header_base(cart);
 	parse_cart_header(cart, header_base);
 
-	get_cart_ram_size(cart);
+	get_cart_ram_size(cart, header_base);
 	if (!cart_alloc_ram(cart)) return 0;
 
 	cart->mbc30 = is_mbc30(cart);
@@ -256,7 +287,8 @@ static void make_sav_path (const char *romfile, char *out, size_t outsize) {
 	memcpy(out + base_len, ".sav", 5);
 }
 
-static inline int read_int64 (FILE *f, int64_t *v) {
+static int read_int64 (FILE *f, int64_t *v)
+{
 	*v = 0;
 	for (int i = 0; i < 8; i++) {
 		int a = fgetc(f);
@@ -266,7 +298,8 @@ static inline int read_int64 (FILE *f, int64_t *v) {
 	return 1;
 }
 
-static inline int write_int64 (FILE *f, int64_t v) {
+static int write_int64 (FILE *f, int64_t v)
+{
 	for (int i = 0; i < 8; i++) {
 		uint8_t a = (v >> (i * 8)) & 0xFF;
 		if (fputc(a, f) == EOF) return 0;
