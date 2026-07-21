@@ -40,6 +40,9 @@ static void normalize_mbc (Cartucho *cart, uint8_t header_type) {
 	case 0x20: cart->mbc_type = MBC6; break;
 	case 0x22: cart->mbc_type = MBC7; cart->battery = 1; break;
 
+	case 0xFC: cart->mbc_type = HUC1; cart->battery = 1; break;
+	case 0xFF: cart->mbc_type = HUC1; cart->battery = 1; break;
+
 	default:
 		fprintf(stderr, "Cartucho: Unknown MBC type (0x%02X), considering as ROM only\n", header_type);
 		cart->mbc_type = MBC_NONE;
@@ -66,6 +69,7 @@ static void select_mbc_fx (Cartucho *cart) {
 	case MBC7:	LOAD_FX(mbc7)
 	case M161:	LOAD_FX(m161)
 	case MMM01:	LOAD_FX(mmm01)
+	case HUC1:	LOAD_FX(huc1)
 	default:
 		fprintf(stderr, "Cartridge: Current MBC unimplemented, using ROM-only (probably incorrect banking)\n");
 		LOAD_FX(mbcNone)
