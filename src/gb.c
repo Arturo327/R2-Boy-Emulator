@@ -29,6 +29,7 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile)
 	init_ppu(&gb->ppu);
 	init_apu(&gb->apu);
 	init_opcodes(&gb->opcodes);
+	init_printer(&gb->printer);
 
 	init_config_defaults(&gb->cfg);
 
@@ -145,6 +146,7 @@ void gb_step (GB *gb)
 
 	cpu_step(&gb->cpu);
 	save_state_step(gb);
+	printer_step(&gb->printer);
 	dma_step(gb);
 
 	uint16_t old_div = gb->timer.div;

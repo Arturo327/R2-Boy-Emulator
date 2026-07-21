@@ -57,7 +57,9 @@ static int catchup_shift (Serial *serial)
 static int master_step (Serial *serial, uint16_t old_div, uint16_t div)
 {
 	if (!serial->sent) {
-		if (link_is_connected(serial->link)) {
+		if (serial->printer) {
+			printer_send_byte(serial->printer, serial->SB);
+		} else if (link_is_connected(serial->link)) {
 			link_send_byte(serial->link, serial->SB);
 		}
 		serial->sent = 1;
@@ -67,7 +69,9 @@ static int master_step (Serial *serial, uint16_t old_div, uint16_t div)
 	if (div_bit) serial->clock++;
 
 	if (!serial->recived) {
-		if (!link_is_connected(serial->link)) {
+		if (serial->printer) {
+			serial->recived = printer_get_byte(serial->printer, &serial->buff);
+		} else if (!link_is_connected(serial->link)) {
 			serial->buff = 0xFF;
 			serial->recived = 1;
 		} else {

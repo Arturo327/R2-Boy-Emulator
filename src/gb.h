@@ -59,6 +59,7 @@ typedef struct GB {
 	Audio audio;
 	Gamepad pad;
 	Link link;
+	Printer printer;
 
 	Memory memory;
 	PPU ppu;

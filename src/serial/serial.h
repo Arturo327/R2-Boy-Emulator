@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "frontend/link.h"
+#include "frontend/printer.h"
 
 typedef struct Serial {
 	uint8_t SB;
@@ -17,6 +18,7 @@ typedef struct Serial {
 	uint8_t clock;
 
 	Link *link;
+	Printer *printer;
 } Serial;
 
 int serial_step (Serial *serial, uint16_t old_div, uint16_t div);

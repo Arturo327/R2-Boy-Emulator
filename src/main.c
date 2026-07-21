@@ -116,6 +116,10 @@ static inline void print_usage (const char *prog)
 	printf("	Connect to a remote Game Link host using the specified\n");
 	printf("	IP address and TCP port.\n\n");
 
+	printf("    --printer\n");
+	printf("	Use the Game Boy Printer. It will generate the output on <ROM>_NNN.bmp\n");
+	printf("	Can't be used at the same time that --link-host/--link-connect.\n\n");
+
 	printf("    --volume <0..100>\n");
 	printf("	Set the audio output volume. Default: 100.\n\n");
 
@@ -164,6 +168,8 @@ typedef struct {
 	char *romfile;
 	char *biosfile;
 	int debug;
+
+	int printer;
 	int link_host_port;
 	char *link_connect_addr;
 
@@ -186,12 +192,14 @@ static Args parse_args (int argc, char *argv[])
 		{"mute", no_argument, 0, 'M'},
 		{"palette", required_argument, 0, 'P'},
 		{"remap", no_argument, 0, 'R'},
+		{"printer", no_argument, 0, 'X'},
 		{0, 0, 0, 0}
 	};
 
 	Args args = {
 		.biosfile = "roms/bios.bin",
 		.debug = 0,
+		.printer = 0,
 		.link_host_port = 0,
 		.link_connect_addr = NULL,
 		.volume = -1,
@@ -222,6 +230,8 @@ static Args parse_args (int argc, char *argv[])
 			args.link_host_port = port;
 			break;
 		}
+		case 'X': args.printer = 1; break;
+
 		case 'V': {
 			char *end;
 			errno = 0;
@@ -254,6 +264,16 @@ static Args parse_args (int argc, char *argv[])
 
 static void init_link (GB *gb, Args args)
 {
+	if (args.printer) {
+		attach_printer(&gb->printer, args.romfile);
+		gb->serial.printer = &gb->printer;
+	}
+
+	if (args.printer && (args.link_host_port > 0 || args.link_connect_addr)) {
+		fprintf(stderr, "Warning: --printer and --link-connect/--link-host are mutually exclusive; using --printer\n");
+		return;
+	}
+
 	if (args.link_host_port > 0 && args.link_connect_addr)
 		fprintf(stderr, "Warning: --link-host and --link-connect are mutually exclusive; using --link-host\n");
 
@@ -266,7 +286,8 @@ static void init_link (GB *gb, Args args)
 		char *colon = strchr(args.link_connect_addr, ':');
 		if (colon) {
 			size_t len = (size_t)(colon - args.link_connect_addr);
-			if (len >= sizeof(ip)) len = sizeof(ip) - 1;
+			if (len >= sizeof(ip))
+				len = sizeof(ip) - 1;
 			memcpy(ip, args.link_connect_addr, len);
 
 			uint16_t port;

@@ -26,7 +26,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 - SDL-based graphics output
 - Keyboard and Gamepad input support
 - Testing support (headless debug mode for mooneye/Blargg ROMs)
-- Save game support with **autosave on a background thread**, so you won't loose your mewtwo even if you shutdown the computer.
+- Save game support with autosave on a background thread, so you don't loose your mewtwo even if you shutdown the computer
 - M-Cycle accurate
 - Link Cable support over TCP/IP
 - Frontend UX:
@@ -35,8 +35,8 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
   - Volume / mute control (runtime hotkeys + `--volume`/`--mute` flags)
   - Turbo / fast-forward (hold `Tab`; audio is muted while active)
   - Alternative color palettes (`--palette`, hotkey `P` to cycle)
-- Thread-safe autosave: SRAM/RTC writes are mutex-protected so the background saver never observes a torn snapshot
 - 2 Save State slots: save or load the Game Boy state just pressing a key
+- Game Boy Printer support. It saves the printed image on a file.
 
 ---
 
@@ -47,7 +47,7 @@ R2-Boy works correctly and runs every DMG compatible game I tested.
 This project is under active development.
 
 Planned:
-- Implement Game Boy Printer and Game Boy Camera
+- Implement Game Boy Camera
 - CGB (Game Boy Color) support (more in the future)
 
 ---
@@ -106,6 +106,7 @@ Common options:
 | `--remap`                    | Open the visual key-remap window and exit (saves on `S`, aborts on `ESC`/close) |
 | `--link-host <PORT>`         | Host a Game Link session on the given TCP port |
 | `--link-connect <IP>:<PORT>` | Connect to a Game Link host |
+| `--printer`                  | Use the Game Boy Printer and save the printed images on a file |
 | `-h`, `--help`               | Show help and exit |
 | `-v`, `--version`            | Show version and exit |
 
@@ -293,6 +294,7 @@ src/
 |   ├── config.c/.h
 |   ├── remap_ui.c/.h
 |   ├── gamepad.c/.h
+|   ├── printer.c/.h
 |   └── link.c/.h
 ├── ppu/
 |   ├── ppu.c/.h
