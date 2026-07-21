@@ -8,7 +8,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 
 - DMG (Original Game Boy) emulation
 - CPU instruction emulation (including halt-bug, OAM bug)
-- Memory bus implementation
+- Memory bus emulation
 - Cartridge loading. Supported mappings:
   - MBC1
   - MBC2
@@ -18,13 +18,15 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
   - MBC7 + acceleromter
   - MMM01
   - M161
+  - HuC1
+  - HuC-3
 - Timer emulation
 - PPU (Pixel Processing Unit) emulation
 - APU (Audio Processing Unit) emulation
 - SDL-based graphics output
 - Keyboard and Gamepad input support
 - Testing support (headless debug mode for mooneye/Blargg ROMs)
-- Save game support with **autosave on a background thread** (atomic `.tmp` + `rename`)
+- Save game support with **autosave on a background thread**, so you won't loose your mewtwo even if you shutdown the computer.
 - M-Cycle accurate
 - Link Cable support over TCP/IP
 - Frontend UX:
@@ -42,12 +44,10 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 
 R2-Boy works correctly and runs every DMG compatible game I tested.
 
-It won't run games with rare MBC types, due to HuC1 and HuC-3 are not yet implemented
-
 This project is under active development.
 
 Planned:
-- Implement remainig MBC types
+- Implement Game Boy Printer and Game Boy Camera
 - CGB (Game Boy Color) support (more in the future)
 
 ---
@@ -181,7 +181,7 @@ Runtime hotkey changes (volume, mute, palette) are written back to `config.ini` 
 
 ## Save Games & Autosave
 
-Battery-backed cartridges (MBC1/2/3/5 with battery; MBC3 + RTC) write their SRAM and RTC state to `<rom>.sav` next to the ROM, the same layout other DMG emulators use.
+Battery-backed cartridges write their SRAM and RTC state to `<rom>.sav` next to the ROM, the same layout other DMG emulators use.
 
 Saves run on a **dedicated background thread**:
 
@@ -219,6 +219,8 @@ For running tests like mooneye, use the option:
 
 In debug mode, video output is disabled and the emulator automatically checks the register values used by Mooneye test ROMs to determine whether the test passed.
 
+---
+
 ## Link Cable
 
 R2-Boy includes Link Cable support over TCP/IP, allowing two emulator instances to communicate across the network.
@@ -250,7 +252,7 @@ Client:
 
 Reconnection is supported; if the process terminates on either side, restarting it will re-establish the connection.
 
-However, most games don't handle mid-game reconnection and will simply freeze.
+However, most games don't handle mid-game reconnection and will probably simply freeze.
 
 ---
 
@@ -273,13 +275,34 @@ MIT
 ```
 src/
 ├── apu/
+|   └── apu.c/.h
 ├── bus/
+|   └── bus.c/.h
 ├── cartucho/
+|   ├── mbc/
+|   ├── cartucho.c/.h
+|   ├── savestate.c/.h
+|   └── save.c/.h
 ├── cpu/
+|   ├── opcodes/
+|   └── cpu.c/.h
 ├── frontend/
+|   ├── frontend.c/.h
+|   ├── lcd.c/.h
+|   ├── audio.c/.h
+|   ├── config.c/.h
+|   ├── remap_ui.c/.h
+|   ├── gamepad.c/.h
+|   └── link.c/.h
 ├── ppu/
+|   ├── ppu.c/.h
+|   ├── bg_fetcher.c/.h
+|   ├── sp_fetcher.c/.h
+|   └── types.h
 ├── serial/
+|   └── serial.c/.h
 ├── timer/
+|   └── timer.c/.h
 ├── gb.c
 ├── gb.h
 └── main.c

@@ -40,7 +40,7 @@ static void normalize_mbc (Cartucho *cart, uint8_t header_type) {
 	case 0x20: cart->mbc_type = MBC6; break;
 	case 0x22: cart->mbc_type = MBC7; cart->battery = 1; break;
 
-	case 0xFC: cart->mbc_type = HUC1; cart->battery = 1; break;
+	case 0xFE: cart->mbc_type = HUC3; cart->battery = 1; break;
 	case 0xFF: cart->mbc_type = HUC1; cart->battery = 1; break;
 
 	default:
@@ -70,6 +70,7 @@ static void select_mbc_fx (Cartucho *cart) {
 	case M161:	LOAD_FX(m161)
 	case MMM01:	LOAD_FX(mmm01)
 	case HUC1:	LOAD_FX(huc1)
+	case HUC3:	LOAD_FX(huc3)
 	default:
 		fprintf(stderr, "Cartridge: Current MBC unimplemented, using ROM-only (probably incorrect banking)\n");
 		LOAD_FX(mbcNone)
@@ -247,6 +248,10 @@ static int init_special_mbcs (Cartucho *cart)
 		fprintf(stderr, "Cartucho: not enough memory for the MMM01\n");
 		return 0;
 	}
+	if (cart->mbc_type == HUC3 && !huc3_init(cart)) {
+		fprintf(stderr, "Cartucho: not enough memory for the HuC-3\n");
+		return 0;
+	}
 	if (cart->has_rtc && !rtc_init(cart)) {
 		fprintf(stderr, "Cartucho: not enough memory for the RTC\n");
 		return 0;
@@ -275,183 +280,12 @@ int load_rom (Cartucho *cart, const char *filename)
 	return 1;
 }
 
-static void make_sav_path (const char *romfile, char *out, size_t outsize) {
-	size_t len = strlen(romfile);
-	const char *dot = strrchr(romfile, '.');
-	const char *slash = strrchr(romfile, '/');
-
-	size_t base_len = len;
-	if (dot && (!slash || dot > slash)) {
-		base_len = (size_t)(dot - romfile);
-	}
-
-	if (base_len > outsize - 5) base_len = outsize - 5;
-
-	memcpy(out, romfile, base_len);
-	memcpy(out + base_len, ".sav", 5);
-}
-
-static int read_int64 (FILE *f, int64_t *v)
-{
-	*v = 0;
-	for (int i = 0; i < 8; i++) {
-		int a = fgetc(f);
-		if (a == EOF) return 0;
-		*v |= (int64_t)((uint64_t)(uint8_t)a) << (i * 8);
-	}
-	return 1;
-}
-
-static int write_int64 (FILE *f, int64_t v)
-{
-	for (int i = 0; i < 8; i++) {
-		uint8_t a = (v >> (i * 8)) & 0xFF;
-		if (fputc(a, f) == EOF) return 0;
-	}
-	return 1;
-}
-
-static void load_rtc_data (RTC *rtc, uint8_t *buf, int64_t base)
-{
-	rtc->s = buf[0] & 0x3F;
-	rtc->m = buf[1] & 0x3F;
-	rtc->h = buf[2] & 0x1F;
-	rtc->d = ((uint16_t)(buf[4] & 0x01) << 8) | buf[3];
-	rtc->halt = (buf[4] & 0x40) != 0;
-	rtc->carry = (buf[4] & 0x80) != 0;
-	rtc->base = (time_t) base;
-
-	rtc->s_l = rtc->s;
-	rtc->m_l = rtc->m;
-	rtc->h_l = rtc->h;
-	rtc->d_l = rtc->d;
-	rtc->halt_l = rtc->halt;
-	rtc->carry_l = rtc->carry;
-}
-
-int load_sram (Cartucho *cart, const char *romfile)
-{
-	if (!cart->battery) return 0;
-	if ((!cart->ram || cart->ram_size == 0) && !cart->has_rtc) return 0;
-
-	char path[512];
-	make_sav_path(romfile, path, sizeof(path));
-
-	FILE *f = fopen(path, "rb");
-	if (!f) return 0;
-
-	if (cart->ram && cart->ram_size > 0) {
-		size_t a = fread(cart->ram, 1, cart->ram_size, f);
-		if (a != cart->ram_size) {
-			fprintf(stderr, "Could not load saved game %s\n", path);
-			fclose(f);
-			return 0;
-		}
-	}
-
-	if (cart->has_rtc) {
-		uint8_t buf[5];
-		int64_t base;
-
-		if (fread(buf, 1, 5, f) == 5 && read_int64(f, &base)) {
-			load_rtc_data((RTC *)cart->state, buf, base);
-		} else {
-			printf("No RTC data in %s, starting clock fresh\n", path);
-		}
-	}
-
-	fclose(f);
-	printf("Loaded game: %s\n", path);
-	return 1;
-}
-
-static int write_sav_file (const char *savefile, const uint8_t *ram,
-			uint32_t ram_size, const RTC *rtc)
-{
-	char tmp_path[520];
-	int n = snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", savefile);
-	if (n < 0 || (size_t)n >= sizeof(tmp_path)) {
-		fprintf(stderr, "Save path too long: %s\n", savefile);
-		return 0;
-	}
-
-	FILE *f = fopen(tmp_path, "wb");
-	if (!f) {
-		fprintf(stderr, "Could not save game %s\n", savefile);
-		return 0;
-	}
-
-	if (ram && ram_size > 0)
-		if (fwrite(ram, 1, ram_size, f) != ram_size) goto fail;
-
-	if (rtc) {
-		uint8_t dh = ((rtc->d >> 8) & 0x01)
-			| (rtc->halt  ? 0x40 : 0)
-			| (rtc->carry ? 0x80 : 0);
-		uint8_t buf[5] = { rtc->s, rtc->m, rtc->h,
-				(uint8_t)(rtc->d & 0xFF), dh };
-		int64_t base = (int64_t) rtc->base;
-
-		if (fwrite(buf, 1, 5, f) != 5) goto fail;
-		if (!write_int64(f, base)) goto fail;
-	}
-
-	if (fflush(f) != 0) goto fail;
-	if (fclose(f) != 0) {
-		fprintf(stderr, "Could not save game. File %s was corrupted\n", savefile);
-		remove(tmp_path);
-		return 0;
-	}
-	if (rename(tmp_path, savefile) != 0) {
-		fprintf(stderr, "Could not rename temp save to %s\n", savefile);
-		remove(tmp_path);
-		return 0;
-	}
-	return 1;
-
-fail:
-	fprintf(stderr, "Could not save game. File %s was corrupted\n", savefile);
-	fclose(f);
-	remove(tmp_path);
-	return 0;
-}
-
-int save_sram (Cartucho *cart, const char *romfile)
-{
-	if (!cart->battery) return 0;
-	if ((!cart->ram || cart->ram_size == 0) && !cart->has_rtc) return 0;
-
-	char savefile[512];
-	make_sav_path(romfile, savefile, sizeof(savefile));
-
-	int save_success = write_sav_file(savefile, cart->ram, cart->ram_size,
-					cart->has_rtc ? cart->state : NULL);
-
-	if (save_success) {
-		printf("Saved game: %s\n", savefile);
-		return 1;
-	}
-	return 0;
-}
-
-void save_sram_snapshot (Cartucho *cart, const char *romfile,
-			 const uint8_t *ram_snap, uint32_t ram_size,
-			 const RTC *rtc_snap)
-{
-	if (!cart->battery) return;
-	if ((!ram_snap || ram_size == 0) && !cart->has_rtc) return;
-
-	char path[512];
-	make_sav_path(romfile, path, sizeof(path));
-	write_sav_file(path, ram_snap, ram_size,
-			cart->has_rtc ? rtc_snap : NULL);
-}
-
 void free_cart (Cartucho *cart)
 {
 	if (cart->mbc_type == MBC6) mbc6_free(cart);
 	if (cart->mbc_type == MBC7) mbc7_free(cart);
 	if (cart->mbc_type == MMM01) mmm01_free(cart);
+	if (cart->mbc_type == HUC3) huc3_free(cart);
 	if (cart->has_rtc) rtc_free(cart);
 	free(cart->rom);
 	free(cart->ram);

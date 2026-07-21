@@ -11,6 +11,7 @@
 #include "cartucho/mbc/m161.h"
 #include "cartucho/mbc/mmm01.h"
 #include "cartucho/mbc/huc1.h"
+#include "cartucho/mbc/huc3.h"
 
 #include <stdint.h>
 
@@ -26,7 +27,8 @@ typedef enum {
 	MBC7,
 	M161,
 	MMM01,
-	HUC1
+	HUC1,
+	HUC3
 } MBC_Type;
 
 typedef struct Cartucho {
@@ -66,12 +68,6 @@ typedef struct Cartucho {
 } Cartucho;
 
 int load_rom (Cartucho *cart, const char *filename);
-
-int load_sram (Cartucho *cart, const char *romfile);
-int save_sram (Cartucho *cart, const char *romfile);
-void save_sram_snapshot (Cartucho *cart, const char *romfile, const uint8_t *ram_snap,
-			uint32_t ram_size, const RTC *rtc_snap);
-
 void free_cart (Cartucho *cart);
 
 #endif

@@ -7,6 +7,7 @@
 #define AUTOSAVE_INTERVAL_MS 5000
 
 typedef struct GB GB;
+typedef struct Cartucho Cartucho;
 
 typedef struct AutoSave {
 	pthread_mutex_t lock;
@@ -20,5 +21,7 @@ typedef struct AutoSave {
 void request_save (GB *gb);
 void start_save_thread (GB *gb, const char *romfile);
 void stop_save_thread (GB *gb);
+int load_sram (Cartucho *cart, const char *romfile);
+int save_sram (Cartucho *cart, const char *romfile);
 
 #endif

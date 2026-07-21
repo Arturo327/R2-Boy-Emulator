@@ -79,6 +79,19 @@ static void io_mbc7 (SaveState *s, MBC7State *m)
 	io_num(s, &m->ee_state);
 }
 
+static void io_huc3 (SaveState *s, HuC3State *h)
+{
+	io_num(s, &h->select);
+	io_num(s, &h->cmd);
+	io_num(s, &h->arg);
+	io_num(s, &h->addr);
+	io_num(s, &h->response);
+	io_num(s, &h->ready);
+	io_num(s, &h->ir);
+	io_buf(s, h->mem, sizeof(h->mem));
+	io_num(s, &h->base);
+}
+
 static void io_cart (SaveState *s, GB *gb)
 {
 	Cartucho *cart = &gb->memory.cart;
@@ -96,6 +109,7 @@ static void io_cart (SaveState *s, GB *gb)
 	if (cart->mbc_type == MBC6) io_mbc6(s, (MBC6State *)cart->state);
 	if (cart->mbc_type == MBC7) io_mbc7(s, (MBC7State *)cart->state);
 	if (cart->mbc_type == MMM01) io_buf(s, (MMM01Regs *)cart->state, sizeof(MMM01Regs));
+	if (cart->mbc_type == HUC3) io_huc3(s, (HuC3State *)cart->state);
 	uint32_t ram_size = cart->ram_size;
 	io_num(s, &ram_size);
 	pthread_mutex_unlock(&gb->save.lock);
