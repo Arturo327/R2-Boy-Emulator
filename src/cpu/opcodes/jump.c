@@ -111,7 +111,7 @@ static void decode_ret_nc (GB *gb) {		// 0xD0
 
 static void reti (GB *gb) {			// 0xD9
 	gb->cpu.pc = gb->cpu.wz;
-	gb->cpu.bus->interrupts->IME = 1;
+	gb->interrupts.IME = 1;
 }
 static void decode_reti (GB *gb) {
 	push_mcycle(gb, pop_l_z);

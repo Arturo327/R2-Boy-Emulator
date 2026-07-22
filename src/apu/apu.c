@@ -8,12 +8,14 @@ static const uint8_t DUTY_TABLE[4] = { 0x01, 0x81, 0x87, 0x7E };
 static const uint16_t NOISE_DIVISOR[8] = {8,16,32,48,64,80,96,112};
 static const uint8_t WAVE_SHIFT[4] = {4, 0, 1, 2};
  
-void init_apu (APU *apu) {
+void init_apu (APU *apu)
+{
 	memset(apu, 0, sizeof(APU));
 	apu->sample_rate = 44100;
 }
  
-void init_apu_reg (APU *apu) {
+void init_apu_reg (APU *apu)
+{
 	apu->nr10 = 0x80;
 	apu->nr11 = 0xBF;
 	apu->nr12 = 0xF3;
@@ -306,7 +308,8 @@ static int16_t dac_ch4 (APU *apu)
 	return bit ? (int16_t)ch->volume : -(int16_t)ch->volume;
 }
 
-static Sample mixer (APU *apu, AnalogChannels chs) {
+static Sample mixer (APU *apu, AnalogChannels chs)
+{
 	Sample s;
 
 	s.right = (apu->nr51 & 0x01) ? chs.ch1 : 0;
@@ -324,12 +327,14 @@ static Sample mixer (APU *apu, AnalogChannels chs) {
 	return s;
 }
 
-static void volume (APU *apu, Sample *s) {
+static void volume (APU *apu, Sample *s)
+{
 	s->right = s->right * ((apu->nr50 & 0x07) + 1) * MASTER_GAIN;
 	s->left = s->left * (((apu->nr50 & 0x70) >> 4) + 1) * MASTER_GAIN;
 }
 
-static void HPF (APU *apu, Sample *s) {
+static void HPF (APU *apu, Sample *s)
+{
 	int32_t r = s->right - apu->right_capacitor;
 	apu->right_capacitor += r >> 10;
 	s->right = (int16_t) r;
@@ -339,7 +344,8 @@ static void HPF (APU *apu, Sample *s) {
 	s->left = (int16_t) l;
 }
 
-static Sample mix_channels_raw (APU *apu) {
+static Sample mix_channels_raw (APU *apu)
+{
 	AnalogChannels chs;
 	chs.ch1 = dac(&apu->ch1.ch, apu->nr11);
 	chs.ch2 = dac(&apu->ch2, apu->nr21);

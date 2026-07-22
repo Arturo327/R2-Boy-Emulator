@@ -88,14 +88,14 @@ int load_sram (Cartucho *cart, const char *romfile)
 		if (fread(buf, 1, 5, f) == 5 && read_int64(f, &base)) {
 			load_rtc_data((RTC *)cart->state, buf, base);
 		} else {
-			printf("No RTC data in %s, starting clock fresh\n", path);
+			fprintf(stderr, "No RTC data in %s, starting clock fresh\n", path);
 		}
 	}
 
 	if (cart->mbc_type == HUC3) {
 		HuC3State *h = (HuC3State *)cart->state;
 		if (fread(h->mem, 1, 256, f) != 256 || !read_int64(f, &h->base)) {
-			printf("No RTC data in %s, starting clock fresh\n", path);
+			fprintf(stderr, "No RTC data in %s, starting clock fresh\n", path);
 		}
 		h->select = 0;
 		h->cmd = 0;
@@ -122,8 +122,13 @@ static int write_sav_file (const char *savefile, const uint8_t *ram, uint32_t ra
 	}
 
 	FILE *f = fopen(tmp_path, "wb");
-	if (!f) goto fail;
+	if (!f) {
+		fprintf(stderr, "Could not save game\n");
+		remove(tmp_path);
+		return 0;
+	}
 
+	int closed = 0;
 	if (ram && ram_size > 0)
 		if (fwrite(ram, 1, ram_size, f) != ram_size) goto fail;
 
@@ -144,13 +149,15 @@ static int write_sav_file (const char *savefile, const uint8_t *ram, uint32_t ra
 
 	if (fflush(f)) goto fail;
 	if (fclose(f)) goto fail;
+	closed = 1;
+
 	if (rename(tmp_path, savefile)) goto fail;
 	return 1;
 
 fail:
-	fprintf(stderr, "Could not save game\n");
-	fclose(f);
+	if (!closed) fclose(f);
 	remove(tmp_path);
+	fprintf(stderr, "Could not save game\n");
 	return 0;
 }
 

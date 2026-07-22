@@ -3,6 +3,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+#define LYC_INT_SELECT 0x40
+#define MODE2_INT_SELECT 0x20
+#define MODE1_INT_SELECT 0x10
+#define MODE0_INT_SELECT 0x08
+#define LYC_LY 0x04
+
 void init_ppu_reg (PPU *ppu)
 {
 	ppu->lcdc = 0x91;
@@ -25,12 +31,12 @@ void init_ppu (PPU *ppu)
 static void update_stat_line_ex (PPU *ppu, int force_mode2)
 {
 	int line = 0;
-	if ((ppu->stat & 0x40) && (ppu->stat & 0x04)) line = 1;
-	if ((ppu->stat & 0x20) && (ppu->mode == OAM_SCAN || force_mode2)) line = 1;
-	if ((ppu->stat & 0x10) && ppu->mode == VBLANK) line = 1;
-	if ((ppu->stat & 0x08) && ppu->mode == HBLANK) line = 1;
+	if ((ppu->stat & LYC_INT_SELECT) && (ppu->stat & LYC_LY)) line = 1;
+	if ((ppu->stat & MODE2_INT_SELECT) && (ppu->mode == OAM_SCAN || force_mode2)) line = 1;
+	if ((ppu->stat & MODE1_INT_SELECT) && ppu->mode == VBLANK) line = 1;
+	if ((ppu->stat & MODE0_INT_SELECT) && ppu->mode == HBLANK) line = 1;
 
-	if (line && !ppu->stat_line && (ppu->lcdc & 0x80))
+	if (line && !ppu->stat_line && (ppu->lcdc & PPU_ENABLE))
 		ppu->bus->interrupts->IF |= 0x02;
 
 	ppu->stat_line = line;
@@ -43,9 +49,9 @@ void update_stat_line (PPU *ppu) {
 void check_lyc (PPU *ppu)
 {
 	if (ppu->ly == ppu->lyc) {
-		ppu->stat |= 0x04;
+		ppu->stat |= LYC_LY;
 	} else {
-		ppu->stat &= ~0x04;
+		ppu->stat &= ~LYC_LY;
 	}
 	update_stat_line(ppu);
 }
@@ -55,7 +61,7 @@ static void check_lyc_delayed (PPU *ppu)
 	if (ppu->ly == ppu->lyc) {
 		ppu->lyc_delay = 2;
 	} else {
-		ppu->stat &= ~0x04;
+		ppu->stat &= ~LYC_LY;
 		update_stat_line(ppu);
 	}
 }
@@ -174,7 +180,7 @@ static inline void begin_sprite_delay (PPU *ppu)
 
 static int handle_sprites (PPU *ppu)
 {
-	if (!ppu->sp.sprite_active && !ppu->sp.sprite_waiting && (ppu->lcdc & 0x02))
+	if (!ppu->sp.sprite_active && !ppu->sp.sprite_waiting && (ppu->lcdc & SP_ENABLE))
 		start_sprites(ppu);
 
 	if (ppu->sp.sprite_waiting && ppu->bg.num_fifo > 0) {
@@ -185,7 +191,7 @@ static int handle_sprites (PPU *ppu)
 	if (ppu->sp.sprite_active) {
 		sprite_fetch(ppu);
 
-		if (!ppu->sp.sprite_active && !ppu->sp.sprite_waiting && (ppu->lcdc & 0x02))
+		if (!ppu->sp.sprite_active && !ppu->sp.sprite_waiting && (ppu->lcdc & SP_ENABLE))
 			start_sprites(ppu);
 
 		if (ppu->sp.sprite_waiting) {
@@ -236,13 +242,13 @@ static int dot_line_step (PPU *ppu)
 
 static void scan_oam (PPU *ppu, int x)
 {
-	if (!(ppu->lcdc & 0x02)) return;
+	if (!(ppu->lcdc & SP_ENABLE)) return;
 	if (ppu->sp.num_sprites >= 10) return;
 	GB *gb = (GB *)ppu->bus->ctx;
 	Sprite *sp = (Sprite *)(gb->memory.oam + (x << 2));
 
 	int sprite_y = (int)sp->y - 16;
-	int sprite_h = (ppu->lcdc & 0x04) ? 16 : 8;
+	int sprite_h = (ppu->lcdc & SP_SIZE) ? 16 : 8;
 	if ((int)ppu->ly >= sprite_y && (int)ppu->ly < sprite_y + sprite_h) {
 		ppu->sp.sprites[ppu->sp.num_sprites++] = *sp;
 	}
@@ -401,7 +407,7 @@ static int handle_oam_scan (PPU *ppu)
 
 void ppu_step (PPU *ppu)
 {
-	if (!(ppu->lcdc & 0x80)) {
+	if (!(ppu->lcdc & PPU_ENABLE)) {
 		turn_lcd_off(ppu);
 		return;
 	}
@@ -416,7 +422,7 @@ void ppu_step (PPU *ppu)
 	while (time_dots > 0) {
 
 		if (ppu->lyc_delay > 0 && --ppu->lyc_delay == 0) {
-			ppu->stat |= 0x04;
+			ppu->stat |= LYC_LY;
 			update_stat_line(ppu);
 		}
 

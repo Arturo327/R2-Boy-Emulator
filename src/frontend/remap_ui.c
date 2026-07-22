@@ -22,6 +22,7 @@ static int is_modifier_scancode (SDL_Scancode sc)
 static TTF_Font *open_font (int size)
 {
 	static const char *fonts[] = {
+		/* Linux */
 		"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
 		"/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
 		"/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
@@ -29,12 +30,52 @@ static TTF_Font *open_font (int size)
 		"/usr/share/fonts/truetype/freefont/FreeSans.ttf",
 		"/usr/share/fonts/TTF/DejaVuSans.ttf",
 		"/usr/local/share/fonts/dejavu/DejaVuSans.ttf",
+		/* macOS (system + user fonts) */
+		"/System/Library/Fonts/Helvetica.ttc",
+		"/System/Library/Fonts/SFNSMono.ttf",
+		"/System/Library/Fonts/Supplemental/Arial.ttf",
+		"/Library/Fonts/Arial.ttf",
+		"$HOME/Library/Fonts/Arial.ttf",
 	};
 	int n = sizeof(fonts) / sizeof(fonts[0]);
 	for (int i = 0; i < n; i++) {
-		TTF_Font *f = TTF_OpenFont(fonts[i], size);
+		char path[512];
+		const char *p = fonts[i];
+		if (strncmp(p, "$HOME/", 6) == 0) {
+			const char *home = getenv("HOME");
+			if (!home) continue;
+			snprintf(path, sizeof(path), "%s/%s", home, p + 6);
+			p = path;
+		}
+		TTF_Font *f = TTF_OpenFont(p, size);
 		if (f) return f;
 	}
+
+	const char *xdg = getenv("XDG_DATA_HOME");
+	char path[600];
+	const char *candidates[] = {
+		"/fonts/dejavu/DejaVuSans.ttf",
+		"/fonts/DejaVuSans.ttf",
+	};
+	size_t ncand = sizeof(candidates) / sizeof(candidates[0]);
+
+	for (size_t i = 0; i < ncand; i++) {
+		if (xdg && *xdg) {
+			snprintf(path, sizeof(path), "%s%s", xdg, candidates[i]);
+			TTF_Font *f = TTF_OpenFont(path, size);
+			if (f) return f;
+		}
+	}
+
+	const char *home = getenv("HOME");
+	if (home && *home) {
+		for (size_t i = 0; i < ncand; i++) {
+			snprintf(path, sizeof(path), "%s/.local/share%s", home, candidates[i]);
+			TTF_Font *f = TTF_OpenFont(path, size);
+			if (f) return f;
+		}
+	}
+
 	return NULL;
 }
 
@@ -88,8 +129,10 @@ static int init_font (SdlFrontend *sdl)
 {
 	TTF_Font *font = open_font(18);
 	if (!font) {
-		fprintf(stderr, "No usable TTF font found under /usr/share/fonts\n");
-		fprintf(stderr, "Install fonts-dejavu-core or similar.\n");
+		fprintf(stderr, "No usable TTF font found.\n");
+		fprintf(stderr, "Linux:  install fonts-dejavu-core or similar.\n");
+		fprintf(stderr, "macOS:  copy a .ttf to ~/Library/Fonts/.\n");
+
 		SDL_DestroyRenderer(sdl->ren);
 		SDL_DestroyWindow(sdl->win);
 		TTF_Quit();

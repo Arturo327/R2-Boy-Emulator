@@ -12,7 +12,10 @@ int mbc6_init (Cartucho *cart)
 
 	MBC6State *mbc6 = (MBC6State *)cart->state;
 	mbc6->flash.data = malloc(MBC6_FLASH_SIZE);
-	if (!mbc6->flash.data) return 0;
+	if (!mbc6->flash.data) {
+		free(cart->state);
+		return 0;
+	}
 
 	memset(mbc6->flash.data, 0xFF, MBC6_FLASH_SIZE);
 	memset(mbc6->flash.hidden, 0xFF, sizeof(mbc6->flash.hidden));

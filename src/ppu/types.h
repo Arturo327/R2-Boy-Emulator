@@ -10,6 +10,15 @@
 #define DRAWING_LINES 144
 #define TOTAL_LINES 154
 
+#define PPU_ENABLE 0x80
+#define WIN_TILE_MAP 0x40
+#define WIN_ENABLE 0x20
+#define BG_WIN_TILES 0x10
+#define BG_TILE_MAP 0x08
+#define SP_SIZE 0x04
+#define SP_ENABLE 0x02
+#define BG_WIN_PRIO 0x01
+
 typedef enum {
 	HBLANK,
 	VBLANK,

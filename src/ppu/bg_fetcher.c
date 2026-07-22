@@ -10,18 +10,18 @@ uint8_t bg_fifo_pop (PPU *ppu) {
 
 static void start_window (PPU *ppu)
 {
-	if (!ppu->bg.window_active && (ppu->lcdc & 0x20) && ppu->ly >= ppu->wy) {
-		int win_start = (ppu->wx < 7) ? 0 : (ppu->wx - 7);
-		if (ppu->x == win_start) {
-			ppu->bg.window_active = 1;
-			ppu->bg.fetcher_t = 0;
-			ppu->fetch_x = 0;
-			ppu->bg.num_fifo = 0;
-			ppu->bg.discard = 0;
-			ppu->bg.discard_px = 0;
-			ppu->bg.startup_tiles = 0;
-		}
-	}
+	if (ppu->bg.window_active || !(ppu->lcdc & WIN_ENABLE) || ppu->ly < ppu->wy) return;
+
+	int win_start = (ppu->wx < 7) ? 0 : (ppu->wx - 7);
+	if (ppu->x != win_start) return;
+
+	ppu->bg.window_active = 1;
+	ppu->bg.fetcher_t = 0;
+	ppu->fetch_x = 0;
+	ppu->bg.num_fifo = 0;
+	ppu->bg.discard = 0;
+	ppu->bg.discard_px = 0;
+	ppu->bg.startup_tiles = 0;
 }
 
 static void fetch_tile_id (GB *gb, PPU *ppu)
@@ -33,14 +33,14 @@ static void fetch_tile_id (GB *gb, PPU *ppu)
 	if (ppu->bg.window_active) {
 		tile_x = ppu->fetch_x >> 3;
 		tile_y = ppu->bg.window_line >> 3;
-		tile_map_base = (ppu->lcdc & 0x40) ? 0x1C00 : 0x1800;
+		tile_map_base = (ppu->lcdc & WIN_TILE_MAP) ? 0x1C00 : 0x1800;
 		ppu->bg.fetcher_bit_y = ppu->bg.window_line & 7;
 	} else {
 		uint8_t bg_x = ppu->fetch_x;
 		uint8_t bg_y = ppu->scy + ppu->ly;
 		tile_x = bg_x >> 3;
 		tile_y = bg_y >> 3;
-		tile_map_base = (ppu->lcdc & 0x08) ? 0x1C00 : 0x1800;
+		tile_map_base = (ppu->lcdc & BG_TILE_MAP) ? 0x1C00 : 0x1800;
 		ppu->bg.fetcher_bit_y = bg_y & 7;
 	}
 
@@ -52,7 +52,7 @@ static void fetch_tile_id (GB *gb, PPU *ppu)
 static void fetch_tile_low (GB *gb, PPU *ppu)
 {
 	uint16_t tile_addr = 0;
-	if (ppu->lcdc & 0x10) tile_addr = ppu->bg.fetcher_tile_id << 4;
+	if (ppu->lcdc & BG_WIN_TILES) tile_addr = ppu->bg.fetcher_tile_id << 4;
 	else tile_addr = 0x1000 + (((int16_t)(int8_t)ppu->bg.fetcher_tile_id) << 4);
 	uint8_t l = gb->memory.vram[tile_addr + (ppu->bg.fetcher_bit_y << 1)];
 
@@ -65,7 +65,7 @@ static void fetch_tile_low (GB *gb, PPU *ppu)
 static void fetch_tile_high (GB *gb, PPU *ppu)
 {
 	uint16_t tile_addr = 0;
-	if (ppu->lcdc & 0x10) tile_addr = ppu->bg.fetcher_tile_id << 4;
+	if (ppu->lcdc & BG_WIN_TILES) tile_addr = ppu->bg.fetcher_tile_id << 4;
 	else tile_addr = 0x1000 + (((int16_t)(int8_t)ppu->bg.fetcher_tile_id) << 4);
 	uint8_t h = gb->memory.vram[tile_addr + (ppu->bg.fetcher_bit_y << 1) + 1];
 

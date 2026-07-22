@@ -7,8 +7,8 @@
 
 int init_screen (LCD *lcd, const char *game_title)
 {
-	char final_title[26] = "R2-Boy - ";
-	strcat(final_title, game_title);
+	char final_title[32];
+	snprintf(final_title, sizeof(final_title), "R2-Boy - %s", game_title ? game_title : "");
 
 	lcd->window = SDL_CreateWindow(
 		final_title,
@@ -61,9 +61,18 @@ int init_screen (LCD *lcd, const char *game_title)
 
 void cleanup_screen (LCD *lcd)
 {
-	if (lcd->texture) { SDL_DestroyTexture(lcd->texture); lcd->texture  = NULL; }
-	if (lcd->renderer) { SDL_DestroyRenderer(lcd->renderer); lcd->renderer = NULL; }
-	if (lcd->window) { SDL_DestroyWindow(lcd->window); lcd->window = NULL; }
+	if (lcd->texture) {
+		SDL_DestroyTexture(lcd->texture);
+		lcd->texture = NULL;
+	}
+	if (lcd->renderer) {
+		SDL_DestroyRenderer(lcd->renderer);
+		lcd->renderer = NULL;
+	}
+	if (lcd->window) {
+		SDL_DestroyWindow(lcd->window);
+		lcd->window = NULL;
+	}
 }
 
 void update_screen (LCD *lcd, uint32_t *framebuffer, uint8_t rumble)

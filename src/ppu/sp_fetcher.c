@@ -1,6 +1,11 @@
 #include "ppu/sp_fetcher.h"
 #include "gb.h"
 
+#define PRIORITY 0x80
+#define Y_FLIP 0x40
+#define X_FLIP 0x20
+#define PALETTE 0x10
+
 void start_sprites (PPU *ppu) {
 
 	if (ppu->x <= 1) {
@@ -43,12 +48,12 @@ static void get_sp_addr (PPU *ppu)
 
 	int line = (int)ppu->ly - ((int)ppu->sp.sprites[ppu->sp.sel_sprite].y - 16);
 
-	uint8_t sp_h = (ppu->lcdc & 0x04) ? 16 : 8;
-	uint8_t tile_line = (ppu->sp.sprites[ppu->sp.sel_sprite].flags & 0x40) ?
+	uint8_t sp_h = (ppu->lcdc & SP_SIZE) ? 16 : 8;
+	uint8_t tile_line = (ppu->sp.sprites[ppu->sp.sel_sprite].flags & Y_FLIP) ?
 		(sp_h - 1 - line) : line;
 
 	uint8_t tile = ppu->sp.sprites[ppu->sp.sel_sprite].tile;
-	if (ppu->lcdc & 0x04) tile &= 0xFE;
+	if (ppu->lcdc & SP_SIZE) tile &= 0xFE;
 	ppu->sp.addr = tile << 4;
 	ppu->sp.addr += tile_line << 1;
 }
@@ -57,10 +62,10 @@ static void fetch_tile_low (PPU *ppu, GB *gb)
 {
 	uint8_t l = gb->memory.vram[ppu->sp.addr];
 	for (int i = 0; i < 8; i++) {
-		uint8_t bit = (ppu->sp.sprites[ppu->sp.sel_sprite].flags & 0x20) ?
+		uint8_t bit = (ppu->sp.sprites[ppu->sp.sel_sprite].flags & X_FLIP) ?
 			i : 7 - i;
 		ppu->sp.buff[i].color = (l >> bit) & 1;
-		ppu->sp.buff[i].pal = (ppu->sp.sprites[ppu->sp.sel_sprite].flags & 0x10) ?
+		ppu->sp.buff[i].pal = (ppu->sp.sprites[ppu->sp.sel_sprite].flags & PALETTE) ?
 			ppu->obp1 : ppu->obp0;
 	}
 }
@@ -69,10 +74,10 @@ static void fetch_tile_high (PPU *ppu, GB *gb)
 {
 	uint8_t h = gb->memory.vram[ppu->sp.addr + 1];
 	for (int i = 0; i < 8; i++) {
-		uint8_t bit = (ppu->sp.sprites[ppu->sp.sel_sprite].flags & 0x20) ?
+		uint8_t bit = (ppu->sp.sprites[ppu->sp.sel_sprite].flags & X_FLIP) ?
 			i : 7 - i;
 		ppu->sp.buff[i].color |= ((h >> bit) & 1) << 1;
-		ppu->sp.buff[i].bg_prio = ppu->sp.sprites[ppu->sp.sel_sprite].flags & 0x80;
+		ppu->sp.buff[i].bg_prio = ppu->sp.sprites[ppu->sp.sel_sprite].flags & PRIORITY;
 	}
 }
 
