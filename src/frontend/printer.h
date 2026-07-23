@@ -50,7 +50,6 @@ typedef struct Printer {
 	uint32_t print_cycles;
 	uint8_t reply;
 
-	int print_count;
 	char path_prefix[512];
 } Printer;
 

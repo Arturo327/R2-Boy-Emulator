@@ -35,7 +35,7 @@ typedef struct {
 	Keybind right, left, up, down;
 	Keybind a, b, start, select;
 	Keybind turbo, mute, palette;
-	Keybind vol_up, vol_down;
+	Keybind vol_up, vol_down, screenshot;
 	Keybind save_1, load_1, save_2, load_2;
 	Keybind tilt_right, tilt_left, tilt_up, tilt_down;
 } Keymap;
@@ -43,7 +43,7 @@ typedef struct {
 typedef struct {
 	SDL_GameControllerButton right, left, up, down;
 	SDL_GameControllerButton a, b, start, select;
-	SDL_GameControllerButton turbo, mute, palette, vol_up, vol_down;
+	SDL_GameControllerButton turbo, mute, palette, vol_up, vol_down, screenshot;
 	SDL_GameControllerButton save_1, load_1, save_2, load_2;
 	SDL_GameControllerButton tilt_right, tilt_left, tilt_up, tilt_down;
 } Padmap;
@@ -52,7 +52,7 @@ typedef enum {
 	ACT_RIGHT = 0, ACT_LEFT, ACT_UP, ACT_DOWN,
 	ACT_A, ACT_B, ACT_START, ACT_SELECT,
 	ACT_TURBO, ACT_SAVE1, ACT_LOAD1, ACT_SAVE2, ACT_LOAD2,
-	ACT_MUTE, ACT_PALETTE, ACT_VOL_UP, ACT_VOL_DOWN,
+	ACT_MUTE, ACT_PALETTE, ACT_VOL_UP, ACT_VOL_DOWN, ACT_SCREENSHOT,
 	ACT_TILT_RIGHT, ACT_TILT_LEFT, ACT_TILT_UP, ACT_TILT_DOWN,
 	ACT_COUNT
 } Action;

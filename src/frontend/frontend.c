@@ -2,6 +2,7 @@
 #include "gb.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #define JOYPAD_RIGHT 0x01
 #define JOYPAD_LEFT 0x02
@@ -13,6 +14,126 @@
 #define JOYPAD_START  0x80
 
 #define GAMEPAD_DEADZONE 8000
+
+#define SCREENSHOT_W 160
+#define SCREENSHOT_H 144
+
+static void screenshot_path_prefix (const char *romfile, char *out, size_t outsize)
+{
+	size_t len = strlen(romfile);
+	const char *dot = strrchr(romfile, '.');
+	const char *slash = strrchr(romfile, '/');
+
+	size_t base_len = len;
+	if (dot && (!slash || dot > slash))
+		base_len = (size_t)(dot - romfile);
+
+	if (base_len > outsize - 1)
+		base_len = outsize - 1;
+
+	memcpy(out, romfile, base_len);
+	out[base_len] = '\0';
+}
+
+static int file_exists (const char *path) {
+	FILE *f = fopen(path, "r");
+	if (!f) return 0;
+	fclose(f);
+	return 1;
+}
+
+static int bmp_row_pad (int w) {
+	int row_bytes = w * 3;
+	return (4 - (row_bytes % 4)) % 4;
+}
+
+static uint32_t bmp_data_size (int w, int h) {
+	return (uint32_t)(w * 3 + bmp_row_pad(w)) * (uint32_t)h;
+}
+
+static void write_bmp_row (FILE *f, const uint32_t *row, int w, int pad)
+{
+	static const uint8_t padbuf[3] = { 0, 0, 0 };
+
+	for (int x = 0; x < w; x++) {
+		uint8_t bgr[3] = {
+			(uint8_t)(row[x] & 0xFF),
+			(uint8_t)((row[x] >> 8) & 0xFF),
+			(uint8_t)((row[x] >> 16) & 0xFF)
+		};
+		fwrite(bgr, 1, 3, f);
+	}
+	if (pad) fwrite(padbuf, 1, (size_t)pad, f);
+}
+
+static void write_bmp_rows (FILE *f, const uint32_t *pixels, int w, int h)
+{
+	int pad = bmp_row_pad(w);
+	const uint32_t *row = pixels + (size_t)(h - 1) * w;
+
+	for (int y = 0; y < h; y++) {
+		write_bmp_row(f, row, w, pad);
+		row -= w;
+	}
+}
+
+static void write_bmp_header (FILE *f, int w, int h, uint32_t data_size)
+{
+	uint32_t file_size = 54u + data_size;
+	uint8_t header[54];
+	memset(header, 0, sizeof(header));
+
+	header[0] = 'B';
+	header[1] = 'M';
+	header[2] = (uint8_t)(file_size);
+	header[3] = (uint8_t)(file_size >> 8);
+	header[4] = (uint8_t)(file_size >> 16);
+	header[5] = (uint8_t)(file_size >> 24);
+	header[10] = 54;
+	header[14] = 40;
+	header[18] = (uint8_t)(w);
+	header[19] = (uint8_t)(w >> 8);
+	header[20] = (uint8_t)(w >> 16);
+	header[21] = (uint8_t)(w >> 24);
+	header[22] = (uint8_t)(h);
+	header[23] = (uint8_t)(h >> 8);
+	header[24] = (uint8_t)(h >> 16);
+	header[25] = (uint8_t)(h >> 24);
+	header[26] = 1;
+	header[28] = 24;
+	header[34] = (uint8_t)(data_size);
+	header[35] = (uint8_t)(data_size >> 8);
+	header[36] = (uint8_t)(data_size >> 16);
+	header[37] = (uint8_t)(data_size >> 24);
+
+	fwrite(header, 1, sizeof(header), f);
+}
+
+static void take_screenshot (GB *gb)
+{
+	char prefix[512];
+	screenshot_path_prefix(gb->romfile, prefix, sizeof(prefix));
+
+	char path[600];
+	int n = 0;
+	do {
+		n++;
+		snprintf(path, sizeof(path), "%s_screenshot_%03d.bmp", prefix, n);
+	} while (file_exists(path));
+
+	FILE *f = fopen(path, "wb");
+	if (!f) {
+		fprintf(stderr, "Screenshot: could not save %s\n", path);
+		return;
+	}
+
+	write_bmp_header(f, SCREENSHOT_W, SCREENSHOT_H,
+			bmp_data_size(SCREENSHOT_W, SCREENSHOT_H));
+	write_bmp_rows(f, gb->ppu.framebuffer, SCREENSHOT_W, SCREENSHOT_H);
+
+	fclose(f);
+	printf("Screenshot saved: %s\n", path);
+}
 
 static int handle_window_event (SDL_Event *e)
 {
@@ -118,6 +239,7 @@ static void handle_hotkey (GB *gb, SDL_Scancode sc, uint16_t mods, int pressed)
 	else if (keybind_match(&cfg->keymap.load_1, sc, mods, 0))	load_state_1(gb);
 	else if (keybind_match(&cfg->keymap.save_2, sc, mods, 0))	save_state_2(gb);
 	else if (keybind_match(&cfg->keymap.load_2, sc, mods, 0))	load_state_2(gb);
+	else if (keybind_match(&cfg->keymap.screenshot, sc, mods, 0))	take_screenshot(gb);
 }
 
 static uint8_t handle_kb_event (GB *gb, const SDL_Event *e, uint8_t curr)
@@ -170,15 +292,16 @@ static void handle_gamepad_button (GB *gb, const SDL_Event *e)
 		return;
 	}
 	if (pressed) {
-		if	(b == pad_binding(pad, ACT_TURBO)) gb->cfg.turbo = 1;
-		else if (b == pad_binding(pad, ACT_MUTE)) toggle_mute(&gb->cfg);
-		else if (b == pad_binding(pad, ACT_VOL_UP)) adjust_volume(&gb->cfg, 10);
-		else if (b == pad_binding(pad, ACT_VOL_DOWN)) adjust_volume(&gb->cfg, -10);
-		else if (b == pad_binding(pad, ACT_PALETTE)) cycle_palette(gb);
-		else if (b == pad_binding(pad, ACT_SAVE1)) save_state_1(gb);
-		else if (b == pad_binding(pad, ACT_LOAD1)) load_state_1(gb);
-		else if (b == pad_binding(pad, ACT_SAVE2)) save_state_2(gb);
-		else if (b == pad_binding(pad, ACT_LOAD2)) load_state_2(gb);
+		if	(b == pad_binding(pad, ACT_TURBO))	gb->cfg.turbo = 1;
+		else if (b == pad_binding(pad, ACT_MUTE))	toggle_mute(&gb->cfg);
+		else if (b == pad_binding(pad, ACT_VOL_UP))	adjust_volume(&gb->cfg, 10);
+		else if (b == pad_binding(pad, ACT_VOL_DOWN))	adjust_volume(&gb->cfg, -10);
+		else if (b == pad_binding(pad, ACT_PALETTE))	cycle_palette(gb);
+		else if (b == pad_binding(pad, ACT_SAVE1))	save_state_1(gb);
+		else if (b == pad_binding(pad, ACT_LOAD1))	load_state_1(gb);
+		else if (b == pad_binding(pad, ACT_SAVE2))	save_state_2(gb);
+		else if (b == pad_binding(pad, ACT_LOAD2))	load_state_2(gb);
+		else if (b == pad_binding(pad, ACT_SCREENSHOT))	take_screenshot(gb);
 	}
 	if (!pressed && b == pad_binding(pad, ACT_TURBO)) gb->cfg.turbo = 0;
 	return;

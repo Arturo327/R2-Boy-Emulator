@@ -57,20 +57,14 @@ static uint32_t printer_pixel_color (uint8_t palette, uint8_t color_id)
 	return 0xFF000000u | ((uint32_t)v << 16) | ((uint32_t)v << 8) | v;
 }
 
-static int write_bmp (const char *path, const uint32_t *pixels, int w, int h)
+static void write_bmp_header (FILE *f, int w, int h, uint32_t data_size)
 {
-	FILE *f = fopen(path, "wb");
-	if (!f) return 0;
-
-	int row_bytes = w * 3;
-	int pad = (4 - (row_bytes % 4)) % 4;
-	uint32_t data_size = (uint32_t)(row_bytes + pad) * (uint32_t)h;
 	uint32_t file_size = 54u + data_size;
-
 	uint8_t header[54];
 	memset(header, 0, sizeof(header));
 
-	header[0] = 'B'; header[1] = 'M';
+	header[0] = 'B';
+	header[1] = 'M';
 	header[2] = (uint8_t)(file_size);
 	header[3] = (uint8_t)(file_size >> 8);
 	header[4] = (uint8_t)(file_size >> 16);
@@ -93,6 +87,17 @@ static int write_bmp (const char *path, const uint32_t *pixels, int w, int h)
 	header[37] = (uint8_t)(data_size >> 24);
 
 	fwrite(header, 1, sizeof(header), f);
+}
+
+static int write_bmp (const char *path, const uint32_t *pixels, int w, int h)
+{
+	FILE *f = fopen(path, "wb");
+	if (!f) return 0;
+
+	int row_bytes = w * 3;
+	int pad = (4 - (row_bytes % 4)) % 4;
+	uint32_t data_size = (uint32_t)(row_bytes + pad) * (uint32_t)h;
+	write_bmp_header(f, w, h, data_size);
 
 	static const uint8_t padbuf[3] = { 0, 0, 0 };
 	for (int y = h - 1; y >= 0; y--) {
@@ -164,8 +169,9 @@ static void printer_render_and_save (Printer *p)
 	}
 
 	char path[600];
+	static int print_count = 0;
 	do {
-		snprintf(path, sizeof(path), "%s_%03d.bmp", p->path_prefix, ++p->print_count);
+		snprintf(path, sizeof(path), "%s_printer_%03d.bmp", p->path_prefix, ++print_count);
 	} while (file_exists(path));
 
 	if (write_bmp(path, pixels, width, height))

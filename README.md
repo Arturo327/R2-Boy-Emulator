@@ -1,33 +1,52 @@
 # R2-Boy - DMG Emulator
 
+![R2-Boy running Pokémon](screenshots/pokemon.gif)
+
+![Language](https://img.shields.io/badge/language-C-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+
 A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focusing on learning how the original hardware works.
 
 ---
 
 ## Features
 
+### Emulation
+
 - DMG (Original Game Boy) emulation
-- CPU instruction emulation (including halt-bug, OAM bug)
+- CPU M-Cycle accurate instruction emulation
+- HALT bug
 - Memory bus emulation
+- OAM bug
+- Timer emulation
+- Serial emulation
+- PPU (Pixel Processing Unit) emulation
+- APU (Audio Processing Unit) emulation
+- OAM DMA emulation
+- Game Boy Printer emulation
+
+### Cartridge
+
 - Cartridge loading. Supported mappings:
   - MBC1
   - MBC2
   - MBC3 + RTC
   - MBC5 + rumble
   - MBC6
-  - MBC7 + acceleromter
+  - MBC7 + accelerometer
   - MMM01
   - M161
   - HuC1
   - HuC-3
-- Timer emulation
-- PPU (Pixel Processing Unit) emulation
-- APU (Audio Processing Unit) emulation
+  - Camera
+
+- Save game support with autosave on a background thread, so you don't lose your mewtwo even if you shut down the computer
+
+### Frontend
+
 - SDL-based graphics output
 - Keyboard and Gamepad input support
 - Testing support (headless debug mode for mooneye/Blargg ROMs)
-- Save game support with autosave on a background thread, so you don't loose your mewtwo even if you shutdown the computer
-- M-Cycle accurate
 - Link Cable support over TCP/IP
 - Frontend UX:
   - Game title shown in the window title (`R2-Boy - <title>`)
@@ -35,8 +54,10 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
   - Volume / mute control (runtime hotkeys + `--volume`/`--mute` flags)
   - Turbo / fast-forward (hold `Tab`; audio is muted while active)
   - Alternative color palettes (`--palette`, hotkey `P` to cycle)
+  - Snapshot the current image on the screen and save on a file
 - 2 Save State slots: save or load the Game Boy state just pressing a key
 - Game Boy Printer support. It saves the printed image on a file.
+- Game Boy Camera support. It uses the computer's webcam, supporting YUYV and JPEG inputs.
 
 ---
 
@@ -47,7 +68,6 @@ R2-Boy works correctly and runs every DMG compatible game I tested.
 This project is under active development.
 
 Planned:
-- Implement Game Boy Camera
 - CGB (Game Boy Color) support (more in the future)
 
 ---
@@ -116,6 +136,8 @@ Common options:
 
 Default keyboard mapping (rebindable, see [Configuration](#configuration)):
 
+### Keyboard
+
 | Key | Action |
 | :---: | :---: |
 | Arrow keys | D-Pad |
@@ -123,17 +145,25 @@ Default keyboard mapping (rebindable, see [Configuration](#configuration)):
 | Z | B |
 | Enter | Start |
 | Backspace | Select |
+
+### Runtime controls
+
+| Key | Action |
+| :---: | :---: |
 | Tab | Turbo (hold) |
-| F1  | Save State 1 |
-| 1 | Load State 1 |
-| F2 | Save State 2 |
-| 2 | Load State 2 |
 | M | Mute toggle |
 | 0 | Volume up |
 | 9 | Volume down |
 | P | Cycle color palette |
+| F12 | Take snapshot |
 
-Gamepads are auto-detected via SDL GameController. The D-Pad, face buttons, Start/Back and analog stick map to the joypad by default; **all gamepad buttons are also rebindable** in the remap window. Rumble carts (`MBC5` with rumble) drive the controller's haptic. For the MBC7 cartridges with accelerometer, the controller's one will be used. In the case is not an accelerometer present, the right joystick or the WASD keys (also configurable) will simulate it.
+### Gamepad
+
+Gamepads are auto-detected via SDL GameController. The D-Pad, face buttons, Start/Back and analog stick map to the joypad by default; all gamepad buttons are also rebindable in the remap window.
+
+Rumble carts (`MBC5` with rumble) drive the controller's haptic. 
+
+For MBC7 cartridges with an accelerometer, R2-Boy uses the controller's accelerometer when available. If no accelerometer is present, the right analog stick or WASD keys can be used to simulate accelerometer input. These controls are also configurable through the remapping interface.
 
 ---
 
@@ -148,7 +178,7 @@ R2-Boy ships six built-in DMG color palettes. The default reproduces the warm gr
 | `BGB`           | BGB emulator palette |
 | `choco`         | Warm brown tint |
 | `pocket_green`  | Cool green pocket-like |
-| `basic`         | Pure withe, black and grey |
+| `basic`         | Pure white, black and grey |
 
 ---
 
@@ -157,6 +187,8 @@ R2-Boy ships six built-in DMG color palettes. The default reproduces the warm gr
 R2-Boy keeps its config in `~/.config/r2boy/config.ini` (or `$XDG_CONFIG_HOME/r2boy/config.ini` if set). Four sections are written. It includes keyboard and gamepad mappings, volume control and palette.
 
 Keyboard bindings support modifier chords written as `Ctrl+Shift+X` style tokens. Any combination of the prefixes `Ctrl`, `Shift`, `Alt`, `GUI` (also accepted: `Control`, `Option`, `Cmd`, `Super`, `Meta`) may precede a scancode name. A bare token like `X` parses as `mods=0` (matches any modifier state, the legacy behaviour). The special value `NONE` (or `—`) means no binding for that action.
+
+![R2-Boy's remap visual SDL window](screenshots/remap_ui.png)
 
 The `--remap` flag opens a **visual SDL window** with a list of all 21 actions and their current keyboard + gamepad bindings. Keyboard keys are captured via SDL `SDL_KEYDOWN` (so layout-independent scancodes and modifier chords work); gamepad buttons are captured via `SDL_CONTROLLERBUTTONDOWN`.
 
@@ -186,13 +218,28 @@ Battery-backed cartridges write their SRAM and RTC state to `<rom>.sav` next to 
 
 Saves run on a **dedicated background thread**:
 
-- The emulator thread sets `cart->save_needed = 1` on every SRAM/RTC write and requests a save roughly every 5 seconds of in-game time (`AUTOSAVE_RATE_FRAMES`).
-- A saver thread snapshots the SRAM and RTC under a short `pthread_mutex` critical section, then `fwrite`s the snapshot **outside** the lock so disk I/O never blocks emulation.
+- The emulator thread sets `save_needed = 1` on every SRAM/RTC write and requests a save roughly every 5 seconds of in-game time (`AUTOSAVE_RATE_FRAMES`).
+- A saver thread snapshots the SRAM and RTC under a short `pthread_mutex` critical section, then `fwrite`s the snapshot outside the lock so disk I/O never blocks emulation.
 - The save file is written to `<rom>.tmp` first, `fflush`ed, `fclose`d, then atomically `rename`d over `<rom>.sav` — a crash or power loss mid-write never corrupts the previous save.
 - A battery-less cart (MBC0, ROM only) skips starting the saver thread entirely.
 - On shutdown, the saver thread is `pthread_join`ed and `cleanup_core` performs one final synchronous flush as a safety net.
 
 Save games are interchangeable with other DMG emulators that follow the standard `.sav` layout.
+
+---
+
+## Save States
+
+R2-Boy provides two save state slots:
+
+- `F1` — Save State 1
+- `1` — Load State 1
+- `F2` — Save State 2
+- `2` — Load State 2
+
+These keys are also rebindable and persisted at `config.ini`.
+
+Save states are separate from battery-backed cartridge saves.
 
 ---
 
@@ -223,6 +270,8 @@ In debug mode, video output is disabled and the emulator automatically checks th
 ---
 
 ## Link Cable
+
+![R2-Boy running multiplayer TETRIS](screenshots/tetris_link_cable.png)
 
 R2-Boy includes Link Cable support over TCP/IP, allowing two emulator instances to communicate across the network.
 
@@ -257,11 +306,48 @@ However, most games don't handle mid-game reconnection and will probably simply 
 
 ---
 
+## Game Boy Printer
+
+R2-Boy supports Game Boy Printer emulation, allowing compatible games to print images directly from the emulator.
+
+When enabled, the emulator receives the print data sent by the Game Boy and converts it into an image file on the host computer.
+
+Enable Game Boy Printer support with:
+
+```bash
+./build/r2boy --printer game.gb
+```
+
+The printed images are saved automatically to files on the host system.
+
+It can't be used at the same time that the Link Cable, in order to reproduce original behavior.
+
+---
+
+## Game Boy Camera
+
+![An image of a real Game Boy taken and printed by the Game Boy Camera running in R2-Boy](screenshots/camera.png)
+
+R2-Boy supports Game Boy Camera emulation using the computer's webcam as the camera input.
+
+The emulator supports YUYV and JPEG webcam input formats.
+
+This allows compatible Game Boy Camera software to capture images using a modern computer webcam while running inside R2-Boy.
+
+The Game Boy Camera implementation is designed to reproduce the original camera interface while adapting the physical camera hardware to a modern webcam.
+
+---
+
 ## Accuracy
 
 The emulator aims to emulate the Game Boy hardware at the cycle level whenever possible.
 
-It currently passes all Blargg tests (including ```oam_bug```!), Mooneye and dmg-acid2. It also fails Blargg's ```cgb_sound``` and ```interrupt_time``` exacly like a real DMG.
+R2-Boy currently passes:
+- All Blargg's test ROMs
+- All Mooneye tests ROMs
+- dmg-acid2
+
+It also fails the Blargg's CGB specific ROMs `cgb_sound` and `interrupt_time` exactly like a real DMG.
 
 ---
 
