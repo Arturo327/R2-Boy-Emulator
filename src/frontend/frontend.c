@@ -255,6 +255,12 @@ int frontend_init (GB *gb, const char *game_title)
 			: "using accelerometer simulation via keyboard / right Joystick");
 	}
 
+	if (gb->memory.cart.mbc_type == CAM) {
+		printf("Camera: %s\n", init_webcam(&gb->webcam)
+			? "webcam connected"
+			: "no usable webcam found, using a synthetic image");
+		}
+
 	if (!init_audio(&gb->audio, &gb->cfg)) {
 		gb->running = 0;
 		return 0;
@@ -267,6 +273,8 @@ void frontend_shutdown (GB *gb)
 	cleanup_audio(&gb->audio);
 	cleanup_gamepad(&gb->pad);
 	cleanup_screen(&gb->lcd);
+	if (gb->memory.cart.mbc_type == CAM)
+		cleanup_webcam(&gb->webcam);
 	SDL_Quit();
 }
 

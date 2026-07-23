@@ -145,9 +145,12 @@ void gb_step (GB *gb)
 	}
 
 	cpu_step(&gb->cpu);
+	dma_step(gb);
+
 	save_state_step(gb);
 	printer_step(&gb->printer);
-	dma_step(gb);
+	if (gb->memory.cart.mbc_type == CAM)
+		cam_step(gb);
 
 	uint16_t old_div = gb->timer.div;
 	if (timer_step(&gb->timer)) {

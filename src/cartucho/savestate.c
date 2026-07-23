@@ -32,8 +32,8 @@ static void io_cpu (SaveState *s, CPU *cpu)
 static void io_ppu (SaveState *s, PPU *ppu)
 {
 	io_buf(s, ppu, offsetof(PPU, bus));
-	io_buf(s, (uint8_t *)ppu + offsetof(PPU, palette),
-	       sizeof(PPU) - offsetof(PPU, palette));
+	io_buf(s, (uint8_t *)ppu + offsetof(PPU, stat_line),
+		sizeof(PPU) - offsetof(PPU, stat_line));
 }
 
 static void io_mbc6 (SaveState *s, MBC6State *m)
@@ -120,8 +120,11 @@ static void io_cart (SaveState *s, GB *gb)
 		s->ok = 0;
 		return;
 	}
-	if (cart->ram && cart->ram_size > 0)
+	if (cart->ram && cart->ram_size > 0) {
+		pthread_mutex_lock(&gb->save.lock);
 		io_buf(s, cart->ram, cart->ram_size);
+		pthread_mutex_unlock(&gb->save.lock);
+	}
 }
 
 static void io_memory (SaveState *s, GB *gb)
@@ -170,7 +173,7 @@ static int state_io (GB *gb, FILE *f, int saving)
 	return ss.ok;
 }
 
-static void state_path (const char *romfile, char *out, size_t outsize, int save_num)
+static int state_path (const char *romfile, char *out, size_t outsize, int save_num)
 {
 	size_t len = strlen(romfile);
 	const char *dot = strrchr(romfile, '.');
@@ -182,11 +185,12 @@ static void state_path (const char *romfile, char *out, size_t outsize, int save
  
 	char extension[6];
 	int ext_len = snprintf(extension, sizeof(extension), ".ss%d", save_num);
-	if (ext_len < 0) return;
+	if (ext_len < 0) return 0;
 
-	if (base_len + (size_t)ext_len + 1 > outsize) return;
+	if (base_len + (size_t)ext_len + 1 > outsize) return 0;
 	memcpy(out, romfile, base_len);
 	memcpy(out + base_len, extension, (size_t)ext_len + 1);
+	return 1;
 }
  
 int can_save_state (GB *gb) {
@@ -197,7 +201,10 @@ int save_state (GB *gb)
 {
 	char path[600];
 	char tmp_path[608];
-	state_path(gb->romfile, path, sizeof(path), gb->state_num);
+	if (!state_path(gb->romfile, path, sizeof(path), gb->state_num)) {
+		fprintf(stderr, "SaveState: ROM path too long\n");
+		return 0;
+	}
 	snprintf(tmp_path, sizeof(tmp_path), "%s.tmp", path);
  
 	FILE *f = fopen(tmp_path, "wb");

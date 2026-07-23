@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Isrc -Wall -Wextra -O2 -march=native -pthread
-LDLIBS = -lSDL2 -lSDL2_ttf -pthread
+LDLIBS = -lSDL2 -lSDL2_ttf -pthread -ljpeg
 
 SRC := $(shell find src -name '*.c')
 OBJ := $(patsubst src/%.c,build/%.o,$(SRC))

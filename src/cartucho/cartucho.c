@@ -40,6 +40,7 @@ static void normalize_mbc (Cartucho *cart, uint8_t header_type) {
 	case 0x20: cart->mbc_type = MBC6; break;
 	case 0x22: cart->mbc_type = MBC7; cart->battery = 1; break;
 
+	case 0xFC: cart->mbc_type = CAM; cart->battery = 1; break;
 	case 0xFE: cart->mbc_type = HUC3; cart->battery = 1; break;
 	case 0xFF: cart->mbc_type = HUC1; cart->battery = 1; break;
 
@@ -71,6 +72,7 @@ static void select_mbc_fx (Cartucho *cart) {
 	case MMM01:	LOAD_FX(mmm01)
 	case HUC1:	LOAD_FX(huc1)
 	case HUC3:	LOAD_FX(huc3)
+	case CAM:	LOAD_FX(cam)
 	default:
 		fprintf(stderr, "Cartridge: Current MBC unimplemented, using ROM-only (probably incorrect banking)\n");
 		LOAD_FX(mbcNone)
@@ -209,6 +211,9 @@ static void get_cart_ram_size (Cartucho *cart, uint32_t header_base)
 	if (cart->mbc_type == MBC7)
 		cart->ram_size = 256;
 
+	if (cart->mbc_type == CAM)
+		cart->ram_size = 128 * 1024;
+
 	if (cart->mbc_type == M161)
 		cart->ram_size = 0;
 }
@@ -252,6 +257,10 @@ static int init_special_mbcs (Cartucho *cart)
 		fprintf(stderr, "Cartucho: not enough memory for the HuC-3\n");
 		return 0;
 	}
+	if (cart->mbc_type == CAM && !cam_init(cart)) {
+		fprintf(stderr, "Cartucho: not enough memory for the Camera\n");
+		return 0;
+	}
 	if (cart->has_rtc && !rtc_init(cart)) {
 		fprintf(stderr, "Cartucho: not enough memory for the RTC\n");
 		return 0;
@@ -286,6 +295,7 @@ void free_cart (Cartucho *cart)
 	if (cart->mbc_type == MBC7) mbc7_free(cart);
 	if (cart->mbc_type == MMM01) mmm01_free(cart);
 	if (cart->mbc_type == HUC3) huc3_free(cart);
+	if (cart->mbc_type == CAM) cam_free(cart);
 	if (cart->has_rtc) rtc_free(cart);
 	free(cart->rom);
 	free(cart->ram);

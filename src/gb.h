@@ -60,6 +60,7 @@ typedef struct GB {
 	Gamepad pad;
 	Link link;
 	Printer printer;
+	Webcam webcam;
 
 	Memory memory;
 	PPU ppu;

@@ -305,7 +305,7 @@ static void decode_ld_a_imm16 (GB *gb) {
 // ------------------- LD hl, sp + imm8 ------------------
 
 static void ld_hl_spz (GB *gb) {		// 0xF8
-	int8_t v = (int16_t)gb->cpu.z;
+	int8_t v = gb->cpu.z;
 	uint16_t r = gb->cpu.sp + v;
 	gb->cpu.hl = r;
 	set_z(gb, 0);

@@ -12,6 +12,7 @@
 #include "cartucho/mbc/mmm01.h"
 #include "cartucho/mbc/huc1.h"
 #include "cartucho/mbc/huc3.h"
+#include "cartucho/mbc/camera.h"
 
 #include <stdint.h>
 
@@ -28,7 +29,8 @@ typedef enum {
 	M161,
 	MMM01,
 	HUC1,
-	HUC3
+	HUC3,
+	CAM
 } MBC_Type;
 
 typedef struct Cartucho {

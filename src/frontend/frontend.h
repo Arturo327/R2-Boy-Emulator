@@ -7,6 +7,7 @@
 #include "frontend/gamepad.h"
 #include "frontend/audio.h"
 #include "frontend/lcd.h"
+#include "frontend/webcam.h"
 
 typedef struct GB GB;
 
