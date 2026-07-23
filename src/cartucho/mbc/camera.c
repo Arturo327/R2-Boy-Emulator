@@ -16,13 +16,6 @@ static inline int cam_clamp (int min, int value, int max)
 	return value;
 }
 
-static inline int cam_min (int a, int b) { return (a < b) ? a : b; }
-static inline int cam_max (int a, int b) { return (a > b) ? a : b; }
-
-static inline int sensor_idx (int x, int y) {
-	return x * GBCAM_SENSOR_H + y;
-}
-
 static const float EDGE_ALPHA_LUT[8] = {
 	0.50f, 0.75f, 1.00f, 1.25f, 2.00f, 3.00f, 4.00f, 5.00f
 };
@@ -43,7 +36,7 @@ static uint8_t camera_matrix_process (CameraState *cam, int value, int x, int y)
 	return 0xC0;
 }
 
-typedef struct CamCaptureConfig {
+typedef struct CamConfig {
 	uint32_t p_bits;
 	uint32_t m_bits;
 	uint32_t n_bit;
@@ -52,9 +45,9 @@ typedef struct CamCaptureConfig {
 	float edge_alpha;
 	uint32_t e3_bit;
 	uint32_t i_bit;
-} CamCaptureConfig;
+} CamConfig;
 
-static void camera_decode_regs (CameraState *cam, CamCaptureConfig *cfg)
+static void camera_decode_regs (CameraState *cam, CamConfig *cfg)
 {
 	cfg->p_bits = 0;
 	cfg->m_bits = 0;
@@ -74,33 +67,38 @@ static void camera_decode_regs (CameraState *cam, CamCaptureConfig *cfg)
 	cfg->i_bit = (cam->regs[4] & 0x08) >> 3;
 }
 
-static void camera_capture_sensor (GB *gb, CameraState *cam, const CamCaptureConfig *cfg)
+static void camera_capture_sensor (GB *gb, CameraState *cam, CamConfig *cfg)
 {
 	uint8_t frame[WEBCAM_OUT_W * WEBCAM_OUT_H];
 	webcam_get_frame(&gb->webcam, frame);
 
+	int i = 0;
+	int row;
 	for (int x = 0; x < GBCAM_SENSOR_W; x++) {
+		row = 0;
 		for (int y = 0; y < GBCAM_SENSOR_H; y++) {
 
-			int value = frame[y * WEBCAM_OUT_W + x];
+			int value = frame[row + x];
 			value = (value * (int)cfg->exposure) / 0x0300;
 			value = 128 + ((value - 128) / 8);
 			value = cam_clamp(0, value, 255);
 
 			if (cfg->i_bit) value = 255 - value;
 
-			cam->retina_buf[sensor_idx(x, y)] = value - 128;
+			cam->retina_buf[i++] = value - 128;
+			row += WEBCAM_OUT_W;
 		}
 	}
 }
 
 static void camera_pm_combine (const int *src, int *dst, uint32_t p_bits, uint32_t m_bits)
 {
+	int i = 0;
 	for (int x = 0; x < GBCAM_SENSOR_W; x++) {
 		for (int y = 0; y < GBCAM_SENSOR_H; y++) {
 
-			int px = src[sensor_idx(x, y)];
-			int ms = src[sensor_idx(x, cam_min(y + 1, GBCAM_SENSOR_H - 1))];
+			int px = src[i];
+			int ms = src[i + (y < GBCAM_SENSOR_H - 1)];
 
 			int value = 0;
 			if (p_bits & 1) value += px;
@@ -108,44 +106,54 @@ static void camera_pm_combine (const int *src, int *dst, uint32_t p_bits, uint32
 			if (m_bits & 1) value -= px;
 			if (m_bits & 2) value -= ms;
 
-			dst[sensor_idx(x, y)] = cam_clamp(-128, value, 127);
+			dst[i++] = cam_clamp(-128, value, 127);
 		}
 	}
 }
 
 static void camera_edge_1d (const int *src, int *dst, float edge_alpha)
 {
+	int i = 0;
 	for (int x = 0; x < GBCAM_SENSOR_W; x++) {
+
+		int mw_offset = (x > 0) ? -GBCAM_SENSOR_H : 0;
+		int me_offset = (x < GBCAM_SENSOR_W - 1) ? GBCAM_SENSOR_H : 0;
+
 		for (int y = 0; y < GBCAM_SENSOR_H; y++) {
 
-			int mw = src[sensor_idx(cam_max(0, x - 1), y)];
-			int me = src[sensor_idx(cam_min(x + 1, GBCAM_SENSOR_W - 1), y)];
-			int px = src[sensor_idx(x, y)];
+			int mw = src[i + mw_offset];
+			int me = src[i + me_offset];
+			int px = src[i];
 
 			int value = px + (int)((2 * px - mw - me) * edge_alpha);
-			dst[sensor_idx(x, y)] = cam_clamp(0, value, 255);
+			dst[i++] = cam_clamp(0, value, 255);
 		}
 	}
 }
 
 static void camera_edge_2d (const int *src, int *dst, float edge_alpha)
 {
+	int i = 0;
 	for (int x = 0; x < GBCAM_SENSOR_W; x++) {
+
+		int mw_offset = (x > 0) ? -GBCAM_SENSOR_H : 0;
+		int me_offset = (x < GBCAM_SENSOR_W - 1) ? GBCAM_SENSOR_H : 0;
+
 		for (int y = 0; y < GBCAM_SENSOR_H; y++) {
 
-			int ms = src[sensor_idx(x, cam_min(y + 1, GBCAM_SENSOR_H - 1))];
-			int mn = src[sensor_idx(x, cam_max(0, y - 1))];
-			int mw = src[sensor_idx(cam_max(0, x - 1), y)];
-			int me = src[sensor_idx(cam_min(x + 1, GBCAM_SENSOR_W - 1), y)];
-			int px = src[sensor_idx(x, y)];
+			int mn = src[i - (y > 0)];
+			int ms = src[i + (y < GBCAM_SENSOR_H - 1)];
+			int mw = src[i + mw_offset];
+			int me = src[i + me_offset];
+			int px = src[i];
 
 			int value = px + (int)((4 * px - mw - me - mn - ms) * edge_alpha);
-			dst[sensor_idx(x, y)] = cam_clamp(-128, value, 127);
+			dst[i++] = cam_clamp(-128, value, 127);
 		}
 	}
 }
 
-static void camera_apply_filter (CameraState *cam, uint32_t filtering_mode, const CamCaptureConfig *cfg)
+static void camera_apply_filter (CameraState *cam, uint32_t filtering_mode, CamConfig *cfg)
 {
 	switch (filtering_mode)
 	{
@@ -182,18 +190,29 @@ static void camera_apply_filter (CameraState *cam, uint32_t filtering_mode, cons
 static void camera_build_tiles (CameraState *cam, uint8_t tiles[GBCAM_TILE_ROWS][GBCAM_TILE_COLS][16])
 {
 	memset(tiles, 0, GBCAM_TILES_BYTES);
+	int offset = GBCAM_SENSOR_EXTRA_LINES >> 1;
 
 	for (int x = 0; x < GBCAM_W; x++) {
+
+		uint8_t bit = 1 << (7 - (x & 7));
+		int tile_x = x >> 3;
+		int *src = &cam->retina_buf[offset];
+
 		for (int y = 0; y < GBCAM_H; y++) {
 
-			int value = cam->retina_buf[sensor_idx(x, y + GBCAM_SENSOR_EXTRA_LINES / 2)] + 128;
+			int value = *src + 128;
 			int shade = camera_matrix_process(cam, value, x, y);
 			uint8_t outcolor = 3 - (shade >> 6);
 
-			uint8_t *tile = &tiles[y >> 3][x >> 3][(y & 7) * 2];
-			if (outcolor & 1) tile[0] |= 1 << (7 - (x & 7));
-			if (outcolor & 2) tile[1] |= 1 << (7 - (x & 7));
+			uint8_t *tile = &tiles[y >> 3][tile_x][(y & 7) * 2];
+
+			if (outcolor & 1) tile[0] |= bit;
+			if (outcolor & 2) tile[1] |= bit;
+
+			src++;
 		}
+
+		offset += GBCAM_SENSOR_H;
 	}
 }
 
@@ -210,7 +229,7 @@ static void camera_store_tiles (GB *gb, uint8_t tiles[GBCAM_TILE_ROWS][GBCAM_TIL
 
 static void camera_start_capture (GB *gb, CameraState *cam)
 {
-	CamCaptureConfig cfg;
+	CamConfig cfg;
 	camera_decode_regs(cam, &cfg);
 
 	uint32_t n_bit_timing = (cam->regs[1] & 0x80) ? 0 : 512;
