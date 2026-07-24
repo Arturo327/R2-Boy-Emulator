@@ -1,7 +1,7 @@
 # R2-Boy - DMG Emulator
 
 <figure align="center">
-  <img src="screenshots/pokemon.gif" alt="R2-Boy running Pokémon Red" width="800">
+  <img src="screenshots/pokemon.gif" alt="R2-Boy running Pokémon Red" width="640">
   <figcaption>R2-Boy running Pokémon Red</figcaption>
 </figure>
 
@@ -153,14 +153,14 @@ Default keyboard mapping (rebindable, see [Configuration](#configuration)):
 
 | Key | Action |
 | :---: | :---: |
-| Tab | Turbo (hold) |
+| Tab | Turbo |
 | M | Mute toggle |
-| 0 | Volume up |
-| 9 | Volume down |
+| 0 / 9 | Volume UP / DOWN |
 | P | Cycle color palette |
 | F12 | Take snapshot |
 | F10 | ON / OFF Game Boy |
 | F9  | Pause / Resume |
+| F3 / F4 | Turbo Speed UP / DOWN |
 
 ### Gamepad
 
@@ -189,16 +189,16 @@ R2-Boy ships six built-in DMG color palettes. The default reproduces the warm gr
 
 ## Configuration
 
-R2-Boy keeps its config in `~/.config/r2boy/config.ini` (or `$XDG_CONFIG_HOME/r2boy/config.ini` if set). Four sections are written. It includes keyboard and gamepad mappings, volume control and palette.
+R2-Boy keeps its config in `~/.config/r2boy/config.ini` (or `$XDG_CONFIG_HOME/r2boy/config.ini` if set). Four sections are written. It includes keyboard and gamepad mappings, volume control, palette, input and turbo.
 
 Keyboard bindings support modifier chords written as `Ctrl+Shift+X` style tokens. Any combination of the prefixes `Ctrl`, `Shift`, `Alt`, `GUI` (also accepted: `Control`, `Option`, `Cmd`, `Super`, `Meta`) may precede a scancode name. A bare token like `X` parses as `mods=0` (matches any modifier state, the legacy behaviour). The special value `NONE` (or `—`) means no binding for that action.
 
 <figure align="center">
-  <img src="screenshots/remap_ui.png" alt="R2-Boy's remap visual SDL window" width="800">
+  <img src="screenshots/remap_ui.png" alt="R2-Boy's remap visual SDL window" width="640">
   <figcaption>R2-Boy's remap visual SDL window</figcaption>
 </figure>
 
-The `--remap` flag opens a **visual SDL window** with a list of all 21 actions and their current keyboard + gamepad bindings. Keyboard keys are captured via SDL `SDL_KEYDOWN` (so layout-independent scancodes and modifier chords work); gamepad buttons are captured via `SDL_CONTROLLERBUTTONDOWN`.
+The `--remap` flag opens a **visual SDL window** with a list of all 26 actions and their current keyboard + gamepad bindings. Keyboard keys are captured via SDL `SDL_KEYDOWN` (so layout-independent scancodes and modifier chords work); gamepad buttons are captured via `SDL_CONTROLLERBUTTONDOWN`.
 
 ```bash
 ./build/r2boy --remap
@@ -217,6 +217,8 @@ In the remap window:
 | Window close | Exit without saving |
 
 Runtime hotkey changes (volume, mute, palette) are written back to `config.ini` when the emulator exits, so the next launch picks them up.
+
+Turbo settings are persisted across sessions, including the turbo speed and whether turbo is configured as hold-to-activate or toggle mode.
 
 ---
 
@@ -280,7 +282,7 @@ In debug mode, video output is disabled and the emulator automatically checks th
 ## Link Cable
 
 <figure align="center">
-  <img src="screenshots/tetris_link_cable.png" alt="R2-Boy running multiplayer TETRIS" width="800">
+  <img src="screenshots/tetris_link_cable.png" alt="R2-Boy running multiplayer TETRIS" width="1298">
   <figcaption>R2-Boy running multiplayer TETRIS from separate instances through TCP/IP</figcaption>
 </figure>
 
@@ -338,7 +340,7 @@ It can't be used at the same time that the Link Cable, in order to reproduce ori
 ## Game Boy Camera
 
 <figure align="center">
-  <img src="screenshots/camera.png" alt="Game Boy Camera and Printer in R2-Boy" width="800">
+  <img src="screenshots/camera.png" alt="Game Boy Camera and Printer in R2-Boy" width="480">
   <figcaption>A real Game Boy photographed with R2-Boy's Game Boy Camera emulation and printed using its Game Boy Printer emulation</figcaption>
 </figure>
 

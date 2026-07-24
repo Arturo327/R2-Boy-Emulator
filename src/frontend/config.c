@@ -53,7 +53,9 @@ const ActionMeta ACTIONS[ACT_COUNT] =
 	[ACT_PALETTE]	= { "PALETTE",	"palette",	offsetof(Keymap, palette),	offsetof(Padmap, palette)},
 	[ACT_VOL_UP]	= { "VOLUME UP","vol_up",	offsetof(Keymap, vol_up),	offsetof(Padmap, vol_up)},
 	[ACT_VOL_DOWN]	= { "VOLUME DOWN","vol_down",	offsetof(Keymap, vol_down),	offsetof(Padmap, vol_down)},
-	[ACT_TILT_RIGHT]= { "TILT RIGHT", "tilt_right",offsetof(Keymap, tilt_right),	offsetof(Padmap, tilt_right)},
+	[ACT_TURBO_DOWN]= { "TURBO DOWN","turbo_down",	offsetof(Keymap, turbo_down),	offsetof(Padmap, turbo_down)},
+	[ACT_TURBO_UP]	= { "TURBO UP",	"turbo_up",	offsetof(Keymap, turbo_up),	offsetof(Padmap, turbo_up)},
+	[ACT_TILT_RIGHT]= { "TILT RIGHT", "tilt_right",	offsetof(Keymap, tilt_right),	offsetof(Padmap, tilt_right)},
 	[ACT_TILT_LEFT] = { "TILT LEFT", "tilt_left",	offsetof(Keymap, tilt_left),	offsetof(Padmap, tilt_left)},
 	[ACT_TILT_UP]	= { "TILT UP", "tilt_up",	offsetof(Keymap, tilt_up),	offsetof(Padmap, tilt_up)},
 	[ACT_TILT_DOWN] = { "TILT DOWN", "tilt_down",	offsetof(Keymap, tilt_down),	offsetof(Padmap, tilt_down)},
@@ -88,6 +90,8 @@ void init_config_defaults (Config *cfg)
 	atomic_store(&cfg->muted, 0);
 	cfg->palette = PAL_DEFAULT;
 	cfg->use_acel = 1;
+	cfg->turbo_speed = 3;
+	cfg->turbo_hold = 1;
 }
 
 static struct {
@@ -327,6 +331,8 @@ void default_keymap (Keymap *k)
 		{ ACT_PALETTE,	SDL_SCANCODE_P		},
 		{ ACT_VOL_UP,	SDL_SCANCODE_0		},
 		{ ACT_VOL_DOWN,	SDL_SCANCODE_9		},
+		{ ACT_TURBO_UP,	SDL_SCANCODE_F4		},
+		{ ACT_TURBO_DOWN,SDL_SCANCODE_F3	},
 		{ ACT_TILT_UP,	SDL_SCANCODE_W		},
 		{ ACT_TILT_LEFT,SDL_SCANCODE_A		},
 		{ ACT_TILT_DOWN,SDL_SCANCODE_S		},
@@ -368,6 +374,8 @@ void default_padmap (Padmap *p)
 		{ ACT_PALETTE,	SDL_CONTROLLER_BUTTON_INVALID	},
 		{ ACT_VOL_UP,	SDL_CONTROLLER_BUTTON_INVALID	},
 		{ ACT_VOL_DOWN,	SDL_CONTROLLER_BUTTON_INVALID	},
+		{ ACT_TURBO_UP,	SDL_CONTROLLER_BUTTON_INVALID	},
+		{ ACT_TURBO_DOWN,SDL_CONTROLLER_BUTTON_INVALID	},
 		{ ACT_TILT_RIGHT,SDL_CONTROLLER_BUTTON_INVALID	},
 		{ ACT_TILT_LEFT,SDL_CONTROLLER_BUTTON_INVALID	},
 		{ ACT_TILT_UP,	SDL_CONTROLLER_BUTTON_INVALID	},
@@ -468,6 +476,22 @@ static void load_input (Config *cfg, const char *s)
 		cfg->use_acel = (uint8_t)(value[0]=='1' || value[0]=='t' || value[0]=='T');
 }
 
+static void load_turbo (Config *cfg, const char *s)
+{
+	char field[32];
+	char value[32];
+	if (sscanf(s, " %31[^= ] = %31s", field, value) != 2) return;
+
+	if (!strcmp(field, "speed")) {
+		uint8_t v = atoi(value);
+		if (v > 16) v = 16;
+		if (v < 2) v = 2;
+		cfg->turbo_speed = v;
+	}
+	if (!strcmp(field, "hold"))
+		cfg->turbo_hold = (uint8_t)(value[0] == '1' || value[0] == 't' || value[0] == 'T');
+}
+
 static int action_ini_name (const char *name)
 {
 	if (!name || !*name) return -1;
@@ -547,6 +571,7 @@ void load_config (Config *cfg)
 		else if (!strcmp(section, "audio"))	load_audio (cfg, s);
 		else if (!strcmp(section, "video"))	load_video (cfg, s);
 		else if (!strcmp(section, "input"))	load_input (cfg, s);
+		else if (!strcmp(section, "turbo"))	load_turbo (cfg, s);
 	}
 	fclose(f);
 }
@@ -557,13 +582,17 @@ static void write_cfg_file (Config *cfg, FILE *f)
 
 	fprintf(f, "[audio]\n");
 	fprintf(f, "volume = %d\n", atomic_load(&cfg->volume));
-	fprintf(f, "muted  = %d\n\n", atomic_load(&cfg->muted));
+	fprintf(f, "muted = %d\n\n", atomic_load(&cfg->muted));
 
 	fprintf(f, "[video]\n");
 	fprintf(f, "palette = %s\n\n", palette_name(cfg->palette));
 
 	fprintf(f, "[input]\n");
 	fprintf(f, "use_accelerometer = %d\n\n", cfg->use_acel);
+
+	fprintf(f, "[turbo]\n");
+	fprintf(f, "speed = %d\n", cfg->turbo_speed);
+	fprintf(f, "hold = %d\n\n", cfg->turbo_hold);
 
 	fprintf(f, "[keymap]\n");
 	for (int i = 0; i < ACT_COUNT; i++) {

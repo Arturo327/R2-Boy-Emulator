@@ -8,7 +8,7 @@ static void ring_push (AudioRing *r, int16_t *src, uint32_t n)
 {
 	uint32_t wp = atomic_load_explicit(&r->write_pos, memory_order_relaxed);
 	uint32_t rp = atomic_load_explicit(&r->read_pos, memory_order_acquire);
-	uint32_t free_space = AUDIO_RING_SIZE - ((wp - rp) & (AUDIO_RING_SIZE - 1));
+	uint32_t free_space = AUDIO_RING_SIZE - (wp - rp);
 
 	if (n > free_space) n = free_space;
 	if (n == 0) return;
@@ -33,7 +33,7 @@ static void audio_callback (void *userdata, uint8_t *stream, int len)
 
 	uint32_t wp = atomic_load_explicit(&r->write_pos, memory_order_acquire);
 	uint32_t rp = atomic_load_explicit(&r->read_pos, memory_order_relaxed);
-	uint32_t avail = (wp - rp) & (AUDIO_RING_SIZE - 1);
+	uint32_t avail = wp - rp;
 	int fill = avail < (uint32_t)n ? (int)avail : n;
 
 	uint8_t target = 100;

@@ -22,7 +22,7 @@ typedef struct AudioRing {
 static inline uint32_t ring_used (AudioRing *r) {
 	uint32_t wp = atomic_load_explicit(&r->write_pos, memory_order_acquire);
 	uint32_t rp = atomic_load_explicit(&r->read_pos, memory_order_acquire);
-	return (wp - rp) & (AUDIO_RING_SIZE - 1);
+	return wp - rp;
 }
 
 typedef struct Audio {

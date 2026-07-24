@@ -139,8 +139,9 @@ static inline void print_usage (const char *prog)
 	printf("    Z			    B\n");
 	printf("    Enter		    START\n");
 	printf("    Backspace		    SELECT\n");
-	printf("    Tab			    Turbo (hold)\n");
-	printf("    M / + / -		    Mute / Vol+ / Vol-\n");
+	printf("    Tab			    Turbo (hold / toggle, depending cofig.ini)\n");
+	printf("    F4 / F3                 Turbo Speed + / -\n");
+	printf("    M / 0 / 9		    Mute / Vol+ / Vol-\n");
 	printf("    P			    Cycle color palette\n");
 	printf("    F12			    Take screenshot\n");
 	printf("    F10			    ON / OFF the Game Boy\n");
@@ -384,7 +385,7 @@ static void sleep_until (uint64_t target, uint64_t freq, Link *link, uint32_t rx
 
 static void sync_frame (GB *gb, uint64_t *next_frame, uint64_t frame_ticks, uint64_t freq)
 {
-	if (gb->cfg.turbo) frame_ticks /= 3;
+	if (gb->cfg.turbo) frame_ticks /= gb->cfg.turbo_speed;
 
 	*next_frame += frame_ticks;
 	uint64_t now = SDL_GetPerformanceCounter();

@@ -184,6 +184,15 @@ static void toggle_mute (Config *cfg)
 	fprintf(stderr, "Audio: %s\n", m ? "muted" : "unmuted");
 }
 
+static void adjust_turbo (Config *cfg, int delta)
+{
+	int v = cfg->turbo_speed + delta;
+	if (v > 16) v = 16;
+	if (v < 2) v = 2;
+	cfg->turbo_speed = v;
+	fprintf(stderr, "Turbo Speed: x%d\n", v);
+}
+
 static void adjust_volume (Config *cfg, int delta)
 {
 	int v = atomic_load(&cfg->volume) + delta;
@@ -254,6 +263,8 @@ static void handle_hotkey (GB *gb, SDL_Scancode sc, uint16_t mods, int pressed)
 	if (keybind_match(&cfg->keymap.mute, sc, mods, 0))		toggle_mute(&gb->cfg);
 	else if (keybind_match(&cfg->keymap.vol_up, sc, mods, 0))	adjust_volume(&gb->cfg, 10);
 	else if (keybind_match(&cfg->keymap.vol_down, sc, mods, 0))	adjust_volume(&gb->cfg, -10);
+	else if (keybind_match(&cfg->keymap.turbo_up, sc, mods, 0))	adjust_turbo(&gb->cfg, 1);
+	else if (keybind_match(&cfg->keymap.turbo_down, sc, mods, 0))	adjust_turbo(&gb->cfg, -1);
 	else if (keybind_match(&cfg->keymap.palette, sc, mods, 0))	cycle_palette(gb);
 	else if (keybind_match(&cfg->keymap.save_1, sc, mods, 0))	save_state_1(gb);
 	else if (keybind_match(&cfg->keymap.load_1, sc, mods, 0))	load_state_1(gb);
@@ -262,6 +273,7 @@ static void handle_hotkey (GB *gb, SDL_Scancode sc, uint16_t mods, int pressed)
 	else if (keybind_match(&cfg->keymap.screenshot, sc, mods, 0))	take_screenshot(gb);
 	else if (keybind_match(&cfg->keymap.on, sc, mods, 0))		toggle_on(gb);
 	else if (keybind_match(&cfg->keymap.pause, sc, mods, 0))	toggle_pause(gb);
+	else if (keybind_match(&cfg->keymap.turbo, sc, mods, 0))	gb->cfg.turbo ^= 1;
 }
 
 static uint8_t handle_kb_event (GB *gb, const SDL_Event *e, uint8_t curr)
@@ -277,7 +289,7 @@ static uint8_t handle_kb_event (GB *gb, const SDL_Event *e, uint8_t curr)
 	uint8_t mask = kb_scancode_to_joypad_mask(k, sc, mods, released);
 	if (pressed && !e->key.repeat) handle_hotkey(gb, sc, mods, 1);
 
-	if (keybind_match(&k->turbo, sc, mods, released))
+	if (gb->cfg.turbo_hold && keybind_match(&k->turbo, sc, mods, released))
 		gb->cfg.turbo = pressed ? 1 : 0;
 
 	uint8_t tilt_mask = kb_scancode_to_tilt_mask(k, sc, mods, released);
@@ -302,6 +314,12 @@ static uint8_t pad_button_to_joypad_mask (Padmap *p, SDL_GameControllerButton b)
 	return 0;
 }
 
+static void handle_turbo (Config *cfg)
+{
+	if (cfg->turbo_hold) cfg->turbo = 1;
+	else cfg->turbo ^= 1;
+}
+
 static void handle_gamepad_button (GB *gb, const SDL_Event *e)
 {
 	Padmap *pad = &gb->cfg.padmap;
@@ -314,10 +332,12 @@ static void handle_gamepad_button (GB *gb, const SDL_Event *e)
 		return;
 	}
 	if (pressed) {
-		if	(b == pad_binding(pad, ACT_TURBO))	gb->cfg.turbo = 1;
+		if	(b == pad_binding(pad, ACT_TURBO))	handle_turbo(&gb->cfg);
 		else if (b == pad_binding(pad, ACT_MUTE))	toggle_mute(&gb->cfg);
 		else if (b == pad_binding(pad, ACT_VOL_UP))	adjust_volume(&gb->cfg, 10);
 		else if (b == pad_binding(pad, ACT_VOL_DOWN))	adjust_volume(&gb->cfg, -10);
+		else if (b == pad_binding(pad, ACT_TURBO_UP))	adjust_turbo(&gb->cfg, 1);
+		else if (b == pad_binding(pad, ACT_TURBO_DOWN))	adjust_turbo(&gb->cfg, -1);
 		else if (b == pad_binding(pad, ACT_PALETTE))	cycle_palette(gb);
 		else if (b == pad_binding(pad, ACT_SAVE1))	save_state_1(gb);
 		else if (b == pad_binding(pad, ACT_LOAD1))	load_state_1(gb);
