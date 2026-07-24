@@ -12,8 +12,6 @@
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
 </p>
 
-<br>
-
 A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focusing on learning how the original hardware works.
 
 ---
@@ -204,9 +202,9 @@ Keyboard bindings support modifier chords written as `Ctrl+Shift+X` style tokens
   <figcaption>R2-Boy's remap visual SDL window</figcaption>
 </figure>
 
-<p>
+<br><br>
+
 The `--remap` flag opens a **visual SDL window** with a list of all 26 actions and their current keyboard + gamepad bindings. Keyboard keys are captured via SDL `SDL_KEYDOWN` (so layout-independent scancodes and modifier chords work); gamepad buttons are captured via `SDL_CONTROLLERBUTTONDOWN`.
-</p>
 
 ```bash
 ./build/r2boy --remap
@@ -294,9 +292,9 @@ In debug mode, video output is disabled and the emulator automatically checks th
   <figcaption>R2-Boy running multiplayer TETRIS from separate instances through TCP/IP</figcaption>
 </figure>
 
-<p>
+<br><br>
+
 R2-Boy includes Link Cable support over TCP/IP, allowing two emulator instances to communicate across the network.
-</p>
 
 ### Host
 
@@ -354,13 +352,13 @@ It can't be used at the same time that the Link Cable, in order to reproduce ori
   <figcaption>A real Game Boy photographed with R2-Boy's Game Boy Camera emulation and printed using its Game Boy Printer emulation</figcaption>
 </figure>
 
-<p>
+<br><br>
+
 R2-Boy supports Game Boy Camera emulation using the computer's webcam as the camera input.
 
 The emulator supports YUYV and JPEG webcam input formats.
 
 This allows compatible Game Boy Camera software to capture images using a modern computer webcam while running inside R2-Boy.
-</p>
 
 ---
 
