@@ -16,10 +16,21 @@ static int load_bios (GB *gb, const char *filename)
 	return n == 0x100;
 }
 
-void init_regs (GB *gb)
+static void reset_cartucho (Cartucho *c)
 {
-	memset(gb->memory.vram, 0, sizeof(Memory) - offsetof(Memory, vram));
+	if (!c->rom) return;
+	c->rom_bank = 1;
+	c->ram_bank = 0;
+	c->ram_enabled = (c->mbc_type == MBC_NONE);
+	c->mbc_mode = 0;
+	c->bank1 = 1;
+	c->bank2 = 0;
+	c->save_needed = 0;
+	c->rumble_on = 0;
+}
 
+static void reset_components (GB *gb)
+{
 	memset(&gb->ppu, 0, sizeof(PPU));
 	init_ppu(&gb->ppu);
 	gb->ppu.palette = gb->cfg.palette;
@@ -37,7 +48,31 @@ void init_regs (GB *gb)
 
 	if (gb->link.active) gb->serial.link = &gb->link;
 	if (gb->printer.enabled) gb->serial.printer = &gb->printer;
+}
 
+static void reset_rest (GB *gb)
+{
+	gb->clock = 0;
+	gb->paused = 0;
+	gb->state_save_pending = 0;
+	gb->state_load_pending = 0;
+	gb->boot_rom_disable_pending = 0;
+
+	reset_cartucho(&gb->memory.cart);
+
+	if (gb->audio.dev) {
+		ring_clear(&gb->audio.ring);
+		gb->apu.buffer_pos = 0;
+	}
+
+	if (gb->link.active) {
+		ring_reset(&gb->link.rx);
+		ring_reset(&gb->link.tx);
+	}
+}
+
+static void reset_bios (GB *gb)
+{
 	if (!gb->hay_bios) {
 		init_ppu_reg(&gb->ppu);
 		init_apu_reg(&gb->apu);
@@ -51,8 +86,17 @@ void init_regs (GB *gb)
 		gb->cpu.pc = 0;
 		gb->boot_rom_enabled = 1;
 	}
+}
 
+void reset_gb (GB *gb)
+{
+	memset(gb->memory.vram, 0, sizeof(Memory) - offsetof(Memory, vram));
+	reset_components(gb);
+
+	reset_bios(gb);
 	init_bus(&gb->bus, gb);
+
+	reset_rest(gb);
 	gb->on = 1;
 }
 

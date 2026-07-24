@@ -184,11 +184,6 @@ static void detect_m161 (Cartucho *cart)
 	if (game_count == 0) return;
 
 	cart->mbc_type = M161;
-	cart->rom_bank = 0;
-	cart->mbc_mode = 0;
-
-	cart->battery = 0;
-	cart->has_rtc = 0;
 }
 
 static void parse_cart_header (Cartucho *cart, uint32_t header_base)

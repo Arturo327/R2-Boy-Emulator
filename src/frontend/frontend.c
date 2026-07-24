@@ -161,6 +161,15 @@ static void toggle_pause (GB *gb)
 {
 	if (!gb->on) return;
 	gb->paused = !gb->paused;
+	if (gb->paused) {
+		ring_clear(&gb->audio.ring);
+		gb->apu.buffer_pos = 0;
+		if (gb->audio.dev)
+			SDL_PauseAudioDevice(gb->audio.dev, 1);
+	} else {
+		if (gb->audio.dev)
+			SDL_PauseAudioDevice(gb->audio.dev, 0);
+	}
 	fprintf(stderr, "%s\n", gb->paused ? "Paused" : "Resumed");
 }
 
@@ -168,12 +177,23 @@ static void toggle_on (GB *gb)
 {
 	if (gb->on) {
 		gb->on = 0;
-		gb->paused = 0;
+		if (gb->paused) {
+			gb->paused = 0;
+			fprintf(stderr, "Resumed\n");
+		}
+		if (gb->audio.dev) {
+			ring_clear(&gb->audio.ring);
+			gb->apu.buffer_pos = 0;
+		}
+		if (gb->link.active) {
+			ring_reset(&gb->link.rx);
+			ring_reset(&gb->link.tx);
+		}
 		shutdown_screen(&gb->ppu);
 	} else {
-		gb->on = 1;
-		gb->paused = 0;
-		init_regs(gb);
+		reset_gb(gb);
+		if (gb->audio.dev)
+			SDL_PauseAudioDevice(gb->audio.dev, 0);
 	}
 }
 

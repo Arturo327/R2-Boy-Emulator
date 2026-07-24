@@ -91,7 +91,7 @@ typedef struct GB {
 	AutoSave save;
 } GB;
 
-void init_regs (GB *gb);
+void reset_gb (GB *gb);
 void init (GB *gb, const char *romfile, const char *biosfile);
 void init_test (GB *gb, const char *romfile);
 

@@ -338,7 +338,8 @@ static void turn_lcd_on (PPU *ppu)
 static void stop_glitch (PPU *ppu)
 {
 	color_screen_whiter(ppu);
-	burn_line(ppu, ppu->ly);
+	if (ppu->mode != VBLANK)
+		burn_line(ppu, ppu->ly);
 	ppu->ready = 1;
 }
 

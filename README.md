@@ -5,8 +5,14 @@
   <figcaption>R2-Boy running Pokémon Red</figcaption>
 </figure>
 
-![Language](https://img.shields.io/badge/language-C-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+<br>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/language-C-blue" alt="Language">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
+</p>
+
+<br>
 
 A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focusing on learning how the original hardware works.
 
@@ -198,6 +204,8 @@ Keyboard bindings support modifier chords written as `Ctrl+Shift+X` style tokens
   <figcaption>R2-Boy's remap visual SDL window</figcaption>
 </figure>
 
+<br>
+
 The `--remap` flag opens a **visual SDL window** with a list of all 26 actions and their current keyboard + gamepad bindings. Keyboard keys are captured via SDL `SDL_KEYDOWN` (so layout-independent scancodes and modifier chords work); gamepad buttons are captured via `SDL_CONTROLLERBUTTONDOWN`.
 
 ```bash
@@ -286,6 +294,8 @@ In debug mode, video output is disabled and the emulator automatically checks th
   <figcaption>R2-Boy running multiplayer TETRIS from separate instances through TCP/IP</figcaption>
 </figure>
 
+<br>
+
 R2-Boy includes Link Cable support over TCP/IP, allowing two emulator instances to communicate across the network.
 
 ### Host
@@ -343,6 +353,8 @@ It can't be used at the same time that the Link Cable, in order to reproduce ori
   <img src="screenshots/camera.png" alt="Game Boy Camera and Printer in R2-Boy" width="480">
   <figcaption>A real Game Boy photographed with R2-Boy's Game Boy Camera emulation and printed using its Game Boy Printer emulation</figcaption>
 </figure>
+
+<br>
 
 R2-Boy supports Game Boy Camera emulation using the computer's webcam as the camera input.
 

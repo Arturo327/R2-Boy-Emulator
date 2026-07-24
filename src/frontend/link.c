@@ -73,7 +73,7 @@ static int ring_has_data (LinkRing *r)
 	return wp != rp;
 }
 
-static void ring_reset (LinkRing *r)
+void ring_reset (LinkRing *r)
 {
 	uint32_t wp = atomic_load_explicit(&r->write_pos, memory_order_acquire);
 	atomic_store_explicit(&r->read_pos, wp, memory_order_release);

@@ -25,6 +25,11 @@ static inline uint32_t ring_used (AudioRing *r) {
 	return wp - rp;
 }
 
+static inline void ring_clear (AudioRing *r) {
+	uint32_t wp = atomic_load_explicit(&r->write_pos, memory_order_acquire);
+	atomic_store_explicit(&r->read_pos, wp, memory_order_release);
+}
+
 typedef struct Audio {
 	SDL_AudioDeviceID dev;
 	uint32_t sample_rate;

@@ -50,6 +50,7 @@ int link_connect (Link *link, const char *ip, uint16_t port);
 void link_close (Link *link);
 int link_is_connected (Link *link);
 
+void ring_reset (LinkRing *r);
 int link_get_byte (Link *link, uint8_t *out);
 void link_send_byte (Link *link, uint8_t val);
 
