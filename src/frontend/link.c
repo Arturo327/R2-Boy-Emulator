@@ -307,7 +307,10 @@ int link_host (Link *link, uint16_t port)
 	link->port = port;
 
 	int s = socket(AF_INET, SOCK_STREAM, 0);
-	if (s < 0) { perror("socket"); return 0; }
+	if (s < 0) {
+		perror("socket");
+		return 0;
+	}
 
 	int one = 1;
 	setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));

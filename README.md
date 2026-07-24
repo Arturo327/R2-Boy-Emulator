@@ -1,6 +1,9 @@
 # R2-Boy - DMG Emulator
 
-![R2-Boy running Pokémon](screenshots/pokemon.gif)
+<figure align="center">
+  <img src="screenshots/pokemon.gif" alt="R2-Boy running Pokémon Red" width="800">
+  <figcaption>R2-Boy running Pokémon Red</figcaption>
+</figure>
 
 ![Language](https://img.shields.io/badge/language-C-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -122,7 +125,7 @@ Common options:
 | `-b`, `--bios <file>`        | Use a specific Game Boy boot ROM (default `roms/bios.bin`) |
 | `--volume <0..100>`          | Set the audio output volume |
 | `--mute`                     | Start with audio muted |
-| `--palette <NAME>`           | Use a built-in palette: `DMG`, `pocket`, `BGB`, `choco`, `pocket_green` |
+| `--palette <NAME>`           | Use a built-in palette: `DMG`, `pocket`, `BGB`, `choco`, `pocket_green`, `basic` |
 | `--remap`                    | Open the visual key-remap window and exit (saves on `S`, aborts on `ESC`/close) |
 | `--link-host <PORT>`         | Host a Game Link session on the given TCP port |
 | `--link-connect <IP>:<PORT>` | Connect to a Game Link host |
@@ -156,6 +159,8 @@ Default keyboard mapping (rebindable, see [Configuration](#configuration)):
 | 9 | Volume down |
 | P | Cycle color palette |
 | F12 | Take snapshot |
+| F10 | ON / OFF Game Boy |
+| F9  | Pause / Resume |
 
 ### Gamepad
 
@@ -188,7 +193,10 @@ R2-Boy keeps its config in `~/.config/r2boy/config.ini` (or `$XDG_CONFIG_HOME/r2
 
 Keyboard bindings support modifier chords written as `Ctrl+Shift+X` style tokens. Any combination of the prefixes `Ctrl`, `Shift`, `Alt`, `GUI` (also accepted: `Control`, `Option`, `Cmd`, `Super`, `Meta`) may precede a scancode name. A bare token like `X` parses as `mods=0` (matches any modifier state, the legacy behaviour). The special value `NONE` (or `—`) means no binding for that action.
 
-![R2-Boy's remap visual SDL window](screenshots/remap_ui.png)
+<figure align="center">
+  <img src="screenshots/remap_ui.png" alt="R2-Boy's remap visual SDL window" width="800">
+  <figcaption>R2-Boy's remap visual SDL window</figcaption>
+</figure>
 
 The `--remap` flag opens a **visual SDL window** with a list of all 21 actions and their current keyboard + gamepad bindings. Keyboard keys are captured via SDL `SDL_KEYDOWN` (so layout-independent scancodes and modifier chords work); gamepad buttons are captured via `SDL_CONTROLLERBUTTONDOWN`.
 
@@ -271,7 +279,10 @@ In debug mode, video output is disabled and the emulator automatically checks th
 
 ## Link Cable
 
-![R2-Boy running multiplayer TETRIS](screenshots/tetris_link_cable.png)
+<figure align="center">
+  <img src="screenshots/tetris_link_cable.png" alt="R2-Boy running multiplayer TETRIS" width="800">
+  <figcaption>R2-Boy running multiplayer TETRIS from separate instances through TCP/IP</figcaption>
+</figure>
 
 R2-Boy includes Link Cable support over TCP/IP, allowing two emulator instances to communicate across the network.
 
@@ -326,15 +337,16 @@ It can't be used at the same time that the Link Cable, in order to reproduce ori
 
 ## Game Boy Camera
 
-![An image of a real Game Boy taken and printed by the Game Boy Camera running in R2-Boy](screenshots/camera.png)
+<figure align="center">
+  <img src="screenshots/camera.png" alt="Game Boy Camera and Printer in R2-Boy" width="800">
+  <figcaption>A real Game Boy photographed with R2-Boy's Game Boy Camera emulation and printed using its Game Boy Printer emulation</figcaption>
+</figure>
 
 R2-Boy supports Game Boy Camera emulation using the computer's webcam as the camera input.
 
 The emulator supports YUYV and JPEG webcam input formats.
 
 This allows compatible Game Boy Camera software to capture images using a modern computer webcam while running inside R2-Boy.
-
-The Game Boy Camera implementation is designed to reproduce the original camera interface while adapting the physical camera hardware to a modern webcam.
 
 ---
 

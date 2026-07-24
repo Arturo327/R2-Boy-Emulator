@@ -36,9 +36,11 @@ static int handle_interrupts (CPU *cpu) {
 	return 1;
 }
 
-void cpu_step (CPU *cpu) {
-
+void cpu_step (CPU *cpu)
+{
 	GB *gb = (GB *) cpu->bus->ctx;
+
+	if (cpu->locked || cpu->stopped) return;
 
 	if (cpu->instr_head >= cpu->instr_tail) {
 

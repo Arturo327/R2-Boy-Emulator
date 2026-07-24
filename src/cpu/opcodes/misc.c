@@ -4,21 +4,30 @@
 
 static void illegal_opcode (GB *gb)
 {
-	uint16_t pc = gb->cpu.pc - 1;
-	uint8_t opcode = gb->bus.read8(gb->bus.ctx, pc);
-	fprintf(stderr, "FATAL: Illegal opcode %02X at PC=%04X\n", opcode, pc);
+	gb->cpu.pc--;
+	uint8_t opcode = gb->bus.read8(gb->bus.ctx, gb->cpu.pc);
+
+	fprintf(stderr, "CPU: illegal opcode %02X at PC=%04X - CPU locked (reset required)\n",
+		opcode, gb->cpu.pc);
 	fprintf(stderr, "A=%02X B=%02X C=%02X D=%02X E=%02X H=%02X L=%02X SP=%04X\n",
 		gb->cpu.a, gb->cpu.b, gb->cpu.c, gb->cpu.d,
 		gb->cpu.e, gb->cpu.h, gb->cpu.l, gb->cpu.sp);
-	gb->cpu.halted = 1;
-	gb->running = 0;	
+
+	gb->cpu.locked = 1;
 }
 
 // --------------------- STOP ------------------------
 
 static void stop (GB *gb) {				// 0x10
+	if (gb->ppu.lcdc & 0x80)
+		gb->ppu.stop_glitch_pending = 1;
+
+	uint8_t pending = gb->interrupts.IE & gb->interrupts.IF & 0x1F;
+	if (!gb->interrupts.IME && pending) return;
+
 	gb->cpu.pc++;
-	gb->cpu.halted = 1;
+	div_reset(gb);
+	gb->cpu.stopped = 1;
 }
 
 // ---------------------- RLCA --------------------
@@ -172,6 +181,7 @@ void init_misc (OpcodeTable *t)
 	t->main[0xD3] = illegal_opcode;
 	t->main[0xDB] = illegal_opcode;
 	t->main[0xDD] = illegal_opcode;
+	t->main[0xE3] = illegal_opcode;
 	t->main[0xE4] = illegal_opcode;
 	t->main[0xEB] = illegal_opcode;
 	t->main[0xEC] = illegal_opcode;

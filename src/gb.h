@@ -21,6 +21,8 @@
 #define TILT_UP 0x04
 #define TILT_DOWN 0x08
 
+#define TICKS_PER_FRAME 70224
+
 typedef struct Joypad {
 	uint8_t buttons;
 	uint8_t joyp;
@@ -73,9 +75,12 @@ typedef struct GB {
 
 	uint8_t boot_rom_enabled;
 	uint8_t boot_rom_disable_pending;
+	uint8_t hay_bios;
 
 	uint64_t clock;
-	int running;
+	uint8_t running;
+	uint8_t on;
+	uint8_t paused;
 
 	const char *romfile;
 	uint8_t state_save_pending;
@@ -86,6 +91,7 @@ typedef struct GB {
 	AutoSave save;
 } GB;
 
+void init_regs (GB *gb);
 void init (GB *gb, const char *romfile, const char *biosfile);
 void init_test (GB *gb, const char *romfile);
 

@@ -50,6 +50,8 @@ typedef struct CPU {
 
 	uint8_t halted;
 	uint8_t halt_bug;
+	uint8_t stopped;
+	uint8_t locked;
 
 	int8_t instr_head;
 	int8_t instr_tail;

@@ -8,7 +8,6 @@
 #include <SDL2/SDL.h>
 
 #define GB_CLOCK_HZ 4194304ULL
-#define TICKS_PER_FRAME 70224
 #define AUTOSAVE_RATE_FRAMES ((uint32_t)(AUTOSAVE_INTERVAL_MS / 1000.0 * (((double)GB_CLOCK_HZ) / ((double)TICKS_PER_FRAME))))
 
 #define VERSION "R2-Boy v1.0.0-beta"
@@ -128,7 +127,7 @@ static inline void print_usage (const char *prog)
 
 	printf("    --palette <NAME>\n");
 	printf("	Select a built-in color palette. NAME is one of:\n");
-	printf("	\"DMG\", \"pocket\", \"BGB\", \"choco\", \"pocket_green\"\n\n");
+	printf("	\"DMG\", \"pocket\", \"BGB\", \"choco\", \"pocket_green\", \"basic\"\n\n");
 
 	printf("    --remap\n");
 	printf("	Run an interactive key-remap prompt at startup.\n");
@@ -143,6 +142,11 @@ static inline void print_usage (const char *prog)
 	printf("    Tab			    Turbo (hold)\n");
 	printf("    M / + / -		    Mute / Vol+ / Vol-\n");
 	printf("    P			    Cycle color palette\n");
+	printf("    F12			    Take screenshot\n");
+	printf("    F10			    ON / OFF the Game Boy\n");
+	printf("    F9			    Pause / Resume\n");
+	printf("    F1 / 1                  Save / Load State slot 1\n");
+	printf("    F2 / 2                  Save / Load State slot 2\n");
 }
 
 static inline void print_version (void) {
@@ -209,7 +213,8 @@ static Args parse_args (int argc, char *argv[])
 
 	int opt;
 	while ((opt = getopt_long(argc, argv, "hvdb:H:C:V:MP:R", long_options, NULL)) != -1) {
-		switch (opt) {
+		switch (opt)
+		{
 		case 'd': {
 			printf("DEBUG MODE active\n");
 			args.debug = 1;
@@ -335,6 +340,14 @@ static int init_emulator (GB *gb, const char *romfile, const char *biosfile) {
 	return 1;
 }
 
+static int idle_tick (GB *gb, uint64_t *next_frame)
+{
+	if (!handle_events(gb)) return 0;
+	SDL_Delay(10);
+	*next_frame = SDL_GetPerformanceCounter();
+	return 1;
+}
+
 static int run_frame (GB *gb, uint32_t max_queued)
 {
 	while (1) {
@@ -349,7 +362,8 @@ static int run_frame (GB *gb, uint32_t max_queued)
 				SDL_Delay(1);
 		}
 
-		if ((gb->clock & 511) == 0 && !handle_events(gb))
+		int check_events = !gb->on || (gb->clock & 511) == 0;
+		if (check_events && !handle_events(gb))
 			return 0;
 
 		if (gb->ppu.ready) return 1;
@@ -381,42 +395,89 @@ static void sync_frame (GB *gb, uint64_t *next_frame, uint64_t frame_ticks, uint
 	sleep_until(*next_frame, freq, link, rx_mark);
 }
 
-static void run (GB *gb, const char *romfile)
+static uint32_t compute_max_queued (GB *gb)
 {
 	double frames_per_sec = ((double)GB_CLOCK_HZ) / ((double)TICKS_PER_FRAME);
 	uint32_t samples_per_frame = (uint32_t)((double)gb->audio.sample_rate / frames_per_sec * 2.0);
-	uint32_t max_queued = (uint32_t)(samples_per_frame * 3.0);
+	return (uint32_t)(samples_per_frame * 3.0);
+}
 
+static int handle_idle (GB *gb, int *was_idle, uint64_t *next_frame)
+{
+	int cond = (!gb->on && !gb->ppu.shutdown_pending) || gb->paused;
+	if (cond) {
+		if (!*was_idle)
+			SDL_PauseAudioDevice(gb->audio.dev, 1);
+		*was_idle = 1;
+		return idle_tick(gb, next_frame);
+	}
+	if (*was_idle)
+		SDL_PauseAudioDevice(gb->audio.dev, 0);
+	*was_idle = 0;
+	return 1;
+}
+
+static int handle_active_frame (GB *gb, uint32_t max_queued)
+{
+	if (!run_frame(gb, max_queued)) return 0;
+
+	queue_audio(gb);
+	update_screen(&gb->lcd, gb->ppu.framebuffer, gb->memory.cart.rumble_on);
+	update_rumble(&gb->pad, gb->memory.cart.rumble_on);
+	return 1;
+}
+
+static void handle_autosave (GB *gb, uint32_t *frames_since_save)
+{
+	if (!gb->memory.cart.save_needed) return;
+	if (++*frames_since_save < AUTOSAVE_RATE_FRAMES) return;
+
+	gb->memory.cart.save_needed = 0;
+	*frames_since_save = 0;
+	request_save(gb);
+}
+
+static void throttle_audio (GB *gb, uint32_t max_queued)
+{
+	if (gb->cfg.turbo)
+		return;
+
+	while (ring_used(&gb->audio.ring) > max_queued)
+		SDL_Delay(1);
+}
+
+static void end_frame_timing(GB *gb, uint64_t *next_frame, uint64_t freq)
+{
+	uint64_t frame_ticks = gb->clock * freq / GB_CLOCK_HZ;
+	gb->clock = 0;
+	sync_frame(gb, next_frame, frame_ticks, freq);
+}
+
+static void run (GB *gb, const char *romfile)
+{
+	uint32_t max_queued = compute_max_queued(gb);
 	uint64_t freq = SDL_GetPerformanceFrequency();
 	uint64_t next_frame = SDL_GetPerformanceCounter();
 
 	uint32_t frames_since_save = 0;
+	int was_idle = 0;
 
 	while (gb->running && !quit_requested) {
 
-		if (!run_frame(gb, max_queued)) {
+		if (!handle_idle(gb, &was_idle, &next_frame)) {
+			gb->running = 0;
+			break;
+		}
+		if (was_idle) continue;
+
+		if (!handle_active_frame(gb, max_queued)) {
 			gb->running = 0;
 			break;
 		}
 
-		uint64_t frame_ticks = gb->clock * freq / GB_CLOCK_HZ;
-		gb->clock = 0;
-
-		queue_audio(gb);
-		update_screen(&gb->lcd, gb->ppu.framebuffer, gb->memory.cart.rumble_on);
-		update_rumble(&gb->pad, gb->memory.cart.rumble_on);
-
-		if (gb->memory.cart.save_needed && ++frames_since_save >= AUTOSAVE_RATE_FRAMES) {
-			gb->memory.cart.save_needed = 0;
-			frames_since_save = 0;
-			request_save(gb);
-		}
-
-		if (!gb->cfg.turbo) {
-			while (ring_used(&gb->audio.ring) > max_queued) SDL_Delay(1);
-		}
-
-		sync_frame(gb, &next_frame, frame_ticks, freq);
+		handle_autosave(gb, &frames_since_save);
+		throttle_audio(gb, max_queued);
+		end_frame_timing(gb, &next_frame, freq);
 	}
 
 	cleanup(gb, romfile);

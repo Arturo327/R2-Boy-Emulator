@@ -26,8 +26,10 @@ static uint8_t joypad_calc_lo (GB *gb)
 
 static void joypad_interrupt (GB *gb, uint8_t old_lo, uint8_t new_lo)
 {
-	if ((old_lo & ~new_lo) & 0x0F)
+	if ((old_lo & ~new_lo) & 0x0F) {
 		gb->interrupts.IF |= 0x10;
+		gb->cpu.stopped = 0;
+	}
 }
 
 void joypad_update (GB *gb, uint8_t new_buttons)
@@ -39,6 +41,23 @@ void joypad_update (GB *gb, uint8_t new_buttons)
 	uint8_t new_lo = joypad_calc_lo(gb);
 
 	joypad_interrupt(gb, old_lo, new_lo);
+}
+
+void div_reset (GB *gb)
+{
+	uint8_t old_div = (uint8_t)(gb->timer.div >> 8);
+
+	if (timer_selected_bit(gb->timer.div, gb->timer.tac) && (gb->timer.tac & 0x04)) {
+		gb->timer.tima++;
+		if (gb->timer.tima == 0)
+			gb->timer.tima_overflow = 4;
+	}
+
+	gb->timer.div = 0;
+	apu_div_reset(&gb->apu, old_div);
+
+	if (serial_div_reset(&gb->serial, old_div))
+		gb->interrupts.IF |= 0x08;
 }
 
 static void oam_bug_rw (GB *gb)
@@ -273,19 +292,7 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 		case 0xFF02: serial_write_sc(&gb->serial, val); break;
 
 		// Timer
-		case 0xFF04: {
-			uint8_t old_div = (uint8_t)(gb->timer.div >> 8);
-			if (timer_selected_bit(gb->timer.div, gb->timer.tac) && (gb->timer.tac & 0x04)) {
-				gb->timer.tima++;
-				if (gb->timer.tima == 0)
-					gb->timer.tima_overflow = 4;
-			}
-			gb->timer.div = 0;
-			apu_div_reset(&gb->apu, old_div);
-			if (serial_div_reset(&gb->serial, old_div))
-				gb->interrupts.IF |= 0x08;
-			break;
-		}
+		case 0xFF04: div_reset(gb); break;
 		case 0xFF05: {
 			if (gb->timer.reload) {
 				gb->timer.reload = 0;

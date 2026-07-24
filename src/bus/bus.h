@@ -23,6 +23,7 @@ typedef struct Bus {
 	void *ctx;
 } Bus;
 
+void div_reset (GB *gb);
 void init_bus (Bus *bus, GB *gb);
 void joypad_update (GB *gb, uint8_t new_buttons);
 void oam_bug (GB *gb, uint16_t val, int is_write);

@@ -94,6 +94,10 @@ typedef struct PPU {
 	uint16_t dots;
 	uint8_t ready;
 	uint8_t lcd_was_off;
+	uint8_t stop_glitch_pending;
+
+	uint8_t shutdown_pending;
+	uint8_t shutdown_frame;
 
 	uint8_t x;
 	uint8_t fetch_x;

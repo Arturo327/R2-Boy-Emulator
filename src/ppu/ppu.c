@@ -254,13 +254,58 @@ static void scan_oam (PPU *ppu, int x)
 	}
 }
 
+static void burn_line (PPU *ppu, uint8_t ly)
+{
+	int offset = ly * 160;
+	int n = offset + 160;
+	for (int i = offset; i < n; i++) {
+		ppu->framebuffer[i] = PALETTES[ppu->palette][3];
+	}
+}
+
+static void color_screen_whiter (PPU *ppu)
+{
+	int pixels = sizeof(ppu->framebuffer) / sizeof(ppu->framebuffer[0]);
+	for (int i = 0; i < pixels; i++) {
+		ppu->framebuffer[i] = PALETTES[ppu->palette][4];
+	}
+}
+
+static void color_screen_white (PPU *ppu)
+{
+	int pixels = sizeof(ppu->framebuffer) / sizeof(ppu->framebuffer[0]);
+	for (int i = 0; i < pixels; i++) {
+		ppu->framebuffer[i] = PALETTES[ppu->palette][0];
+	}
+}
+
+void shutdown_screen (PPU *ppu)
+{
+	color_screen_whiter(ppu);
+	ppu->shutdown_pending = 1;
+	ppu->shutdown_frame = 0;
+}
+
+int ppu_shutdown_step (PPU *ppu)
+{
+	if (!ppu->shutdown_frame) color_screen_white(ppu);
+	burn_line(ppu, 72);
+
+	ppu->shutdown_frame++;
+	ppu->ready = 1;
+
+	if (ppu->shutdown_frame >= 20) {
+		ppu->shutdown_pending = 0;
+		color_screen_whiter(ppu);
+	}
+	return 1;
+}
+
 static void turn_lcd_off (PPU *ppu)
 {
 	if (!ppu->lcd_was_off) {
-		int pixels = sizeof(ppu->framebuffer) / sizeof(ppu->framebuffer[0]);
-		for (int i = 0; i < pixels; i++) {
-			ppu->framebuffer[i] = PALETTES[ppu->palette][4];
-		}
+		color_screen_whiter(ppu);
+		if (ppu->mode != VBLANK) burn_line(ppu, ppu->ly);
 		ppu->ready = 1;
 	} else {
 		ppu->ready = 0;
@@ -288,6 +333,13 @@ static void turn_lcd_on (PPU *ppu)
 	ppu->first_line = 1;
 	ppu->hblank_pending = 0;
 	ppu->x = 0;
+}
+
+static void stop_glitch (PPU *ppu)
+{
+	color_screen_whiter(ppu);
+	burn_line(ppu, ppu->ly);
+	ppu->ready = 1;
 }
 
 static void finish_hblank (PPU *ppu)
@@ -407,6 +459,12 @@ static int handle_oam_scan (PPU *ppu)
 
 void ppu_step (PPU *ppu)
 {
+	if (ppu->stop_glitch_pending) {
+		ppu->stop_glitch_pending = 0;
+		stop_glitch(ppu);
+		return;
+	}
+
 	if (!(ppu->lcdc & PPU_ENABLE)) {
 		turn_lcd_off(ppu);
 		return;

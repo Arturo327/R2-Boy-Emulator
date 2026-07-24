@@ -157,6 +157,26 @@ static int keybind_match (const Keybind *kb, SDL_Scancode sc, uint16_t mods, int
 	return (norm & kb->mods) == kb->mods;
 }
 
+static void toggle_pause (GB *gb)
+{
+	if (!gb->on) return;
+	gb->paused = !gb->paused;
+	fprintf(stderr, "%s\n", gb->paused ? "Paused" : "Resumed");
+}
+
+static void toggle_on (GB *gb)
+{
+	if (gb->on) {
+		gb->on = 0;
+		gb->paused = 0;
+		shutdown_screen(&gb->ppu);
+	} else {
+		gb->on = 1;
+		gb->paused = 0;
+		init_regs(gb);
+	}
+}
+
 static void toggle_mute (Config *cfg)
 {
 	uint8_t m = !atomic_load(&cfg->muted);
@@ -201,7 +221,7 @@ static inline void load_state_2 (GB *gb) {
 static uint8_t kb_scancode_to_tilt_mask (const Keymap *k, SDL_Scancode sc, uint16_t mods, int is_release)
 {
 	static const Action actions[] = { ACT_TILT_RIGHT, ACT_TILT_LEFT, ACT_TILT_UP, ACT_TILT_DOWN };
-	static const uint8_t masks[]  = { TILT_RIGHT, TILT_LEFT, TILT_UP, TILT_DOWN };
+	static const uint8_t masks[] = { TILT_RIGHT, TILT_LEFT, TILT_UP, TILT_DOWN };
 	int n = sizeof(actions) / sizeof(actions[0]);
 	for (int i = 0; i < n; i++) {
 		Keybind kb = kb_binding(k, actions[i]);
@@ -240,6 +260,8 @@ static void handle_hotkey (GB *gb, SDL_Scancode sc, uint16_t mods, int pressed)
 	else if (keybind_match(&cfg->keymap.save_2, sc, mods, 0))	save_state_2(gb);
 	else if (keybind_match(&cfg->keymap.load_2, sc, mods, 0))	load_state_2(gb);
 	else if (keybind_match(&cfg->keymap.screenshot, sc, mods, 0))	take_screenshot(gb);
+	else if (keybind_match(&cfg->keymap.on, sc, mods, 0))		toggle_on(gb);
+	else if (keybind_match(&cfg->keymap.pause, sc, mods, 0))	toggle_pause(gb);
 }
 
 static uint8_t handle_kb_event (GB *gb, const SDL_Event *e, uint8_t curr)
@@ -302,6 +324,8 @@ static void handle_gamepad_button (GB *gb, const SDL_Event *e)
 		else if (b == pad_binding(pad, ACT_SAVE2))	save_state_2(gb);
 		else if (b == pad_binding(pad, ACT_LOAD2))	load_state_2(gb);
 		else if (b == pad_binding(pad, ACT_SCREENSHOT))	take_screenshot(gb);
+		else if (b == pad_binding(pad, ACT_ON))		toggle_on(gb);
+		else if (b == pad_binding(pad, ACT_PAUSE))	toggle_pause(gb);
 	}
 	if (!pressed && b == pad_binding(pad, ACT_TURBO)) gb->cfg.turbo = 0;
 	return;

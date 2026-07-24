@@ -16,6 +16,46 @@ static int load_bios (GB *gb, const char *filename)
 	return n == 0x100;
 }
 
+void init_regs (GB *gb)
+{
+	memset(gb->memory.vram, 0, sizeof(Memory) - offsetof(Memory, vram));
+
+	memset(&gb->ppu, 0, sizeof(PPU));
+	init_ppu(&gb->ppu);
+	gb->ppu.palette = gb->cfg.palette;
+	gb->ppu.lcd_was_off = 1;
+
+	memset(&gb->apu, 0, sizeof(APU));
+	init_apu(&gb->apu);
+	gb->apu.sample_rate = gb->audio.sample_rate;
+
+	memset(&gb->cpu, 0, sizeof(CPU));
+	memset(&gb->dma, 0, sizeof(DMA));
+	memset(&gb->timer, 0, sizeof(Timer));
+	memset(&gb->serial, 0, sizeof(Serial));
+	memset(&gb->interrupts, 0, sizeof(Interrupts));
+
+	if (gb->link.active) gb->serial.link = &gb->link;
+	if (gb->printer.enabled) gb->serial.printer = &gb->printer;
+
+	if (!gb->hay_bios) {
+		init_ppu_reg(&gb->ppu);
+		init_apu_reg(&gb->apu);
+		init_cpu(&gb->cpu);
+		gb->timer.div = 0xABCC;
+		gb->serial.SC = 0x7E;
+		gb->timer.tac = 0xF8;
+		gb->joypad.joyp = 0xCF;
+		gb->boot_rom_enabled = 0;
+	} else {
+		gb->cpu.pc = 0;
+		gb->boot_rom_enabled = 1;
+	}
+
+	init_bus(&gb->bus, gb);
+	gb->on = 1;
+}
+
 static int init_core (GB *gb, const char *romfile, const char *biosfile)
 {
 	memset(gb, 0, sizeof(GB));
@@ -43,13 +83,15 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile)
 		gb->timer.tac = 0xF8;
 		gb->joypad.joyp = 0xCF;
 		gb->boot_rom_enabled = 0;
+		gb->hay_bios = 0;
 		if (biosfile != NULL)
 			printf("Could not load BOOT ROM %s. Running without BIOS\n", biosfile);
 
-	} else if (biosfile != NULL) {
+	} else {
 
 		printf("Using BOOT ROM %s\n", biosfile);
 		gb->boot_rom_enabled = 1;
+		gb->hay_bios = 1;
 	}
 
 	init_bus(&gb->bus, gb);
@@ -78,6 +120,7 @@ void init (GB *gb, const char *romfile, const char *biosfile)
 	gb->apu.sample_rate = gb->audio.sample_rate;
 
 	gb->running = 1;
+	gb->on = 1;
 }
 
 void init_test (GB *gb, const char *romfile)
@@ -88,6 +131,7 @@ void init_test (GB *gb, const char *romfile)
 	}
 
 	gb->running = 1;
+	gb->on = 1;
 }
 
 void cleanup_core (GB *gb, const char *romfile)
@@ -137,11 +181,34 @@ static void save_state_step (GB *gb)
 	}
 }
 
+static void stop_step (GB *gb) {
+	gb->ppu.ready = 0;
+	cpu_step(&gb->cpu);
+	save_state_step(gb);
+	printer_step(&gb->printer);
+	if (gb->memory.cart.mbc_type == CAM)
+		cam_step(gb);
+	gb->clock += 4;
+}
+
 void gb_step (GB *gb)
 {
+	if (!gb->on) {
+		if (gb->ppu.shutdown_pending) {
+			ppu_shutdown_step(&gb->ppu);
+			gb->clock += TICKS_PER_FRAME;
+		}
+		return;
+	}
+
 	if (gb->boot_rom_disable_pending && gb->cpu.pc >= 0x100) {
 		gb->boot_rom_enabled = 0;
 		gb->boot_rom_disable_pending = 0;
+	}
+
+	if (gb->cpu.stopped) {
+		stop_step(gb);
+		return;
 	}
 
 	cpu_step(&gb->cpu);
@@ -153,12 +220,11 @@ void gb_step (GB *gb)
 		cam_step(gb);
 
 	uint16_t old_div = gb->timer.div;
-	if (timer_step(&gb->timer)) {
+	if (timer_step(&gb->timer))
 		gb->interrupts.IF |= 0x04;
-	}
-	if (serial_step(&gb->serial, old_div, gb->timer.div)) {
+
+	if (serial_step(&gb->serial, old_div, gb->timer.div))
 		gb->interrupts.IF |= 0x08;
-	}
 
 	ppu_step(&gb->ppu);
 	apu_step(&gb->apu);

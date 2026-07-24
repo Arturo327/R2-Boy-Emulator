@@ -9,6 +9,8 @@
 
 void init_ppu (PPU *ppu);
 void init_ppu_reg (PPU *ppu);
+void shutdown_screen (PPU *ppu);
+int ppu_shutdown_step (PPU *ppu);
 
 void check_lyc (PPU *ppu);
 void update_stat_line (PPU *ppu);
