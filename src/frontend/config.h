@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdatomic.h>
 #include <SDL2/SDL.h>
-#include "frontend/remap_ui.h"
+#include "frontend/config_ui.h"
 
 typedef struct Config Config;
 
@@ -79,6 +79,35 @@ typedef struct Config {
 	DmgPalette palette;
 	uint8_t use_acel;
 } Config;
+
+typedef enum {
+	SET_VOLUME = 0,
+	SET_MUTE,
+	SET_PALETTE,
+	SET_USE_ACCEL,
+	SET_TURBO_SPEED,
+	SET_TURBO_HOLD,
+	SET_COUNT
+} SettingId;
+
+typedef enum {
+	SETTING_BOOL,
+	SETTING_INT,
+	SETTING_ENUM
+} SettingKind;
+
+typedef struct SettingMeta {
+	const char *label;
+	SettingKind kind;
+	int min, max, step;
+} SettingMeta;
+
+extern const SettingMeta SETTINGS[SET_COUNT];
+
+int  get_setting_value (Config *cfg, SettingId id);
+void set_setting_value (Config *cfg, SettingId id, int value);
+void format_setting_value (Config *cfg, SettingId id, char *buf, size_t n);
+int  default_setting_value (SettingId id);
 
 void default_keymap (Keymap *k);
 void default_padmap (Padmap *p);

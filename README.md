@@ -57,7 +57,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 - Link Cable support over TCP/IP
 - Frontend UX:
   - Game title shown in the window title (`R2-Boy - <title>`)
-  - Key remapping (`--remap` interactive prompt; persisted to `~/.config/r2boy/config.ini`)
+  - Key remapping (`--config` visual interactive window to change mappings and cofiguration; persisted to `~/.config/r2boy/config.ini`)
   - Volume / mute control (runtime hotkeys + `--volume`/`--mute` flags)
   - Turbo / fast-forward (hold `Tab`; audio is muted while active)
   - Alternative color palettes (`--palette`, hotkey `P` to cycle)
@@ -130,7 +130,7 @@ Common options:
 | `--volume <0..100>`          | Set the audio output volume |
 | `--mute`                     | Start with audio muted |
 | `--palette <NAME>`           | Use a built-in palette: `DMG`, `pocket`, `BGB`, `choco`, `pocket_green`, `basic` |
-| `--remap`                    | Open the visual key-remap window and exit (saves on `S`, aborts on `ESC`/close) |
+| `--config`                   | Open the visual configuration window and exit (saves on `S`, aborts on `ESC`/close) |
 | `--link-host <PORT>`         | Host a Game Link session on the given TCP port |
 | `--link-connect <IP>:<PORT>` | Connect to a Game Link host |
 | `--printer`                  | Use the Game Boy Printer and save the printed images on a file |
@@ -198,19 +198,23 @@ R2-Boy keeps its config in `~/.config/r2boy/config.ini` (or `$XDG_CONFIG_HOME/r2
 Keyboard bindings support modifier chords written as `Ctrl+Shift+X` style tokens. Any combination of the prefixes `Ctrl`, `Shift`, `Alt`, `GUI` (also accepted: `Control`, `Option`, `Cmd`, `Super`, `Meta`) may precede a scancode name. A bare token like `X` parses as `mods=0` (matches any modifier state, the legacy behaviour). The special value `NONE` (or `—`) means no binding for that action.
 
 <figure align="center">
-  <img src="screenshots/remap_ui.png" alt="R2-Boy's remap visual SDL window" width="640">
-  <figcaption>R2-Boy's remap visual SDL window</figcaption>
+  <img src="screenshots/config.png" alt="R2-Boy's configuration visual SDL window" width="1644">
+  <figcaption>R2-Boy's configuration visual SDL window, both screens</figcaption>
 </figure>
 
 <br><br>
 
-The `--remap` flag opens a **visual SDL window** with a list of all 26 actions and their current keyboard + gamepad bindings. Keyboard keys are captured via SDL `SDL_KEYDOWN` (so layout-independent scancodes and modifier chords work); gamepad buttons are captured via `SDL_CONTROLLERBUTTONDOWN`.
+The `--config` flag opens a **visual SDL window** with two screens:
+- One for a list of all 26 actions and their current keyboard + gamepad bindings
+- The other one is for other configurations, like turbo speed, palette, volume...
+
+Keyboard keys are captured via SDL `SDL_KEYDOWN` (so layout-independent scancodes and modifier chords work); gamepad buttons are captured via `SDL_CONTROLLERBUTTONDOWN`.
 
 ```bash
-./build/r2boy --remap
+./build/r2boy --config
 ```
 
-In the remap window:
+In the config window:
 
 | Key | Action |
 | :---: | :--- |
@@ -218,11 +222,13 @@ In the remap window:
 | Enter | Capture keyboard binding for selected row |
 | Tab | Capture gamepad binding for selected row |
 | D | Reset selected row to default |
+| R | Reset hole screen to default |
 | S | Save and exit |
+| Q / E | Change screen |
 | ESC | Exit without saving |
 | Window close | Exit without saving |
 
-Runtime hotkey changes (volume, mute, palette) are written back to `config.ini` when the emulator exits, so the next launch picks them up.
+Runtime hotkey changes (volume, mute, palette) are also written back to `config.ini` when the emulator exits, so the next launch picks them up.
 
 Turbo settings are persisted across sessions, including the turbo speed and whether turbo is configured as hold-to-activate or toggle mode.
 
@@ -402,7 +408,7 @@ src/
 |   ├── lcd.c/.h
 |   ├── audio.c/.h
 |   ├── config.c/.h
-|   ├── remap_ui.c/.h
+|   ├── config_ui.c/.h
 |   ├── gamepad.c/.h
 |   ├── printer.c/.h
 |   └── link.c/.h

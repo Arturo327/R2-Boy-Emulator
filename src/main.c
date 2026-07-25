@@ -129,9 +129,9 @@ static inline void print_usage (const char *prog)
 	printf("	Select a built-in color palette. NAME is one of:\n");
 	printf("	\"DMG\", \"pocket\", \"BGB\", \"choco\", \"pocket_green\", \"basic\"\n\n");
 
-	printf("    --remap\n");
-	printf("	Run an interactive key-remap prompt at startup.\n");
-	printf("	The mapping is persisted to ~/.config/r2boy/config.ini\n\n");
+	printf("    --config\n");
+	printf("	Run an interactive visual window for change configuration and key mapping.\n");
+	printf("	The mapping and configuration is persisted to ~/.config/r2boy/config.ini\n\n");
 
 	printf("DEFAULT KEYBOARD CONTROLS:\n");
 	printf("    Arrow Keys		    D-Pad\n");
@@ -196,7 +196,7 @@ static Args parse_args (int argc, char *argv[])
 		{"volume", required_argument, 0, 'V'},
 		{"mute", no_argument, 0, 'M'},
 		{"palette", required_argument, 0, 'P'},
-		{"remap", no_argument, 0, 'R'},
+		{"config", no_argument, 0, 'R'},
 		{"printer", no_argument, 0, 'X'},
 		{0, 0, 0, 0}
 	};
@@ -252,7 +252,7 @@ static Args parse_args (int argc, char *argv[])
 		case 'M': args.mute = 1; break;
 		case 'P': args.palette = optarg; break;
 
-		case 'R': run_remap(); exit(0);
+		case 'R': run_config(); exit(0);
 		case 'h': print_usage(argv[0]); exit(0);
 		case 'v': print_version(); exit(0);
 		default: print_err(argv[0]); exit(1);

@@ -61,6 +61,80 @@ const ActionMeta ACTIONS[ACT_COUNT] =
 	[ACT_TILT_DOWN] = { "TILT DOWN", "tilt_down",	offsetof(Keymap, tilt_down),	offsetof(Padmap, tilt_down)},
 };
 
+const SettingMeta SETTINGS[SET_COUNT] = {
+	[SET_VOLUME]		= { "Volume",		SETTING_INT,  0, 100,	5	},
+	[SET_MUTE]		= { "Muted",		SETTING_BOOL, 0, 1,	1	},
+	[SET_PALETTE]		= { "Palette",		SETTING_ENUM, 0, PAL_COUNT - 1, 1 },
+	[SET_USE_ACCEL]		= { "Use Accelerometer",SETTING_BOOL, 0, 1,	1 },
+	[SET_TURBO_SPEED]	= { "Turbo Speed",	SETTING_INT,  2, 16,	1 },
+	[SET_TURBO_HOLD]	= { "Turbo Hold Mode",	SETTING_BOOL, 0, 1,	1 },
+};
+
+static int clampi (int v, int lo, int hi)
+{
+	if (v < lo) return lo;
+	if (v > hi) return hi;
+	return v;
+}
+
+int get_setting_value (Config *cfg, SettingId id)
+{
+	switch (id)
+	{
+	case SET_VOLUME:	return atomic_load(&cfg->volume);
+	case SET_MUTE:		return atomic_load(&cfg->muted) ? 1 : 0;
+	case SET_PALETTE:	return (int) cfg->palette;
+	case SET_USE_ACCEL:	return cfg->use_acel ? 1 : 0;
+	case SET_TURBO_SPEED:	return cfg->turbo_speed;
+	case SET_TURBO_HOLD:	return cfg->turbo_hold ? 1 : 0;
+	default:		return 0;
+	}
+}
+
+void set_setting_value (Config *cfg, SettingId id, int value)
+{
+	const SettingMeta *m = &SETTINGS[id];
+	value = clampi(value, m->min, m->max);
+
+	switch (id)
+	{
+	case SET_VOLUME:	atomic_store(&cfg->volume, value); break;
+	case SET_MUTE:		atomic_store(&cfg->muted, (uint8_t) value); break;
+	case SET_PALETTE:	cfg->palette = (DmgPalette) value; break;
+	case SET_USE_ACCEL:	cfg->use_acel = (uint8_t) value; break;
+	case SET_TURBO_SPEED:	cfg->turbo_speed = (uint8_t) value; break;
+	case SET_TURBO_HOLD:	cfg->turbo_hold = (uint8_t) value; break;
+	default: break;
+	}
+}
+
+void format_setting_value (Config *cfg, SettingId id, char *buf, size_t n)
+{
+	int v = get_setting_value(cfg, id);
+	switch (SETTINGS[id].kind)
+	{
+	case SETTING_BOOL:
+		snprintf(buf, n, "%s", v ? "ON" : "OFF");
+		break;
+	case SETTING_ENUM:
+		snprintf(buf, n, "%s", palette_name((DmgPalette) v));
+		break;
+	case SETTING_INT:
+	default:
+		if (id == SET_VOLUME) snprintf(buf, n, "%d%%", v);
+		else if (id == SET_TURBO_SPEED) snprintf(buf, n, "x%d", v);
+		else snprintf(buf, n, "%d", v);
+		break;
+	}
+}
+
+int default_setting_value (SettingId id)
+{
+	Config tmp;
+	init_config_defaults(&tmp);
+	return get_setting_value(&tmp, id);
+}
+
 Keybind kb_binding (const Keymap *k, Action a)
 {
 	return *(Keybind *)((const char *)k + ACTIONS[a].kb_offset);

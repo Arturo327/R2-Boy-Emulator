@@ -306,7 +306,7 @@ void attach_printer (Printer *p, const char *romfile)
 	init_printer(p);
 	printer_make_path_prefix(p, romfile);
 	p->enabled = 1;
-	printf("Game Boy Printer: attached (prints will be saved as %s_NNN.bmp)\n", p->path_prefix);
+	printf("Game Boy Printer: attached (prints will be saved as %s_printer_NNN.bmp)\n", p->path_prefix);
 }
 
 void printer_send_byte (Printer *p, uint8_t val)
