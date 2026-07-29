@@ -187,42 +187,40 @@ static void camera_apply_filter (CameraState *cam, uint32_t filtering_mode, CamC
 #define GBCAM_TILE_COLS (GBCAM_W / 8)
 #define GBCAM_TILES_BYTES (GBCAM_TILE_ROWS * GBCAM_TILE_COLS * 16)
 
-static void camera_build_tiles (CameraState *cam, uint8_t tiles[GBCAM_TILE_ROWS][GBCAM_TILE_COLS][16])
+static void camera_build_tiles (CameraState *cam, uint8_t *tiles)
 {
 	memset(tiles, 0, GBCAM_TILES_BYTES);
 	int offset = GBCAM_SENSOR_EXTRA_LINES >> 1;
 
 	for (int x = 0; x < GBCAM_W; x++) {
-
 		uint8_t bit = 1 << (7 - (x & 7));
 		int tile_x = x >> 3;
 		int *src = &cam->retina_buf[offset];
 
 		for (int y = 0; y < GBCAM_H; y++) {
-
 			int value = *src + 128;
 			int shade = camera_matrix_process(cam, value, x, y);
 			uint8_t outcolor = 3 - (shade >> 6);
 
-			uint8_t *tile = &tiles[y >> 3][tile_x][(y & 7) * 2];
+			int tile_index = (y >> 3) * GBCAM_TILE_COLS + tile_x;
+			uint8_t *tile = &tiles[tile_index * 16 + (y & 7) * 2];
 
 			if (outcolor & 1) tile[0] |= bit;
 			if (outcolor & 2) tile[1] |= bit;
-
 			src++;
 		}
-
 		offset += GBCAM_SENSOR_H;
 	}
 }
 
-static void camera_store_tiles (GB *gb, uint8_t tiles[GBCAM_TILE_ROWS][GBCAM_TILE_COLS][16])
+static void camera_store_tiles (GB *gb, uint8_t *tiles)
 {
 	Cartucho *cart = &gb->memory.cart;
 
 	pthread_mutex_lock(&gb->save.lock);
 	if (cart->ram && cart->ram_size >= 0x100 + GBCAM_TILES_BYTES)
 		memcpy(cart->ram + 0x100, tiles, GBCAM_TILES_BYTES);
+
 	cart->save_needed = 1;
 	pthread_mutex_unlock(&gb->save.lock);
 }
@@ -240,7 +238,7 @@ static void camera_start_capture (GB *gb, CameraState *cam)
 	uint32_t filtering_mode = (cfg.n_bit << 3) | (cfg.vh_bits << 1) | cfg.e3_bit;
 	camera_apply_filter(cam, filtering_mode, &cfg);
 
-	uint8_t tiles[GBCAM_TILE_ROWS][GBCAM_TILE_COLS][16];
+	uint8_t tiles[GBCAM_TILES_BYTES];
 	camera_build_tiles(cam, tiles);
 	camera_store_tiles(gb, tiles);
 }

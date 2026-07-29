@@ -58,6 +58,8 @@ typedef struct Cartucho {
 
 	uint8_t has_rumble;
 	uint8_t rumble_on;
+	uint32_t rumble_on_ticks;
+	uint32_t rumble_since;
 
 	uint8_t battery;
 	uint8_t save_needed;

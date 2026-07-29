@@ -15,7 +15,7 @@ typedef struct Gamepad {
 
 int init_gamepad (Gamepad *pad);
 void cleanup_gamepad (Gamepad *pad);
-void update_rumble (Gamepad *pad, uint8_t active);
+void update_rumble (Gamepad *pad, uint16_t intensity);
 void open_gamepad (Gamepad *pad, int device_index);
 int gamepad_get_acel (Gamepad *pad, float out[3]);
 

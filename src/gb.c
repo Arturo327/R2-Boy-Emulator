@@ -27,6 +27,8 @@ static void reset_cartucho (Cartucho *c)
 	c->bank2 = 0;
 	c->save_needed = 0;
 	c->rumble_on = 0;
+	c->rumble_on_ticks = 0;
+	c->rumble_since = 0;
 }
 
 static void reset_components (GB *gb)

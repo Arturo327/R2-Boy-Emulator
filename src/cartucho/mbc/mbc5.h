@@ -9,5 +9,6 @@ uint8_t mbc5_read_rom (GB *gb, uint16_t addr);
 void mbc5_write_rom (GB *gb, uint16_t addr, uint8_t val);
 uint8_t mbc5_read_ram (GB *gb, uint16_t addr);
 void mbc5_write_ram (GB *gb, uint16_t addr, uint8_t val);
+uint16_t mbc5_sample_rumble (GB *gb);
 
 #endif

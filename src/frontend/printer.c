@@ -1,4 +1,5 @@
 #include "frontend/printer.h"
+#include "utils/utils.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,23 +25,6 @@
 
 static const uint8_t PRINTER_SHADES[4] = { 0xFF, 0xAA, 0x55, 0x00 };
 
-static void printer_make_path_prefix (Printer *p, const char *romfile)
-{
-	size_t len = strlen(romfile);
-	const char *dot = strrchr(romfile, '.');
-	const char *slash = strrchr(romfile, '/');
-
-	size_t base_len = len;
-	if (dot && (!slash || dot > slash))
-		base_len = (size_t)(dot - romfile);
-
-	if (base_len > sizeof(p->path_prefix) - 1)
-		base_len = sizeof(p->path_prefix) - 1;
-
-	memcpy(p->path_prefix, romfile, base_len);
-	p->path_prefix[base_len] = '\0';
-}
-
 static void printer_reset_transfer (Printer *p)
 {
 	p->state = PRT_MAGIC1;
@@ -57,127 +41,77 @@ static uint32_t printer_pixel_color (uint8_t palette, uint8_t color_id)
 	return 0xFF000000u | ((uint32_t)v << 16) | ((uint32_t)v << 8) | v;
 }
 
-static void write_bmp_header (FILE *f, int w, int h, uint32_t data_size)
+static uint32_t *init_print_buf (Printer *p, int width, int height)
 {
-	uint32_t file_size = 54u + data_size;
-	uint8_t header[54];
-	memset(header, 0, sizeof(header));
-
-	header[0] = 'B';
-	header[1] = 'M';
-	header[2] = (uint8_t)(file_size);
-	header[3] = (uint8_t)(file_size >> 8);
-	header[4] = (uint8_t)(file_size >> 16);
-	header[5] = (uint8_t)(file_size >> 24);
-	header[10] = 54;
-	header[14] = 40;
-	header[18] = (uint8_t)(w);
-	header[19] = (uint8_t)(w >> 8);
-	header[20] = (uint8_t)(w >> 16);
-	header[21] = (uint8_t)(w >> 24);
-	header[22] = (uint8_t)(h);
-	header[23] = (uint8_t)(h >> 8);
-	header[24] = (uint8_t)(h >> 16);
-	header[25] = (uint8_t)(h >> 24);
-	header[26] = 1;
-	header[28] = 24;
-	header[34] = (uint8_t)(data_size);
-	header[35] = (uint8_t)(data_size >> 8);
-	header[36] = (uint8_t)(data_size >> 16);
-	header[37] = (uint8_t)(data_size >> 24);
-
-	fwrite(header, 1, sizeof(header), f);
-}
-
-static int write_bmp (const char *path, const uint32_t *pixels, int w, int h)
-{
-	FILE *f = fopen(path, "wb");
-	if (!f) return 0;
-
-	int row_bytes = w * 3;
-	int pad = (4 - (row_bytes % 4)) % 4;
-	uint32_t data_size = (uint32_t)(row_bytes + pad) * (uint32_t)h;
-	write_bmp_header(f, w, h, data_size);
-
-	static const uint8_t padbuf[3] = { 0, 0, 0 };
-	for (int y = h - 1; y >= 0; y--) {
-		for (int x = 0; x < w; x++) {
-			uint32_t px = pixels[y * w + x];
-			uint8_t bgr[3] = {
-				(uint8_t)(px & 0xFF),
-				(uint8_t)((px >> 8) & 0xFF),
-				(uint8_t)((px >> 16) & 0xFF)
-			};
-			fwrite(bgr, 1, 3, f);
-		}
-		if (pad) fwrite(padbuf, 1, (size_t)pad, f);
-	}
-
-	fclose(f);
-	return 1;
-}
-
-static int file_exists (const char *file)
-{
-	FILE *f = fopen(file, "r");
-	if (f == NULL) return 0;
-	fclose(f);
-	return 1;
-}
-
-static void printer_render_and_save (Printer *p)
-{
-	int total_tiles = p->ram_len >> 4;
-	if (total_tiles <= 0) return;
-
-	int rows = (total_tiles + PRINTER_TILES_PER_ROW - 1) / PRINTER_TILES_PER_ROW;
-	int width = PRINTER_TILES_PER_ROW << 3;
-	int height = rows << 3;
-
 	int total_pix = width * height;
 	uint32_t *pixels = malloc((size_t)total_pix * sizeof(uint32_t));
 	if (!pixels) {
 		fprintf(stderr, "Printer: not enough memory to render the print job\n");
-		return;
+		return NULL;
 	}
 
 	uint32_t blank = printer_pixel_color(p->palette, 0);
 	for (int i = 0; i < total_pix; i++)
 		pixels[i] = blank;
 
-	uint8_t *tile = p->ram;
-	for (int i = 0; i < total_tiles; i++) {
+	return pixels;
+}
 
-		int tile_col = i % PRINTER_TILES_PER_ROW;
-		int tile_row = i / PRINTER_TILES_PER_ROW;
-		int base_x = tile_col << 3;
-		int base_y = tile_row << 3;
+static void printer_render_row (uint32_t *row, uint8_t lo, uint8_t hi, uint8_t palette)
+{
+	for (int x = 0; x < 8; x++) {
+		int bit = 7 - x;
+		uint8_t color = ((hi >> bit & 1) << 1) | (lo >> bit & 1);
+		row[x] = printer_pixel_color(palette, color);
+	}
+}
+
+static void printer_render (Printer *p, uint32_t *pixels, int total_tiles, int width)
+{
+	uint8_t *tile = p->ram;
+	uint32_t *row_base = pixels;
+	int tile_col = 0;
+
+	for (int i = 0; i < total_tiles; i++) {
+		uint32_t *row = row_base + (tile_col << 3);
 
 		for (int y = 0; y < 8; y++) {
-			uint8_t lo = *tile++;
-			uint8_t hi = *tile++;
-			for (int x = 0; x < 8; x++) {
-				int bit = 7 - x;
-				uint8_t lo_bit = (lo >> bit) & 1;
-				uint8_t hi_bit = (hi >> bit) & 1;
-				uint8_t color = (hi_bit << 1) | lo_bit;
-				int px = base_x + x;
-				int py = base_y + y;
-				pixels[py * width + px] = printer_pixel_color(p->palette, color);
-			}
+			printer_render_row(row, tile[0], tile[1], p->palette);
+			tile += 2;
+			row += width;
+		}
+
+		if (++tile_col == PRINTER_TILES_PER_ROW) {
+			tile_col = 0;
+			row_base += width << 3;
 		}
 	}
+}
 
+static void save_print (Printer *p, uint32_t *pixels, int width, int height)
+{
 	char path[600];
 	static int print_count = 0;
-	do {
-		snprintf(path, sizeof(path), "%s_printer_%03d.bmp", p->path_prefix, ++print_count);
-	} while (file_exists(path));
-
-	if (write_bmp(path, pixels, width, height))
+	if (next_numbered_file(p->path_prefix, "bmp", &print_count, path, sizeof(path))
+			&& write_bmp(path, pixels, width, height))
 		printf("Printer: saved print job to %s (%dx%d)\n", path, width, height);
 	else
-		fprintf(stderr, "Printer: could not save %s\n", path);
+		fprintf(stderr, "Printer: could not save print job\n");
+}
+
+static void printer_render_and_save (Printer *p)
+{
+	int total_tiles = p->ram_len >> 4;
+	if (total_tiles <= 0) return;
+	int rows = (total_tiles + PRINTER_TILES_PER_ROW - 1) / PRINTER_TILES_PER_ROW;
+	int width = PRINTER_TILES_PER_ROW << 3;
+	int height = rows << 3;
+
+	uint32_t *pixels = init_print_buf(p, width, height);
+	if (!pixels) return;
+	printer_render(p, pixels, total_tiles, width);
+
+	save_print(p, pixels, width, height);
 
 	free(pixels);
 }
@@ -304,9 +238,12 @@ void init_printer (Printer *p) {
 void attach_printer (Printer *p, const char *romfile)
 {
 	init_printer(p);
-	printer_make_path_prefix(p, romfile);
+	if (!path_with_suffix(romfile, "_printer", p->path_prefix, sizeof(p->path_prefix))) {
+		fprintf(stderr, "Printer: ROM path too long, using a generic filename prefix\n");
+		snprintf(p->path_prefix, sizeof(p->path_prefix), "printer");
+	}
 	p->enabled = 1;
-	printf("Game Boy Printer: attached (prints will be saved as %s_printer_NNN.bmp)\n", p->path_prefix);
+	printf("Game Boy Printer: attached (prints will be saved as %s_NNN.bmp)\n", p->path_prefix);
 }
 
 void printer_send_byte (Printer *p, uint8_t val)

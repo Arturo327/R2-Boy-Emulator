@@ -1,4 +1,5 @@
 #include "frontend/frontend.h"
+#include "utils/utils.h"
 #include "gb.h"
 
 #include <stdio.h>
@@ -18,121 +19,26 @@
 #define SCREENSHOT_W 160
 #define SCREENSHOT_H 144
 
-static void screenshot_path_prefix (const char *romfile, char *out, size_t outsize)
-{
-	size_t len = strlen(romfile);
-	const char *dot = strrchr(romfile, '.');
-	const char *slash = strrchr(romfile, '/');
-
-	size_t base_len = len;
-	if (dot && (!slash || dot > slash))
-		base_len = (size_t)(dot - romfile);
-
-	if (base_len > outsize - 1)
-		base_len = outsize - 1;
-
-	memcpy(out, romfile, base_len);
-	out[base_len] = '\0';
-}
-
-static int file_exists (const char *path) {
-	FILE *f = fopen(path, "r");
-	if (!f) return 0;
-	fclose(f);
-	return 1;
-}
-
-static int bmp_row_pad (int w) {
-	int row_bytes = w * 3;
-	return (4 - (row_bytes % 4)) % 4;
-}
-
-static uint32_t bmp_data_size (int w, int h) {
-	return (uint32_t)(w * 3 + bmp_row_pad(w)) * (uint32_t)h;
-}
-
-static void write_bmp_row (FILE *f, const uint32_t *row, int w, int pad)
-{
-	static const uint8_t padbuf[3] = { 0, 0, 0 };
-
-	for (int x = 0; x < w; x++) {
-		uint8_t bgr[3] = {
-			(uint8_t)(row[x] & 0xFF),
-			(uint8_t)((row[x] >> 8) & 0xFF),
-			(uint8_t)((row[x] >> 16) & 0xFF)
-		};
-		fwrite(bgr, 1, 3, f);
-	}
-	if (pad) fwrite(padbuf, 1, (size_t)pad, f);
-}
-
-static void write_bmp_rows (FILE *f, const uint32_t *pixels, int w, int h)
-{
-	int pad = bmp_row_pad(w);
-	const uint32_t *row = pixels + (size_t)(h - 1) * w;
-
-	for (int y = 0; y < h; y++) {
-		write_bmp_row(f, row, w, pad);
-		row -= w;
-	}
-}
-
-static void write_bmp_header (FILE *f, int w, int h, uint32_t data_size)
-{
-	uint32_t file_size = 54u + data_size;
-	uint8_t header[54];
-	memset(header, 0, sizeof(header));
-
-	header[0] = 'B';
-	header[1] = 'M';
-	header[2] = (uint8_t)(file_size);
-	header[3] = (uint8_t)(file_size >> 8);
-	header[4] = (uint8_t)(file_size >> 16);
-	header[5] = (uint8_t)(file_size >> 24);
-	header[10] = 54;
-	header[14] = 40;
-	header[18] = (uint8_t)(w);
-	header[19] = (uint8_t)(w >> 8);
-	header[20] = (uint8_t)(w >> 16);
-	header[21] = (uint8_t)(w >> 24);
-	header[22] = (uint8_t)(h);
-	header[23] = (uint8_t)(h >> 8);
-	header[24] = (uint8_t)(h >> 16);
-	header[25] = (uint8_t)(h >> 24);
-	header[26] = 1;
-	header[28] = 24;
-	header[34] = (uint8_t)(data_size);
-	header[35] = (uint8_t)(data_size >> 8);
-	header[36] = (uint8_t)(data_size >> 16);
-	header[37] = (uint8_t)(data_size >> 24);
-
-	fwrite(header, 1, sizeof(header), f);
-}
-
 static void take_screenshot (GB *gb)
 {
+	static int n = 0;
+
 	char prefix[512];
-	screenshot_path_prefix(gb->romfile, prefix, sizeof(prefix));
-
-	char path[600];
-	int n = 0;
-	do {
-		n++;
-		snprintf(path, sizeof(path), "%s_screenshot_%03d.bmp", prefix, n);
-	} while (file_exists(path));
-
-	FILE *f = fopen(path, "wb");
-	if (!f) {
-		fprintf(stderr, "Screenshot: could not save %s\n", path);
+	if (!path_with_suffix(gb->romfile, "_screenshot", prefix, sizeof(prefix))) {
+		fprintf(stderr, "Screenshot: ROM path too long\n");
 		return;
 	}
 
-	write_bmp_header(f, SCREENSHOT_W, SCREENSHOT_H,
-			bmp_data_size(SCREENSHOT_W, SCREENSHOT_H));
-	write_bmp_rows(f, gb->ppu.framebuffer, SCREENSHOT_W, SCREENSHOT_H);
+	char path[600];
+	if (!next_numbered_file(prefix, "bmp", &n, path, sizeof(path))) {
+		fprintf(stderr, "Screenshot: could not build a filename\n");
+		return;
+	}
 
-	fclose(f);
-	printf("Screenshot saved: %s\n", path);
+	if (write_bmp(path, gb->ppu.framebuffer, SCREENSHOT_W, SCREENSHOT_H))
+		printf("Screenshot saved: %s\n", path);
+	else
+		fprintf(stderr, "Screenshot: could not save %s\n", path);
 }
 
 static int handle_window_event (SDL_Event *e)
@@ -154,7 +60,7 @@ static int keybind_match (const Keybind *kb, SDL_Scancode sc, uint16_t mods, int
 	if (mods & KBMOD_ALT) norm |= KBMOD_ALT;
 	if (mods & KBMOD_GUI) norm |= KBMOD_GUI;
 
-	return (norm & kb->mods) == kb->mods;
+	return norm == kb->mods;
 }
 
 static void toggle_pause (GB *gb)
@@ -164,11 +70,6 @@ static void toggle_pause (GB *gb)
 	if (gb->paused) {
 		ring_clear(&gb->audio.ring);
 		gb->apu.buffer_pos = 0;
-		if (gb->audio.dev)
-			SDL_PauseAudioDevice(gb->audio.dev, 1);
-	} else {
-		if (gb->audio.dev)
-			SDL_PauseAudioDevice(gb->audio.dev, 0);
 	}
 	fprintf(stderr, "%s\n", gb->paused ? "Paused" : "Resumed");
 }
@@ -189,11 +90,15 @@ static void toggle_on (GB *gb)
 			ring_reset(&gb->link.rx);
 			ring_reset(&gb->link.tx);
 		}
+		if (gb->memory.cart.has_rumble) {
+			gb->memory.cart.rumble_on = 0;
+			gb->memory.cart.rumble_on_ticks = 0;
+			gb->memory.cart.rumble_since = 0;
+			update_rumble(&gb->pad, 0);
+		}
 		shutdown_screen(&gb->ppu);
 	} else {
 		reset_gb(gb);
-		if (gb->audio.dev)
-			SDL_PauseAudioDevice(gb->audio.dev, 0);
 	}
 }
 
@@ -475,12 +380,12 @@ int handle_events (GB *gb)
 			return 0;
 
 		if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
-			if (gb->joypad.kb_buttons) {
-				gb->joypad.kb_buttons = 0;
+			uint8_t had_kb = gb->joypad.kb_buttons;
+			gb->joypad.kb_buttons = 0;
+			gb->joypad.kb_tilt = 0;
+			gb->cfg.turbo = 0;
+			if (had_kb)
 				joypad_update(gb, gb->joypad.pad_dpad | gb->joypad.pad_stick);
-				gb->cfg.turbo = 0;
-				gb->joypad.kb_tilt = 0;
-			}
 			continue;
 		}
 

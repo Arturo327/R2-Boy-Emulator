@@ -1,26 +1,11 @@
 #include "cartucho/save.h"
+#include "utils/utils.h"
 #include "gb.h"
 
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
 #include <time.h>
-
-static void make_sav_path (const char *romfile, char *out, size_t outsize) {
-	size_t len = strlen(romfile);
-	const char *dot = strrchr(romfile, '.');
-	const char *slash = strrchr(romfile, '/');
-
-	size_t base_len = len;
-	if (dot && (!slash || dot > slash)) {
-		base_len = (size_t)(dot - romfile);
-	}
-
-	if (base_len > outsize - 5) base_len = outsize - 5;
-
-	memcpy(out, romfile, base_len);
-	memcpy(out + base_len, ".sav", 5);
-}
 
 static int read_int64 (FILE *f, int64_t *v)
 {
@@ -67,7 +52,10 @@ int load_sram (Cartucho *cart, const char *romfile)
 		!cart->has_rtc && cart->mbc_type != HUC3) return 0;
 
 	char path[512];
-	make_sav_path(romfile, path, sizeof(path));
+	if (!path_with_suffix(romfile, ".sav", path, sizeof(path))) {
+		fprintf(stderr, "Save: ROM path too long\n");
+		return 0;
+	}
 
 	FILE *f = fopen(path, "rb");
 	if (!f) return 0;
@@ -134,7 +122,7 @@ static int write_sav_file (const char *savefile, const uint8_t *ram, uint32_t ra
 
 	if (rtc) {
 		uint8_t dh = ((rtc->d >> 8) & 0x01)
-			| (rtc->halt  ? 0x40 : 0)
+			| (rtc->halt ? 0x40 : 0)
 			| (rtc->carry ? 0x80 : 0);
 		uint8_t buf[5] = { rtc->s, rtc->m, rtc->h,
 				(uint8_t)(rtc->d & 0xFF), dh };
@@ -168,7 +156,10 @@ int save_sram (Cartucho *cart, const char *romfile)
 		&& !cart->has_rtc && cart->mbc_type != HUC3) return 0;
 
 	char savefile[512];
-	make_sav_path(romfile, savefile, sizeof(savefile));
+	if (!path_with_suffix(romfile, ".sav", savefile, sizeof(savefile))) {
+		fprintf(stderr, "Save: ROM path too long\n");
+		return 0;
+	}
 
 	uint8_t *extra = NULL;
 	uint32_t extra_size = 0;
@@ -195,15 +186,16 @@ int save_sram (Cartucho *cart, const char *romfile)
 }
 
 static void save_sram_snapshot (Cartucho *cart, const char *romfile,
-			 const uint8_t *ram_snap, uint32_t ram_size, const RTC *rtc_snap,
-			 const uint8_t *extra_snap, uint32_t extra_size)
+			const uint8_t *ram_snap, uint32_t ram_size, const RTC *rtc_snap,
+			const uint8_t *extra_snap, uint32_t extra_size)
 {
 	if (!cart->battery) return;
 	if ((!ram_snap || ram_size == 0) &&
 		!cart->has_rtc && !(extra_snap && extra_size)) return;
 
 	char path[512];
-	make_sav_path(romfile, path, sizeof(path));
+	if (!path_with_suffix(romfile, ".sav", path, sizeof(path))) return;
+
 	write_sav_file(path, ram_snap, ram_size,
 		cart->has_rtc ? rtc_snap : NULL, extra_snap, extra_size);
 }
@@ -225,7 +217,7 @@ static void *save_thread_fn (void *arg)
 
 	while (atomic_load(&gb->save.thread_run)) {
 
-		deadline.tv_sec  += AUTOSAVE_INTERVAL_MS / 1000;
+		deadline.tv_sec += AUTOSAVE_INTERVAL_MS / 1000;
 		deadline.tv_nsec += (AUTOSAVE_INTERVAL_MS % 1000) * 1000000L;
 		if (deadline.tv_nsec >= 1000000000L) {
 			deadline.tv_sec++;

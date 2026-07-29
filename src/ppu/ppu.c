@@ -70,6 +70,7 @@ static void reset_drawing (PPU *ppu)
 {
 	ppu->mode3_cycles = 0;
 	ppu->x = 0;
+	ppu->line_base = ppu->ly * 160;
 	ppu->fetch_x = ppu->scx & ~7;
 
 	ppu->bg.fetcher_t = 0;
@@ -167,7 +168,7 @@ static void draw_pixel (PPU *ppu)
 		else final_pixel = decode_color(ppu, bg, ppu->bgp);
 	}
 
-	ppu->framebuffer[ppu->ly * 160 + ppu->x] = final_pixel;
+	ppu->framebuffer[ppu->line_base + ppu->x] = final_pixel;
 	ppu->x++;	
 }
 

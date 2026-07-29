@@ -44,7 +44,7 @@ typedef struct ConfigUI {
 	int running;
 } ConfigUI;
 
-static int config_open_window (ConfigUI *ui)
+static int init_window (ConfigUI *ui)
 {
 	ui->window = SDL_CreateWindow(
 		"R2-Boy - Configuration",
@@ -66,7 +66,11 @@ static int config_open_window (ConfigUI *ui)
 		ui->window = NULL;
 		return 0;
 	}
+	return 1;
+}
 
+static void init_font (ConfigUI *ui)
+{
 	static const char *candidates[] = {
 		/* Linux */
 		"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
@@ -81,13 +85,26 @@ static int config_open_window (ConfigUI *ui)
 		"/System/Library/Fonts/SFNSMono.ttf",
 		"/System/Library/Fonts/Supplemental/Arial.ttf",
 		"/Library/Fonts/Arial.ttf",
-		"$HOME/Library/Fonts/Arial.ttf",
-		NULL
+		NULL, NULL
 	};
+	const char *home = getenv("HOME");
+	if (home) {
+		char buf[512];
+		snprintf(buf, sizeof(buf), "%s/Library/Fonts/Arial.ttf", home);
+		ui->font = TTF_OpenFont(buf, 18);
+	}
+
 	for (int i = 0; candidates[i]; i++) {
 		ui->font = TTF_OpenFont(candidates[i], 18);
-		if (ui->font) break;
+		if (ui->font) return;
 	}
+}
+
+static int config_open_window (ConfigUI *ui)
+{
+	if (!init_window(ui)) return 0;
+	init_font(ui);
+
 	if (!ui->font) {
 		fprintf(stderr, "Config: could not load a font (tried the bundled font and common system fonts)\n");
 		SDL_DestroyRenderer(ui->renderer);

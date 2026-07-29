@@ -100,6 +100,7 @@ typedef struct PPU {
 	uint8_t shutdown_frame;
 
 	uint8_t x;
+	uint16_t line_base;
 	uint8_t fetch_x;
 	uint8_t short_line;
 	uint8_t first_line;

@@ -17,7 +17,6 @@ void open_gamepad (Gamepad *pad, int device_index) {
 	pad->has_rumble = (SDL_GameControllerRumble(ctrl, 0, 0, 1) == 0);
 #endif
 
-
 #if SDL_VERSION_ATLEAST(2, 0, 14)
 	pad->has_acel = SDL_GameControllerHasSensor(ctrl, SDL_SENSOR_ACCEL);
 	if (pad->has_acel && SDL_GameControllerSetSensorEnabled(ctrl, SDL_SENSOR_ACCEL, SDL_TRUE) != 0)
@@ -65,16 +64,20 @@ void cleanup_gamepad (Gamepad *pad)
 	memset(pad, 0, sizeof(Gamepad));
 }
 
-void update_rumble (Gamepad *pad, uint8_t active)
+void update_rumble (Gamepad *pad, uint16_t intensity)
 {
 #if SDL_VERSION_ATLEAST(2, 0, 9)
 	if (!pad->connected || !pad->has_rumble) return;
-	if (active == pad->rumble_active) return;
-	pad->rumble_active = active;
-	if (active) SDL_GameControllerRumble(pad->ctrl, 0xFFFF, 0xFFFF, 50);
-	else SDL_GameControllerRumble(pad->ctrl, 0, 0, 0);
+
+	if (intensity > 0) {
+		SDL_GameControllerRumble(pad->ctrl, intensity, intensity, 100);
+	} else if (pad->rumble_active) {
+		SDL_GameControllerRumble(pad->ctrl, 0, 0, 0);
+	}
+	pad->rumble_active = (intensity > 0);
 #else
 	(void)pad;
-	(void)active;
+	(void)intensity;
 #endif
 }
+

@@ -93,59 +93,59 @@ static inline void print_usage (const char *prog)
 
 	printf("OPTIONS:\n");
 	printf("    -h, --help\n");
-	printf("	Display this help message and exit.\n\n");
+	printf("        Display this help message and exit.\n\n");
 
 	printf("    -v, --version\n");
-	printf("	Display version information and exit.\n\n");
+	printf("        Display version information and exit.\n\n");
 
 	printf("    -d, --debug\n");
-	printf("	Run in headless mode and verify CPU registers after execution.\n");
-	printf("	Intended for automated test ROMs.\n\n");
+	printf("        Run in headless mode and verify CPU registers after execution.\n");
+	printf("        Intended for automated test ROMs.\n\n");
 
 	printf("    -b, --bios <BIOS_FILE>\n");
-	printf("	Use the specified Game Boy Boot ROM.\n");
-	printf("	Default: roms/bios.bin\n");
-	printf("	If the file cannot be loaded, the emulator boots without a Boot ROM.\n\n");
+	printf("        Use the specified Game Boy Boot ROM.\n");
+	printf("        Default: roms/bios.bin\n");
+	printf("        If the file cannot be loaded, the emulator boots without a Boot ROM.\n\n");
 
-	printf("    --link-host <PORT>\n");
-	printf("	Host a Game Link session and listen for an incoming connection\n");
-	printf("	on the specified TCP port.\n\n");
+        printf("    --link-host <PORT>\n");
+        printf("        Host a Game Link session and listen for an incoming connection\n");
+        printf("        on the specified TCP port.\n\n");
 
-	printf("    --link-connect <IP:PORT>\n");
-	printf("	Connect to a remote Game Link host using the specified\n");
-	printf("	IP address and TCP port.\n\n");
+        printf("    --link-connect <IP:PORT>\n");
+        printf("        Connect to a remote Game Link host using the specified\n");
+        printf("        IP address and TCP port.\n\n");
 
-	printf("    --printer\n");
-	printf("	Use the Game Boy Printer. It will generate the output on <ROM>_NNN.bmp\n");
-	printf("	Can't be used at the same time that --link-host/--link-connect.\n\n");
+        printf("    --printer\n");
+        printf("        Use the Game Boy Printer. It will generate the output on <ROM>_NNN.bmp\n");
+        printf("        Can't be used at the same time that --link-host/--link-connect.\n\n");
 
-	printf("    --volume <0..100>\n");
-	printf("	Set the audio output volume. Default: 100.\n\n");
+        printf("    --volume <0..100>\n");
+        printf("        Set the audio output volume. Default: 100.\n\n");
 
-	printf("    --mute\n");
-	printf("	Start with audio muted.\n\n");
+        printf("    --mute\n");
+        printf("        Start with audio muted.\n\n");
 
-	printf("    --palette <NAME>\n");
-	printf("	Select a built-in color palette. NAME is one of:\n");
-	printf("	\"DMG\", \"pocket\", \"BGB\", \"choco\", \"pocket_green\", \"basic\"\n\n");
+        printf("    --palette <NAME>\n");
+        printf("        Select a built-in color palette. NAME is one of:\n");
+        printf("        \"DMG\", \"pocket\", \"BGB\", \"choco\", \"pocket_green\", \"basic\"\n\n");
 
-	printf("    --config\n");
-	printf("	Run an interactive visual window for change configuration and key mapping.\n");
-	printf("	The mapping and configuration is persisted to ~/.config/r2boy/config.ini\n\n");
+        printf("    --config\n");
+        printf("        Run an interactive visual window for change configuration and key mapping.\n");
+        printf("        The mapping and configuration is persisted to ~/.config/r2boy/config.ini\n\n");
 
 	printf("DEFAULT KEYBOARD CONTROLS:\n");
-	printf("    Arrow Keys		    D-Pad\n");
-	printf("    X			    A\n");
-	printf("    Z			    B\n");
-	printf("    Enter		    START\n");
-	printf("    Backspace		    SELECT\n");
-	printf("    Tab			    Turbo (hold / toggle, depending cofig.ini)\n");
+	printf("    Arrow Keys              D-Pad\n");
+	printf("    X                       A\n");
+	printf("    Z                       B\n");
+	printf("    Enter                   START\n");
+	printf("    Backspace               SELECT\n");
+	printf("    Tab	                    Turbo (hold / toggle, depending cofig.ini)\n");
 	printf("    F4 / F3                 Turbo Speed + / -\n");
-	printf("    M / 0 / 9		    Mute / Vol+ / Vol-\n");
-	printf("    P			    Cycle color palette\n");
-	printf("    F12			    Take screenshot\n");
-	printf("    F10			    ON / OFF the Game Boy\n");
-	printf("    F9			    Pause / Resume\n");
+	printf("    M / 0 / 9               Mute / Vol+ / Vol-\n");
+	printf("    P                       Cycle color palette\n");
+	printf("    F12                     Take screenshot\n");
+	printf("    F10                     ON / OFF the Game Boy\n");
+	printf("    F9                      Pause / Resume\n");
 	printf("    F1 / 1                  Save / Load State slot 1\n");
 	printf("    F2 / 2                  Save / Load State slot 2\n");
 }
@@ -326,7 +326,7 @@ static void init_config (GB *gb, Args args)
 		if (!strcmp(args.palette, n)) {
 			gb->cfg.palette = (DmgPalette)i;
 			gb->ppu.palette = (DmgPalette)i;
-			break;
+			return;
 		}
 	}
 	fprintf(stderr, "Unknown palette: %s (ignored)\n", args.palette);
@@ -422,9 +422,11 @@ static int handle_active_frame (GB *gb, uint32_t max_queued)
 {
 	if (!run_frame(gb, max_queued)) return 0;
 
+	uint16_t rumble = mbc5_sample_rumble(gb);
+
 	queue_audio(gb);
-	update_screen(&gb->lcd, gb->ppu.framebuffer, gb->memory.cart.rumble_on);
-	update_rumble(&gb->pad, gb->memory.cart.rumble_on);
+	update_screen(&gb->lcd, gb->ppu.framebuffer, rumble != 0);
+	update_rumble(&gb->pad, rumble);
 	return 1;
 }
 

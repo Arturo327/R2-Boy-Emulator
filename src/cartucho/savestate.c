@@ -1,8 +1,10 @@
 #include "cartucho/savestate.h"
+#include "utils/utils.h"
 #include "gb.h"
 
 #include <string.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <pthread.h>
 
 static void io_buf (SaveState *s, void *p, size_t n)
@@ -110,6 +112,7 @@ static void io_cart (SaveState *s, GB *gb)
 	if (cart->mbc_type == MBC7) io_mbc7(s, (MBC7State *)cart->state);
 	if (cart->mbc_type == MMM01) io_buf(s, (MMM01Regs *)cart->state, sizeof(MMM01Regs));
 	if (cart->mbc_type == HUC3) io_huc3(s, (HuC3State *)cart->state);
+	if (cart->mbc_type == CAM) io_buf(s, (CameraState *)cart->state, sizeof(CameraState));
 	uint32_t ram_size = cart->ram_size;
 	io_num(s, &ram_size);
 	pthread_mutex_unlock(&gb->save.lock);
@@ -175,22 +178,11 @@ static int state_io (GB *gb, FILE *f, int saving)
 
 static int state_path (const char *romfile, char *out, size_t outsize, int save_num)
 {
-	size_t len = strlen(romfile);
-	const char *dot = strrchr(romfile, '.');
-	const char *slash = strrchr(romfile, '/');
- 
-	size_t base_len = len;
-	if (dot && (!slash || dot > slash))
-		base_len = (size_t)(dot - romfile);
- 
-	char extension[6];
-	int ext_len = snprintf(extension, sizeof(extension), ".ss%d", save_num);
-	if (ext_len < 0) return 0;
+	char ext[8];
+	int ext_len = snprintf(ext, sizeof(ext), ".ss%d", save_num);
+	if (ext_len < 0 || (size_t)ext_len >= sizeof(ext)) return 0;
 
-	if (base_len + (size_t)ext_len + 1 > outsize) return 0;
-	memcpy(out, romfile, base_len);
-	memcpy(out + base_len, extension, (size_t)ext_len + 1);
-	return 1;
+	return path_with_suffix(romfile, ext, out, outsize) != 0;
 }
  
 int can_save_state (GB *gb) {
@@ -239,6 +231,49 @@ int save_state (GB *gb)
 	printf("State saved: %s\n", path);
 	return 1;
 }
+
+static int backup_live_state (GB *gb, char **buf, size_t *len)
+{
+	FILE *f = open_memstream(buf, len);
+	if (!f) return 0;
+
+	int ok = state_io(gb, f, 1);
+	fclose(f);
+
+	if (!ok) {
+		free(*buf);
+		*buf = NULL;
+	}
+	return ok;
+}
+
+static void restore_live_state (GB *gb, char *buf, size_t len)
+{
+	FILE *f = fmemopen(buf, len, "rb");
+	if (!f) {
+		fprintf(stderr, "SaveState: could not restore the previous state\n");
+		return;
+	}
+	state_io(gb, f, 0);
+	fclose(f);
+}
+
+static int validate_header (StateHeader *hdr, GB *gb, const char *path)
+{
+	if (hdr->magic != SAVESTATE_MAGIC) {
+		fprintf(stderr, "SaveState: %s is not a valid savestate file\n", path);
+		return 0;
+	}
+	if (hdr->rom_size != gb->memory.cart.rom_size) {
+		fprintf(stderr, "SaveState: %s saved with a different ROM (size doesn't match)\n", path);
+		return 0;
+	}
+	if (memcmp(hdr->title, gb->memory.cart.title, sizeof(hdr->title)) != 0) {
+		fprintf(stderr, "SaveState: %s seems to be a savestate file from another game\n", path);
+		return 0;
+	}
+	return 1;
+}
  
 int load_state (GB *gb)
 {
@@ -252,33 +287,38 @@ int load_state (GB *gb)
 	}
  
 	StateHeader hdr;
-	int ok = fread(&hdr, sizeof(hdr), 1, f) == 1;
- 
-	if (ok && hdr.magic != SAVESTATE_MAGIC) {
-		fprintf(stderr, "SaveState: %s is not a valid savestate file\n", path);
-		ok = 0;
-	}
-	if (ok && hdr.rom_size != gb->memory.cart.rom_size) {
-		fprintf(stderr, "SaveState: %s saved with a different ROM (size doesn't match)\n", path);
-		ok = 0;
-	}
-	if (ok && memcmp(hdr.title, gb->memory.cart.title, sizeof(hdr.title)) != 0) {
-		fprintf(stderr, "SaveState: %s seems to be a savestate file from another game\n", path);
-		ok = 0;
-	}
- 
-	if (ok) ok = state_io(gb, f, 0);
-	fclose(f);
- 
+	int ok = fread(&hdr, sizeof(hdr), 1, f) == 1 && validate_header(&hdr, gb, path);
+
 	if (!ok) {
+		fclose(f);
 		fprintf(stderr, "SaveState: failed to load the state\n");
 		return 0;
 	}
- 
+
+	char *backup = NULL;
+	size_t backup_len = 0;
+	if (!backup_live_state(gb, &backup, &backup_len)) {
+		fclose(f);
+		fprintf(stderr, "SaveState: could not back up the current state, aborting load\n");
+		return 0;
+	}
+
+	ok = state_io(gb, f, 0);
+	fclose(f);
+
+	if (!ok) {
+		restore_live_state(gb, backup, backup_len);
+		free(backup);
+		fprintf(stderr, "SaveState: %s is corrupt or truncated - previous state kept\n", path);
+		return 0;
+	}
+	free(backup);
+
 	pthread_mutex_lock(&gb->save.lock);
 	gb->memory.cart.save_needed = 1;
 	pthread_mutex_unlock(&gb->save.lock);
  
+	gb->apu.sample_rate = gb->audio.sample_rate;
 	printf("State loaded: %s\n", path);
 	return 1;
 }

@@ -224,6 +224,18 @@ static struct {
 	{"F10",		SDL_SCANCODE_F10},
 	{"F11",		SDL_SCANCODE_F11},
 	{"F12",		SDL_SCANCODE_F12},
+	{"F13",		SDL_SCANCODE_F13},
+	{"F14",		SDL_SCANCODE_F14},
+	{"F15",		SDL_SCANCODE_F15},
+	{"F16",		SDL_SCANCODE_F16},
+	{"F17",		SDL_SCANCODE_F17},
+	{"F18",		SDL_SCANCODE_F18},
+	{"F19",		SDL_SCANCODE_F19},
+	{"F20",		SDL_SCANCODE_F20},
+	{"F21",		SDL_SCANCODE_F21},
+	{"F22",		SDL_SCANCODE_F22},
+	{"F23",		SDL_SCANCODE_F23},
+	{"F24",		SDL_SCANCODE_F24},
 	{"RETURN",	SDL_SCANCODE_RETURN},
 	{"ENTER",	SDL_SCANCODE_RETURN},
 	{"SPACE",	SDL_SCANCODE_SPACE},
@@ -232,7 +244,6 @@ static struct {
 	{"ESCAPE",	SDL_SCANCODE_ESCAPE},
 	{"ESC",		SDL_SCANCODE_ESCAPE},
 	{"MINUS",	SDL_SCANCODE_MINUS},
-	{"PLUS",	SDL_SCANCODE_KP_PLUS},
 	{"EQUALS",	SDL_SCANCODE_EQUALS},
 	{"LCTRL",	SDL_SCANCODE_LCTRL},
 	{"RCTRL",	SDL_SCANCODE_RCTRL},
@@ -243,6 +254,13 @@ static struct {
 	{"KP_PLUS",	SDL_SCANCODE_KP_PLUS},
 	{"KP_MINUS",	SDL_SCANCODE_KP_MINUS},
 	{"KP_EQUALS",	SDL_SCANCODE_KP_EQUALS},
+	{"KP_DECIMAL",	SDL_SCANCODE_KP_DECIMAL},
+	{"KP_DIVIDE",	SDL_SCANCODE_KP_DIVIDE},
+	{"KP_MULTIPLY", SDL_SCANCODE_KP_MULTIPLY},
+	{"KP_ENTER",	SDL_SCANCODE_KP_ENTER},
+	{"KP_PERIOD",	SDL_SCANCODE_KP_PERIOD},
+	{"KP_COMMA",	SDL_SCANCODE_KP_COMMA},
+	{"KP_EQUALSAS400",SDL_SCANCODE_KP_EQUALSAS400},
 	{"PAUSE",	SDL_SCANCODE_PAUSE},
 	{"KP_0",	SDL_SCANCODE_KP_0},
 	{"KP_1",	SDL_SCANCODE_KP_1},
@@ -254,6 +272,15 @@ static struct {
 	{"KP_7",	SDL_SCANCODE_KP_7},
 	{"KP_8",	SDL_SCANCODE_KP_8},
 	{"KP_9",	SDL_SCANCODE_KP_9},
+	{"LEFTBRACKET", SDL_SCANCODE_LEFTBRACKET},
+	{"RIGHTBRACKET",SDL_SCANCODE_RIGHTBRACKET},
+	{"BACKSLASH",	SDL_SCANCODE_BACKSLASH},
+	{"SEMICOLON",	SDL_SCANCODE_SEMICOLON},
+	{"APOSTROPHE",	SDL_SCANCODE_APOSTROPHE},
+	{"GRAVE",	SDL_SCANCODE_GRAVE},
+	{"COMMA",	SDL_SCANCODE_COMMA},
+	{"PERIOD",	SDL_SCANCODE_PERIOD},
+	{"SLASH",	SDL_SCANCODE_SLASH},
 	{NULL,		0}
 };
 
@@ -291,6 +318,9 @@ int parse_keybind_token (const char *token, Keybind *out)
 	out->scancode = SDL_SCANCODE_UNKNOWN;
 	out->mods = 0;
 	if (!token || !*token) return -1;
+
+	if (!strcmp(token, "NONE") || !strcmp(token, "-") || !strcmp(token, "—"))
+		return 0;
 
 	uint16_t mods = 0;
 	const char *p = token;
@@ -335,6 +365,11 @@ int parse_keybind_token (const char *token, Keybind *out)
 void write_keybind_token (Keybind kb, char *buf, size_t n)
 {
 	if (n == 0) return;
+	if (kb.scancode == SDL_SCANCODE_UNKNOWN) {
+		snprintf(buf, n, "NONE");
+		return;
+	}
+
 	buf[0] = 0;
 	const char *sc = scancode_to_name(kb.scancode);
 	if (!sc) sc = "UNKNOWN";
@@ -557,10 +592,10 @@ static void load_turbo (Config *cfg, const char *s)
 	if (sscanf(s, " %31[^= ] = %31s", field, value) != 2) return;
 
 	if (!strcmp(field, "speed")) {
-		uint8_t v = atoi(value);
+		int v = atoi(value);
 		if (v > 16) v = 16;
 		if (v < 2) v = 2;
-		cfg->turbo_speed = v;
+		cfg->turbo_speed = (uint8_t)v;
 	}
 	if (!strcmp(field, "hold"))
 		cfg->turbo_hold = (uint8_t)(value[0] == '1' || value[0] == 't' || value[0] == 'T');
