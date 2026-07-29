@@ -90,6 +90,7 @@ static void reset_drawing (PPU *ppu)
 	ppu->sp.step = 0;
 	ppu->sp.pending = -1;
 	ppu->sp.num_fifo = 0;
+	ppu->sp.fifo_head = 0;
 	ppu->sp.tiles_touched = 0;
 	ppu->sp.delay = 0;
 	for (int i = 0; i < 10; i++) {
@@ -161,10 +162,10 @@ static void draw_pixel (PPU *ppu)
 
 	if (ppu->sp.num_fifo > 0) {
 		SpritePixel sp = get_sp_pixel(ppu);
-		if (!(ppu->lcdc & 1)) bg = 0;
+		if (!(ppu->lcdc & BG_WIN_PRIO)) bg = 0;
 		final_pixel = solve_priority(ppu, sp, bg);
 	} else {
-		if (!(ppu->lcdc & 1)) final_pixel = PALETTES[ppu->palette][0];
+		if (!(ppu->lcdc & BG_WIN_PRIO)) final_pixel = PALETTES[ppu->palette][0];
 		else final_pixel = decode_color(ppu, bg, ppu->bgp);
 	}
 
@@ -466,12 +467,10 @@ void ppu_step (PPU *ppu)
 		stop_glitch(ppu);
 		return;
 	}
-
 	if (!(ppu->lcdc & PPU_ENABLE)) {
 		turn_lcd_off(ppu);
 		return;
 	}
-
 	if (ppu->lcd_was_off) turn_lcd_on(ppu);
 
 	ppu->ready = 0;

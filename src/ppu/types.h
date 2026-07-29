@@ -56,6 +56,7 @@ typedef struct SpriteFetcher {
 
 	SpritePixel fifo[8];
 	uint8_t num_fifo;
+	uint8_t fifo_head;
 	SpritePixel buff[8];
 	uint16_t addr;
 } SpriteFetcher;

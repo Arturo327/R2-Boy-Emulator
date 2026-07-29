@@ -202,7 +202,7 @@ Keyboard bindings support modifier chords written as `Ctrl+Shift+X` style tokens
   <figcaption>R2-Boy's configuration visual SDL window, both screens</figcaption>
 </figure>
 
-<br>
+<br><br>
 
 The `--config` flag opens a **visual SDL window** with two screens:
 - One for a list of all 26 actions and their current keyboard + gamepad bindings
@@ -298,7 +298,7 @@ In debug mode, video output is disabled and the emulator automatically checks th
   <figcaption>R2-Boy running multiplayer TETRIS from separate instances through TCP/IP</figcaption>
 </figure>
 
-<br>
+<br><br>
 
 R2-Boy includes Link Cable support over TCP/IP, allowing two emulator instances to communicate across the network.
 
@@ -358,7 +358,7 @@ It can't be used at the same time that the Link Cable, in order to reproduce ori
   <figcaption>A real Game Boy photographed with R2-Boy's Game Boy Camera emulation and printed using its Game Boy Printer emulation</figcaption>
 </figure>
 
-<br>
+<br><br>
 
 R2-Boy supports Game Boy Camera emulation using the computer's webcam as the camera input.
 
@@ -411,6 +411,7 @@ src/
 |   ├── config_ui.c/.h
 |   ├── gamepad.c/.h
 |   ├── printer.c/.h
+|   ├── webcam.c/.h
 |   └── link.c/.h
 ├── ppu/
 |   ├── ppu.c/.h
@@ -421,6 +422,8 @@ src/
 |   └── serial.c/.h
 ├── timer/
 |   └── timer.c/.h
+├── utils/
+|   └── utils.c/.h
 ├── gb.c
 ├── gb.h
 └── main.c

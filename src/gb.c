@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 static int load_bios (GB *gb, const char *filename)
 {

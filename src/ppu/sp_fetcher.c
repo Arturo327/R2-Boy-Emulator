@@ -84,9 +84,10 @@ static void fetch_tile_high (PPU *ppu, GB *gb)
 static void push_sprite (PPU *ppu)
 {
 	int start_x = (int)ppu->sp.sprites[ppu->sp.sel_sprite].x - 8;
+	uint8_t head = ppu->sp.fifo_head;
 
 	for (int i = ppu->sp.num_fifo; i < 8; i++)
-		ppu->sp.fifo[i].color = 0;
+		ppu->sp.fifo[(head + i) & 7].color = 0;
 
 	if (ppu->sp.sprites[ppu->sp.sel_sprite].x < 8) {
 		int shift = 8 - ppu->sp.sprites[ppu->sp.sel_sprite].x;
@@ -97,10 +98,11 @@ static void push_sprite (PPU *ppu)
 	}
 
 	for (int i = 0; i < 8; i++) {
+		uint8_t idx = (head + i) & 7;
 		if (!ppu->sp.buff[i].color) continue;
-		if (ppu->sp.fifo[i].color != 0 && ppu->sp.fifo[i].src_x < start_x) continue;
+		if (ppu->sp.fifo[idx].color != 0 && ppu->sp.fifo[idx].src_x < start_x) continue;
 		ppu->sp.buff[i].src_x = start_x;
-		ppu->sp.fifo[i] = ppu->sp.buff[i];
+		ppu->sp.fifo[idx] = ppu->sp.buff[i];
 	}
 
 	ppu->sp.sprite_active = 0;
@@ -108,7 +110,8 @@ static void push_sprite (PPU *ppu)
 	ppu->sp.num_fifo = 8;
 }
 
-void sprite_fetch (PPU *ppu) {
+void sprite_fetch (PPU *ppu)
+{
 	GB *gb = (GB *)ppu->bus->ctx;
 
 	if (ppu->sp.step == 0) {
@@ -128,11 +131,10 @@ void sprite_fetch (PPU *ppu) {
 	ppu->sp.step++;
 }
 
-SpritePixel get_sp_pixel (PPU *ppu) {
-	SpritePixel sp = ppu->sp.fifo[0];
-	for (int i = 1; i < ppu->sp.num_fifo; i++) {
-		ppu->sp.fifo[i - 1] = ppu->sp.fifo[i];
-	}
+SpritePixel get_sp_pixel (PPU *ppu)
+{
+	SpritePixel sp = ppu->sp.fifo[ppu->sp.fifo_head];
+	ppu->sp.fifo_head = (ppu->sp.fifo_head + 1) & 7;
 	ppu->sp.num_fifo--;
 	return sp;
 }
