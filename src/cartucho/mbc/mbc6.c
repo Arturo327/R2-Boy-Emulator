@@ -32,6 +32,29 @@ void mbc6_free (Cartucho *cart)
 	cart->state = NULL;
 }
 
+void mbc6_reset (Cartucho *cart)
+{
+	MBC6State *m = (MBC6State *)cart->state;
+	if (!m) return;
+
+	m->rom_bank_a = 0;
+	m->rom_bank_b = 0;
+	m->flash_sel_a = 0;
+	m->flash_sel_b = 0;
+	m->ram_bank_a = 0;
+	m->ram_bank_b = 0;
+	m->ram_enabled = 0;
+	m->flash_enabled = 0;
+	m->flash_write_enabled = 0;
+
+	m->flash.write_enable = 0;
+	m->flash.state = MF_IDLE;
+	m->flash.status = 0;
+	m->flash.program_addr = 0;
+	m->flash.program_len = 0;
+	m->flash.program_hidden = 0;
+}
+
 static inline uint32_t rom_offset (Cartucho *cart, uint8_t bank, uint16_t addr, uint16_t base)
 {
 	uint32_t banks_8k = cart->rom_size >> 13;

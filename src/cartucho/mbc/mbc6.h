@@ -56,6 +56,7 @@ typedef struct MBC6State {
 
 int mbc6_init (Cartucho *cart);
 void mbc6_free (Cartucho *cart);
+void mbc6_reset (Cartucho *cart);
 
 uint8_t mbc6_read_rom (GB *gb, uint16_t addr);
 void mbc6_write_rom (GB *gb, uint16_t addr, uint8_t val);

@@ -460,6 +460,18 @@ static int handle_oam_scan (PPU *ppu)
 	return 0;
 }
 
+static int state_machine (PPU *ppu)
+{
+	switch (ppu->mode)
+	{
+	case OAM_SCAN: return handle_oam_scan(ppu);
+	case DRAWING: return handle_drawing(ppu);
+	case HBLANK: return handle_hblank(ppu);
+	case VBLANK: return handle_vblank(ppu);
+	}
+	return 0;
+}
+
 void ppu_step (PPU *ppu)
 {
 	if (ppu->stop_glitch_pending) {
@@ -485,18 +497,7 @@ void ppu_step (PPU *ppu)
 			update_stat_line(ppu);
 		}
 
-		if (ppu->mode == OAM_SCAN) {
-			if (handle_oam_scan(ppu)) continue;
-
-		} else if (ppu->mode == DRAWING) {
-			if (handle_drawing(ppu)) continue;
-
-		} else if (ppu->mode == HBLANK) {
-			if (handle_hblank(ppu)) continue;
-
-		} else if (ppu->mode == VBLANK) {
-			if (handle_vblank(ppu)) continue;
-		}
+		if (state_machine(ppu)) continue;
 
 		time_dots--;
 		ppu->dots++;

@@ -210,6 +210,7 @@ static void yuyv_downscale_gray (const uint8_t *src, uint32_t sw, uint32_t sh, u
 struct webcam_jpeg_error {
 	struct jpeg_error_mgr pub;
 	jmp_buf jmp;
+	uint8_t *rows;
 };
 
 static void webcam_jpeg_error_exit (j_common_ptr cinfo)
@@ -218,6 +219,8 @@ static void webcam_jpeg_error_exit (j_common_ptr cinfo)
 	char msg[JMSG_LENGTH_MAX];
 	(*cinfo->err->format_message)(cinfo, msg);
 	fprintf(stderr, "Webcam: JPEG decode error: %s\n", msg);
+	free(err->rows);
+	err->rows = NULL;
 	longjmp(err->jmp, 1);
 }
 
@@ -238,6 +241,7 @@ static int decode_mjpeg_gray (const uint8_t *jpeg_data, size_t jpeg_size,
 	cinfo.err = jpeg_std_error(&jerr.pub);
 	jerr.pub.error_exit = webcam_jpeg_error_exit;
 	jerr.pub.emit_message = webcam_jpeg_emit_message;
+	jerr.rows = NULL;
 
 	if (setjmp(jerr.jmp)) {
 		jpeg_destroy_decompress(&cinfo);
@@ -270,6 +274,7 @@ static int decode_mjpeg_gray (const uint8_t *jpeg_data, size_t jpeg_size,
 		jpeg_destroy_decompress(&cinfo);
 		return 0;
 	}
+	jerr.rows = rows;
 
 	while (cinfo.output_scanline < cinfo.output_height) {
 		uint8_t *row_ptr = rows + (size_t)cinfo.output_scanline * sw;

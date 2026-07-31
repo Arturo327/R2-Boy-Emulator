@@ -104,10 +104,13 @@ typedef struct SettingMeta {
 
 extern const SettingMeta SETTINGS[SET_COUNT];
 
-int  get_setting_value (Config *cfg, SettingId id);
+int get_setting_value (Config *cfg, SettingId id);
 void set_setting_value (Config *cfg, SettingId id, int value);
 void format_setting_value (Config *cfg, SettingId id, char *buf, size_t n);
-int  default_setting_value (SettingId id);
+int default_setting_value (SettingId id);
+
+int find_conflicting_kb_action (const Keymap *k, Keybind kb, Action exclude);
+int find_conflicting_pad_action (const Padmap *p, SDL_GameControllerButton b, Action exclude);
 
 void default_keymap (Keymap *k);
 void default_padmap (Padmap *p);

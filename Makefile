@@ -1,32 +1,48 @@
 CC = gcc
-CFLAGS = -Isrc -Wall -Wextra -O2 -march=native -pthread
-LDLIBS = -lSDL2 -lSDL2_ttf -pthread -ljpeg
+
+INC_FLAGS = -Isrc
+WARN_FLAGS = -Wall -Wextra
+ARCH_FLAGS ?= -march=native
+CFLAGS ?= $(INC_FLAGS) $(WARN_FLAGS) -O2 $(ARCH_FLAGS) -pthread
+LDLIBS ?= -lSDL2 -lSDL2_ttf -pthread -ljpeg
+
+BUILD_DIR ?= build
+TARGET ?= $(BUILD_DIR)/r2boy
 
 SRC := $(shell find src -name '*.c')
-OBJ := $(patsubst src/%.c,build/%.o,$(SRC))
+OBJ := $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(SRC))
 DEP := $(OBJ:.o=.d)
 
-.PHONY: all test clean clean_sav
+.PHONY: all test test_mbc clean clean_sav
 
-all: build/r2boy
+all: $(TARGET)
 
-build/r2boy: $(OBJ)
+$(TARGET): $(OBJ)
 	@mkdir -p $(dir $@)
 	$(CC) $(OBJ) $(LDLIBS) -o $@
 
-build/%.o: src/%.c
+$(BUILD_DIR)/%.o: src/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
 
 -include $(DEP)
 
-test: build/r2boy
+debug:
+	$(MAKE) all \
+		BUILD_DIR=build-debug \
+		TARGET=build-debug/r2boy-debug \
+		ARCH_FLAGS= \
+		CFLAGS="$(INC_FLAGS) $(WARN_FLAGS) -O0 -g3 -pthread -fno-omit-frame-pointer -fsanitize=address,undefined -DDEBUG" \
+		LDLIBS="-lSDL2 -lSDL2_ttf -pthread -ljpeg -fsanitize=address,undefined"
+
+
+test: $(TARGET)
 	@find tests/mooneye/acceptance/ -name "*.gb" | while read rom; do \
 		./build/r2boy -d "$$rom" | grep -e "PASS" -e "FAIL"; \
 	done
 	@find tests/mooneye/acceptance/ -name "*.sav" -delete
 
-test_mbc: build/r2boy
+test_mbc: $(TARGET)
 	@find tests/mooneye/emulator-only/ -name "*.gb" | while read rom; do \
 		./build/r2boy -d "$$rom" | grep -e "PASS" -e "FAIL"; \
 	done
@@ -36,4 +52,4 @@ clean_sav:
 	find tests/ -name "*.sav" -delete
 
 clean:
-	rm -r build/
+	rm -rf build/ build-debug/

@@ -247,3 +247,17 @@ void huc3_free (Cartucho *cart)
 	free(cart->state);
 	cart->state = NULL;
 }
+
+void huc3_reset (Cartucho *cart)
+{
+	HuC3State *h = (HuC3State *)cart->state;
+	if (!h) return;
+
+	h->select = 0;
+	h->cmd = 0;
+	h->arg = 0;
+	h->addr = 0;
+	h->response = 0;
+	h->ir = 0;
+	h->ready = 1;
+}

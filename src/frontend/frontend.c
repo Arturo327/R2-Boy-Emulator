@@ -272,7 +272,8 @@ static void handle_gamepad_button (GB *gb, const SDL_Event *e)
 		else if (b == pad_binding(pad, ACT_ON))		toggle_on(gb);
 		else if (b == pad_binding(pad, ACT_PAUSE))	toggle_pause(gb);
 	}
-	if (!pressed && b == pad_binding(pad, ACT_TURBO)) gb->cfg.turbo = 0;
+	if (!pressed && gb->cfg.turbo_hold && b == pad_binding(pad, ACT_TURBO))
+		gb->cfg.turbo = 0;
 	return;
 }
 

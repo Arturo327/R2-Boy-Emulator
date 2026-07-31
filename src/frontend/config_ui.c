@@ -40,6 +40,9 @@ typedef struct ConfigUI {
 	int cursor[PAGE_COUNT];
 	int scroll[PAGE_COUNT];
 
+	char status_msg[64];
+	int status_ttl;
+
 	CaptureMode capturing;
 	int running;
 } ConfigUI;
@@ -326,11 +329,19 @@ static void config_handle_key_capture (ConfigUI *ui, SDL_Event *e)
 	}
 	if (is_modifier_scancode(sc)) return;
 
-	Keybind kb;
-	kb.scancode = sc;
-	kb.mods = e->key.keysym.mod & KBMOD_ANY;
+	Keybind kb = { sc, (uint16_t)(e->key.keysym.mod & KBMOD_ANY) };
+	Action target = (Action) ui->cursor[PAGE_CONTROLS];
 
-	set_kb_binding(&ui->cfg.keymap, (Action) ui->cursor[PAGE_CONTROLS], kb);
+	int conflict = find_conflicting_kb_action(&ui->cfg.keymap, kb, target);
+	if (conflict >= 0) {
+		Keybind none = { SDL_SCANCODE_UNKNOWN, 0 };
+		set_kb_binding(&ui->cfg.keymap, (Action)conflict, none);
+		snprintf(ui->status_msg, sizeof(ui->status_msg),
+				"Removed from %s (was bound there)", ACTIONS[conflict].label);
+		ui->status_ttl = 120;
+	}
+
+	set_kb_binding(&ui->cfg.keymap, target, kb);
 	ui->capturing = CAP_NONE;
 }
 
@@ -347,8 +358,18 @@ static void config_handle_pad_capture (ConfigUI *ui, SDL_Event *e)
 	}
 	if (e->type != SDL_CONTROLLERBUTTONDOWN) return;
 
-	set_pad_binding(&ui->cfg.padmap, (Action) ui->cursor[PAGE_CONTROLS],
-		(SDL_GameControllerButton) e->cbutton.button);
+	SDL_GameControllerButton b = (SDL_GameControllerButton) e->cbutton.button;
+	Action target = (Action) ui->cursor[PAGE_CONTROLS];
+
+	int conflict = find_conflicting_pad_action(&ui->cfg.padmap, b, target);
+	if (conflict >= 0) {
+		set_pad_binding(&ui->cfg.padmap, (Action) conflict, SDL_CONTROLLER_BUTTON_INVALID);
+		snprintf(ui->status_msg, sizeof(ui->status_msg),
+				"Removed from %s (was bound there)", ACTIONS[conflict].label);
+		ui->status_ttl = 120;
+	}
+
+	set_pad_binding(&ui->cfg.padmap, target, b);
 	ui->capturing = CAP_NONE;
 }
 
@@ -470,7 +491,10 @@ static void config_handle_events (ConfigUI *ui, Gamepad *pad)
 	SDL_Event e;
 	while (SDL_PollEvent(&e)) {
 
-		if (e.type == SDL_QUIT) { ui->running = 0; return; }
+		if (e.type == SDL_QUIT) {
+			ui->running = 0;
+			return;
+		}
 		if (e.type == SDL_WINDOWEVENT && e.window.event == SDL_WINDOWEVENT_CLOSE) {
 			ui->running = 0;
 			return;
@@ -485,8 +509,14 @@ static void config_handle_events (ConfigUI *ui, Gamepad *pad)
 			continue;
 		}
 
-		if (ui->capturing == CAP_KEY) { config_handle_key_capture(ui, &e); continue; }
-		if (ui->capturing == CAP_PAD) { config_handle_pad_capture(ui, &e); continue; }
+		if (ui->capturing == CAP_KEY) {
+			config_handle_key_capture(ui, &e);
+			continue;
+		}
+		if (ui->capturing == CAP_PAD) {
+			config_handle_pad_capture(ui, &e);
+			continue;
+		}
 
 		if (e.type == SDL_KEYDOWN)
 			config_handle_keydown(ui, &e.key);

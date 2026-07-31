@@ -24,6 +24,7 @@ typedef struct HuC3State {
 
 int huc3_init (Cartucho *cart);
 void huc3_free (Cartucho *cart);
+void huc3_reset (Cartucho *cart);
 
 uint8_t huc3_read_rom (GB *gb, uint16_t addr);
 void huc3_write_rom (GB *gb, uint16_t addr, uint8_t val);

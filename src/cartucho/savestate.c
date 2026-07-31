@@ -18,9 +18,7 @@ static void io_buf (SaveState *s, void *p, size_t n)
 	if (r != n) s->ok = 0;
 }
 
-static void io_num (SaveState *s, void *v) {
-	io_buf(s, v, sizeof(*v));
-}
+#define io_num(s, v) io_buf((s), (v), sizeof(*(v)))
 
 static void io_cpu (SaveState *s, CPU *cpu)
 {
@@ -33,9 +31,17 @@ static void io_cpu (SaveState *s, CPU *cpu)
 
 static void io_ppu (SaveState *s, PPU *ppu)
 {
-	io_buf(s, ppu, offsetof(PPU, bus));
+	io_buf(s, (uint8_t *)ppu + offsetof(PPU, sp),
+		offsetof(PPU, bus) - offsetof(PPU, sp));
 	io_buf(s, (uint8_t *)ppu + offsetof(PPU, stat_line),
 		sizeof(PPU) - offsetof(PPU, stat_line));
+}
+
+static void io_apu (SaveState *s, APU *apu)
+{
+	io_buf(s, apu, offsetof(APU, buffer));
+	io_buf(s, (uint8_t *)apu + offsetof(APU, accum_l),
+			sizeof(APU) - offsetof(APU, accum_l));
 }
 
 static void io_mbc6 (SaveState *s, MBC6State *m)
@@ -104,7 +110,16 @@ static void io_cart (SaveState *s, GB *gb)
 	io_num(s, &cart->ram_enabled);
 	io_num(s, &cart->bank1);
 	io_num(s, &cart->bank2);
-	io_num(s, &cart->rumble_on);
+	if (cart->has_rumble) {
+		uint32_t on_ticks = cart->rumble_on_ticks;
+		if (s->saving && cart->rumble_on)
+			on_ticks += (uint32_t)gb->clock - cart->rumble_since;
+		io_num(s, &on_ticks);
+		if (!s->saving) {
+			cart->rumble_on_ticks = on_ticks;
+			cart->rumble_since = (uint32_t)gb->clock;
+		}
+	}
  
 	pthread_mutex_lock(&gb->save.lock);
 	if (cart->has_rtc) io_buf(s, (RTC *)cart->state, sizeof(RTC));
@@ -134,7 +149,6 @@ static void io_memory (SaveState *s, GB *gb)
 {
 	Memory *mem = &gb->memory;
 	io_cart(s, gb);
-	io_buf(s, mem->bios, sizeof(mem->bios));
 	io_buf(s, mem->vram, sizeof(mem->vram));
 	io_buf(s, mem->wram, sizeof(mem->wram));
 	io_buf(s, mem->oam,  sizeof(mem->oam));
@@ -162,7 +176,7 @@ static int state_io (GB *gb, FILE *f, int saving)
  
 	io_cpu(&ss, &gb->cpu);
 	io_ppu(&ss, &gb->ppu);
-	io_buf(&ss, &gb->apu, sizeof(APU));
+	io_apu(&ss, &gb->apu);
 	io_buf(&ss, &gb->interrupts, sizeof(Interrupts));
 	io_buf(&ss, &gb->timer, sizeof(Timer));
 	io_buf(&ss, &gb->joypad, sizeof(Joypad));
@@ -278,7 +292,10 @@ static int validate_header (StateHeader *hdr, GB *gb, const char *path)
 int load_state (GB *gb)
 {
 	char path[600];
-	state_path(gb->romfile, path, sizeof(path), gb->state_num);
+	if (!state_path(gb->romfile, path, sizeof(path), gb->state_num)) {
+		fprintf(stderr, "SaveState: ROM path too long\n");
+		return 0;
+	}
  
 	FILE *f = fopen(path, "rb");
 	if (!f) {
@@ -319,6 +336,7 @@ int load_state (GB *gb)
 	pthread_mutex_unlock(&gb->save.lock);
  
 	gb->apu.sample_rate = gb->audio.sample_rate;
+	gb->apu.buffer_pos = 0;
 	printf("State loaded: %s\n", path);
 	return 1;
 }

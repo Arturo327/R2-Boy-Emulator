@@ -75,7 +75,7 @@ R2-Boy works correctly and runs every DMG compatible game I tested.
 This project is under active development.
 
 Planned:
-- CGB (Game Boy Color) support (more in the future)
+- CGB (Game Boy Color) support
 
 ---
 
@@ -96,11 +96,6 @@ Install dependencies (On Ubuntu/Debian like systems):
 sudo apt install build-essential libsdl2-dev libsdl2-ttf-dev
 ```
 
-Create the build directory:
-```bash
-mkdir build
-```
-
 Build the emulator:
 
 ```bash
@@ -112,6 +107,8 @@ The executable will be generated in:
 ```bash
 ./build/r2boy
 ```
+
+> **Note:** the default `CFLAGS` include `-march=native`, which tunes the binary for the CPU you're compiling on. This is great for local builds, but a binary built this way may crash with `SIGILL` if copied to a different machine. If you plan to distribute a binary rather than run it on the machine that built it, drop `-march=native` (or replace it with a more conservative target like `-march=x86-64-v2`).
 
 ### Usage
 

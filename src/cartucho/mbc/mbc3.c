@@ -91,9 +91,11 @@ void mbc3_write_rom (GB *gb, uint16_t addr, uint8_t val)
 		cart->ram_bank = val;
 
 	} else {
+		if (!cart->has_rtc) return;
+
 		pthread_mutex_lock(&gb->save.lock);
 		RTC *rtc = (RTC *)cart->state;
-		if (cart->has_rtc && rtc->latch_prev == 0x00 && val == 0x01) {
+		if (rtc->latch_prev == 0x00 && val == 0x01) {
 			mbc3_sync(cart);
 			rtc->s_l = rtc->s;
 			rtc->m_l = rtc->m;

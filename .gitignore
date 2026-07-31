@@ -1,3 +1,4 @@
 tests/
 roms/
 build/
+build-debug/

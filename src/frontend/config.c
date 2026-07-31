@@ -168,6 +168,29 @@ void init_config_defaults (Config *cfg)
 	cfg->turbo_hold = 1;
 }
 
+int find_conflicting_kb_action (const Keymap *k, Keybind kb, Action exclude)
+{
+	if (kb.scancode == SDL_SCANCODE_UNKNOWN) return -1;
+	for (int i = 0; i < ACT_COUNT; i++) {
+		if (i == (int)exclude) continue;
+		Keybind other = kb_binding(k, (Action)i);
+		if (other.scancode == kb.scancode && other.mods == kb.mods)
+			return i;
+	}
+	return -1;
+}
+
+int find_conflicting_pad_action (const Padmap *p, SDL_GameControllerButton b, Action exclude)
+{
+	if (b == SDL_CONTROLLER_BUTTON_INVALID) return -1;
+	for (int i = 0; i < ACT_COUNT; i++) {
+		if (i == (int)exclude) continue;
+		if (pad_binding(p, (Action)i) == b)
+			return i;
+	}
+	return -1;
+}
+
 static struct {
 	const char *name;
 	SDL_Scancode code;

@@ -222,6 +222,16 @@ void mbc7_free (Cartucho *cart)
 	cart->state = NULL;
 }
 
+void mbc7_reset (Cartucho *cart)
+{
+	MBC7State *m = (MBC7State *)cart->state;
+	if (!m) return;
+
+	memset(m, 0, sizeof(MBC7State));
+	m->latch_x = 0x8000;
+	m->latch_y = 0x8000;
+}
+
 uint8_t mbc7_read_rom (GB *gb, uint16_t addr)
 {
 	Cartucho *cart = &gb->memory.cart;

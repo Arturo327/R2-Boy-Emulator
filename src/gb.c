@@ -30,6 +30,9 @@ static void reset_cartucho (Cartucho *c)
 	c->rumble_on = 0;
 	c->rumble_on_ticks = 0;
 	c->rumble_since = 0;
+	if (c->mbc_type == MBC6) mbc6_reset(c);
+	if (c->mbc_type == MBC7) mbc7_reset(c);
+	if (c->mbc_type == HUC3) huc3_reset(c);
 }
 
 static void reset_components (GB *gb)
