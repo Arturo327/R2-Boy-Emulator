@@ -46,6 +46,7 @@ typedef struct Memory {
 	// only CGB
 	uint8_t vram_bank, wram_bank;
 	uint8_t ff72, ff73, ff75;
+	uint8_t key0, key1;
 	uint8_t bg_palette_ram[64];
 	uint8_t obj_palette_ram[64];
 } Memory;
@@ -102,8 +103,8 @@ void reset_gb (GB *gb);
 void init (GB *gb, const char *romfile, const char *biosfile, Model model);
 void init_test (GB *gb, const char *romfile, Model model);
 
-void cleanup (GB *gb, const char *romfile);
-void cleanup_core (GB *gb, const char *romfile);
+void cleanup (GB *gb);
+void cleanup_core (GB *gb);
 
 void gb_step (GB *gb);
 

@@ -172,6 +172,8 @@ static void write_cgb_regs (GB *gb, uint16_t addr, uint8_t val)
 			gb->ppu.ocps = (gb->ppu.ocps & 0x80) | ((gb->ppu.ocps + 1) & 0x3F);
 		break;
 	case 0xFF6C: gb->ppu.opri = val; break;
+	case 0xFF4C: if (gb->boot_rom_enabled) gb->memory.key0 = val & 0x04; break;
+	case 0xFF4D: gb->memory.key1 = val & 0x01; break;
 	}
 }
 

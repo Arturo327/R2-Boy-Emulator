@@ -117,6 +117,18 @@ void reset_gb (GB *gb)
 	gb->on = 1;
 }
 
+static void check_model_compatibility (GB *gb)
+{
+	uint8_t cgb_flag = gb->memory.cart.rom[find_header_base(&gb->memory.cart) + 0x143];
+	int cgb_aware = (cgb_flag == 0x80 || cgb_flag == 0xC0);
+
+	if (!gb->hay_bios && gb->model == CGB && !cgb_aware)
+		gb->memory.key0 = 0x04;
+
+	if (cgb_flag != 0xC0 || gb->model == CGB) return;
+	fprintf(stderr, "WARNING: %s is a Game Boy Color exclusive ROM\n", gb->romfile);
+}
+
 static int init_core (GB *gb, const char *romfile, const char *biosfile, Model model)
 {
 	memset(gb, 0, sizeof(GB));
@@ -154,8 +166,8 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile, Model m
 		fprintf(stderr, "Failed to load ROM: %s\n", romfile);
 		return 1;
 	}
-
 	load_sram(&gb->memory.cart, romfile);
+	check_model_compatibility(gb);
 
 	return 0;
 }
@@ -188,10 +200,10 @@ void init_test (GB *gb, const char *romfile, Model model)
 	gb->on = 1;
 }
 
-void cleanup_core (GB *gb, const char *romfile)
+void cleanup_core (GB *gb)
 {
 	pthread_mutex_lock(&gb->save.lock);
-	save_sram(&gb->memory.cart, romfile);
+	save_sram(&gb->memory.cart, gb->romfile);
 	pthread_mutex_unlock(&gb->save.lock);
 
 	free_cart(&gb->memory.cart);
@@ -199,12 +211,12 @@ void cleanup_core (GB *gb, const char *romfile)
 	pthread_mutex_destroy(&gb->save.lock);
 }
 
-void cleanup (GB *gb, const char *romfile)
+void cleanup (GB *gb)
 {
 	stop_save_thread(gb);
 	link_close(&gb->link);
 	frontend_shutdown(gb);
-	cleanup_core(gb, romfile);
+	cleanup_core(gb);
 }
 
 static void dma_step (GB *gb)
@@ -235,7 +247,8 @@ static void save_state_step (GB *gb)
 	}
 }
 
-static void stop_step (GB *gb) {
+static void stop_step (GB *gb)
+{
 	gb->ppu.ready = 0;
 	cpu_step(&gb->cpu);
 	save_state_step(gb);

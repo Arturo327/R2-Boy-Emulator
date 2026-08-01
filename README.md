@@ -120,7 +120,7 @@ Common options:
 | Flag | Purpose |
 | :--- | :--- |
 | `-d`, `--debug`              | Headless mode; verify CPU registers (test ROMs) |
-| `-b`, `--bios <file>`        | Use a specific Game Boy boot ROM (default `roms/bios.bin`) |
+| `-b`, `--bios <file>`        | Use a specific Game Boy boot ROM (default `roms/bios.bin` for DMG and `roms/cgb_bios.bin` for CGB) |
 | `--model <MODEL>`            | Set the Game Boy model to run the game: DMG or CGB (CGB is not finished and games won't work properly) |
 | `--volume <0..100>`          | Set the audio output volume |
 | `--mute`                     | Start with audio muted |
@@ -268,9 +268,9 @@ R2-Boy supports the Game Boy boot ROM, just use the option:
 ./build/r2boy --bios <biosfile> game.gb
 ```
 
-If you don't use the option, it will use the default path "roms/bios.bin".
+If you don't use the option, it will use the default path `roms/bios.bin` for DMG and `roms/cgb_bios.bin` for CGB.
 
-If no boot ROM is available, R2-Boy initializes the hardware registers to the same state produced by the original DMG boot ROM (DMG-ABC revision), allowing commercial games to start correctly.
+If no boot ROM is available, R2-Boy initializes the hardware registers to the same state produced by the original Game Boy boot ROMs (DMG-ABC for DMG and CGB-ABCDE for CGB revisions), allowing commercial games to start correctly.
 
 ---
 

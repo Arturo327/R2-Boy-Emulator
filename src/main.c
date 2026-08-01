@@ -34,7 +34,7 @@ static int check_regs (GB *gb, const char *romfile)
 	}
 
 	printf("FAIL (unexpected pattern, revise execution): %s (B=%02X C=%02X D=%02X E=%02X H=%02X L=%02X)\n",
-		romfile, b, c, d, e, h, l);
+			romfile, b, c, d, e, h, l);
 	return 1;
 }
 
@@ -49,7 +49,7 @@ static int run_test (const char *romfile, Model model)
 	init_test(gb, romfile, model);
 	if (!gb->running) {
 		fprintf(stderr, "FAIL: %s (could not load ROM)\n", romfile);
-		cleanup_core(gb, romfile);
+		cleanup_core(gb);
 		free(gb);
 		return 1;
 	}
@@ -67,13 +67,13 @@ static int run_test (const char *romfile, Model model)
 
 	if (!truth_time) {
 		printf("TIMEOUT: %s\n", romfile);
-		cleanup_core(gb, romfile);
+		cleanup_core(gb);
 		free(gb);
 		return 1;
 	}
 
 	int result = check_regs(gb, romfile);
-	cleanup_core(gb, romfile);
+	cleanup_core(gb);
 	free(gb);
 	return result;
 }
@@ -104,7 +104,7 @@ static inline void print_usage (const char *prog)
 
 	printf("    -b, --bios <BIOS_FILE>\n");
 	printf("        Use the specified Game Boy Boot ROM.\n");
-	printf("        Default: roms/bios.bin\n");
+	printf("        Defaults: DMG: roms/bios.bin; CGB: roms/cgb_bios.bin\n");
 	printf("        If the file cannot be loaded, the emulator boots without a Boot ROM.\n\n");
 
 	printf("    --link-host <PORT>\n");
@@ -281,10 +281,6 @@ static Args parse_args (int argc, char *argv[])
 		else if (!strcasecmp(model_arg, "DMG")) args.model = (int)DMG;
 		else fprintf(stderr, "unknown model '%s', ignored (use DMG or CGB)\n", model_arg);
 	}
-	if (!args.biosfile) {
-		args.biosfile = (args.model == CGB) ? "roms/cgb_bios.bin" : "roms/bios.bin";
-		printf("BIOS (%s): %s\n", (args.model == CGB) ? "CGB" : "DMG", args.biosfile);
-	}
 	return args;
 }
 
@@ -350,15 +346,6 @@ static void init_config (GB *gb, Config *cfg, Args args)
 		}
 	}
 	fprintf(stderr, "Unknown palette: %s (ignored)\n", args.palette);
-}
-
-static int init_emulator (GB *gb, const char *romfile, const char *biosfile, Model model) {
-	init(gb, romfile, biosfile, model);
-	if (!gb->running) {
-		cleanup(gb, romfile);
-		return 0;
-	}
-	return 1;
 }
 
 static int idle_tick (GB *gb, uint64_t *next_frame)
@@ -476,7 +463,7 @@ static void end_frame_timing(GB *gb, uint64_t *next_frame, uint64_t freq)
 	sync_frame(gb, next_frame, frame_ticks, freq);
 }
 
-static void run (GB *gb, const char *romfile)
+static void run (GB *gb)
 {
 	uint32_t max_queued = compute_max_queued(gb);
 	uint64_t freq = SDL_GetPerformanceFrequency();
@@ -503,7 +490,37 @@ static void run (GB *gb, const char *romfile)
 		end_frame_timing(gb, &next_frame, freq);
 	}
 
-	cleanup(gb, romfile);
+	cleanup(gb);
+}
+
+static int init_emulator (GB *gb, Args args)
+{
+	Config *cfg = malloc(sizeof(Config));
+	init_config_defaults(cfg);
+	load_config(cfg);
+
+	if (args.model != -1)
+		cfg->model = (Model)args.model;
+
+	if (!args.biosfile) {
+		args.biosfile = (args.model == CGB) ? "roms/cgb_bios.bin" : "roms/bios.bin";
+		printf("BIOS (%s): %s\n", (args.model == CGB) ? "CGB" : "DMG", args.biosfile);
+	}
+
+	init(gb, args.romfile, args.biosfile, cfg->model);
+	if (!gb->running) {
+		cleanup(gb);
+		free(gb);
+		return 0;
+	}
+
+	init_config(gb, cfg, args);
+	free(cfg);
+
+	init_link(gb, args);
+	SDL_PauseAudioDevice(gb->audio.dev, 0);
+	start_save_thread(gb, args.romfile);
+	return 1;
 }
 
 int main (int argc, char *argv[])
@@ -522,21 +539,9 @@ int main (int argc, char *argv[])
 		fprintf(stderr, "FAIL: Not enough memory. Buy more RAM.\n");
 		return 1;
 	}
+	if (!init_emulator(gb, args)) return 1;
 
-	Config *cfg = malloc(sizeof(Config));
-	load_config(cfg);
-	if (args.model != -1) cfg->model = (Model)args.model;
-	if (!init_emulator(gb, args.romfile, args.biosfile, cfg->model)) {
-		free(gb);
-		return 1;
-	}
-	init_config(gb, cfg, args);
-	free(cfg);
-	init_link(gb, args);
-	SDL_PauseAudioDevice(gb->audio.dev, 0);
-	start_save_thread(gb, args.romfile);
-
-	run(gb, args.romfile);
+	run(gb);
 
 	save_config(&gb->cfg);
 	free(gb);

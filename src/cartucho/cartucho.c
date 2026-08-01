@@ -97,7 +97,7 @@ static int valid_logo (Cartucho *cart, uint32_t header_offset)
 	return memcmp(cart->rom + logo_off, NINTENDO_LOGO, sizeof(NINTENDO_LOGO)) == 0;
 }
 
-static uint32_t find_header_base (Cartucho *cart)
+uint32_t find_header_base (Cartucho *cart)
 {
 	if (cart->rom_size <= 0x8000) return 0;
 

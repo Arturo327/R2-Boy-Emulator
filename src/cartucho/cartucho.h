@@ -72,6 +72,7 @@ typedef struct Cartucho {
 } Cartucho;
 
 int load_rom (Cartucho *cart, const char *filename);
+uint32_t find_header_base (Cartucho *cart);
 void free_cart (Cartucho *cart);
 
 #endif
