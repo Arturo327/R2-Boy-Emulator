@@ -4,12 +4,13 @@
 
 static int timer_selected_bit (uint16_t div, uint8_t tac)
 {
-	switch (tac & 0x03) {
-		case 0: return (div >> 9) & 1;
-		case 1: return (div >> 3) & 1;
-		case 2: return (div >> 5) & 1;
-		case 3: return (div >> 7) & 1;
-		default: return 0;
+	switch (tac & 0x03)
+	{
+	case 0: return (div >> 9) & 1;
+	case 1: return (div >> 3) & 1;
+	case 2: return (div >> 5) & 1;
+	case 3: return (div >> 7) & 1;
+	default: return 0;
 	}
 }
 
@@ -26,10 +27,9 @@ static uint8_t joypad_calc_lo (GB *gb)
 
 static void joypad_interrupt (GB *gb, uint8_t old_lo, uint8_t new_lo)
 {
-	if ((old_lo & ~new_lo) & 0x0F) {
-		gb->interrupts.IF |= 0x10;
-		gb->cpu.stopped = 0;
-	}
+	if (!((old_lo & ~new_lo) & 0x0F)) return;
+	gb->interrupts.IF |= 0x10;
+	gb->cpu.stopped = 0;
 }
 
 void joypad_update (GB *gb, uint8_t new_buttons)
@@ -127,12 +127,63 @@ uint8_t dma_read_source (GB *gb, uint16_t addr)
 	return gb->memory.wram[addr - 0xE000];
 }
 
+static uint8_t read_cgb_regs (GB *gb, uint16_t addr)
+{
+	switch (addr)
+	{
+	case 0xFF72: return gb->memory.ff72;
+	case 0xFF73: return gb->memory.ff73;
+	case 0xFF75: return gb->memory.ff75 | 0x8F;
+	case 0xFF76: return apu_pcm12(&gb->apu);
+	case 0xFF77: return apu_pcm34(&gb->apu);
+	case 0xFF68: return gb->ppu.bcps | 0x40;
+	case 0xFF4F: return gb->memory.vram_bank | 0xFE;
+	case 0xFF69:
+		if (gb->ppu.mode == DRAWING) return 0xFF;
+		return gb->memory.bg_palette_ram[gb->ppu.bcps & 0x3F];
+	case 0xFF6A: return gb->ppu.ocps | 0x40;
+
+	default: return 0xFF;
+	}
+}
+
+static void write_cgb_regs (GB *gb, uint16_t addr, uint8_t val)
+{
+	switch (addr)
+	{
+	case 0xFF72: gb->memory.ff72 = val; break;
+	case 0xFF73: gb->memory.ff73 = val; break;
+	case 0xFF75: gb->memory.ff75 = val & 0x70; break;
+	case 0xFF68: gb->ppu.bcps = val & 0xBF; break;
+	case 0xFF4F: gb->memory.vram_bank = val & 0x01; break;
+	case 0xFF70: gb->memory.wram_bank = val & 0x07; break;
+	case 0xFF69:
+		if (gb->ppu.mode != DRAWING)
+			gb->memory.bg_palette_ram[gb->ppu.bcps & 0x3F] = val;
+		if (gb->ppu.bcps & 0x80)
+			gb->ppu.bcps = (gb->ppu.bcps & 0x80) | ((gb->ppu.bcps + 1) & 0x3F);
+		break;
+
+	case 0xFF6A: gb->ppu.ocps = val & 0xBF; break;
+	case 0xFF6B:
+		if (gb->ppu.mode != DRAWING)
+			gb->memory.obj_palette_ram[gb->ppu.ocps & 0x3F] = val;
+		if (gb->ppu.ocps & 0x80)
+			gb->ppu.ocps = (gb->ppu.ocps & 0x80) | ((gb->ppu.ocps + 1) & 0x3F);
+		break;
+	case 0xFF6C: gb->ppu.opri = val; break;
+	}
+}
+
 static uint8_t bus_read8 (void *ctx, uint16_t addr)
 {
 	GB *gb = (GB *)ctx;
 
-	if (addr < 0x100 && gb->boot_rom_enabled) {
-		return gb->memory.bios[addr];
+	if (gb->boot_rom_enabled) {
+		if (addr < 0x100)
+			return gb->memory.bios[addr];
+		if (gb->model == CGB && addr >= 0x200 && addr < 0x900)
+			return gb->memory.bios[addr];
 	}
 
 	if (addr < 0x8000) {
@@ -203,15 +254,15 @@ static uint8_t bus_read8 (void *ctx, uint16_t addr)
 		case 0xFF44: return gb->ppu.ly;
 		case 0xFF45: return gb->ppu.lyc;
 		case 0xFF46: return gb->ppu.dma;
+		case 0xFF4A: return gb->ppu.wy;
+		case 0xFF4B: return gb->ppu.wx;
 		case 0xFF47: return gb->ppu.bgp;
 		case 0xFF48: return gb->ppu.obp0;
 		case 0xFF49: return gb->ppu.obp1;
-		case 0xFF4A: return gb->ppu.wy;
-		case 0xFF4B: return gb->ppu.wx;
 
 		case 0xFF50: return 0xFF;
 
-		default: return 0xFF;
+		default: if (gb->model == CGB) return read_cgb_regs(gb, addr); return 0xFF;
 		}
 	}
 
@@ -350,15 +401,15 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 			gb->dma.delay = 2;
 			break;
 		}
+		case 0xFF4A: gb->ppu.wy = val; break;
+		case 0xFF4B: gb->ppu.wx = val; break;
 		case 0xFF47: gb->ppu.bgp = val; break;
 		case 0xFF48: gb->ppu.obp0 = val; break;
 		case 0xFF49: gb->ppu.obp1 = val; break;
-		case 0xFF4A: gb->ppu.wy = val; break;
-		case 0xFF4B: gb->ppu.wx = val; break;
 
 		case 0xFF50: gb->boot_rom_disable_pending = 1; break;
 
-		default: break;
+		default: if (gb->model == CGB) write_cgb_regs(gb, addr, val); break;
 		}
 		return;
 	}

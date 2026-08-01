@@ -68,6 +68,7 @@ const SettingMeta SETTINGS[SET_COUNT] = {
 	[SET_USE_ACCEL]		= { "Use Accelerometer",SETTING_BOOL, 0, 1,	1 },
 	[SET_TURBO_SPEED]	= { "Turbo Speed",	SETTING_INT,  2, 16,	1 },
 	[SET_TURBO_HOLD]	= { "Turbo Hold Mode",	SETTING_BOOL, 0, 1,	1 },
+	[SET_MODEL]		= { "Emulated Model",	SETTING_ENUM, 0, 2,	1 },
 };
 
 static int clampi (int v, int lo, int hi)
@@ -87,6 +88,7 @@ int get_setting_value (Config *cfg, SettingId id)
 	case SET_USE_ACCEL:	return cfg->use_acel ? 1 : 0;
 	case SET_TURBO_SPEED:	return cfg->turbo_speed;
 	case SET_TURBO_HOLD:	return cfg->turbo_hold ? 1 : 0;
+	case SET_MODEL:		return (int) cfg->model;
 	default:		return 0;
 	}
 }
@@ -104,6 +106,7 @@ void set_setting_value (Config *cfg, SettingId id, int value)
 	case SET_USE_ACCEL:	cfg->use_acel = (uint8_t) value; break;
 	case SET_TURBO_SPEED:	cfg->turbo_speed = (uint8_t) value; break;
 	case SET_TURBO_HOLD:	cfg->turbo_hold = (uint8_t) value; break;
+	case SET_MODEL:		cfg->model = (Model)value; break;
 	default: break;
 	}
 }
@@ -117,7 +120,8 @@ void format_setting_value (Config *cfg, SettingId id, char *buf, size_t n)
 		snprintf(buf, n, "%s", v ? "ON" : "OFF");
 		break;
 	case SETTING_ENUM:
-		snprintf(buf, n, "%s", palette_name((DmgPalette) v));
+		if (id == SET_PALETTE) snprintf(buf, n, "%s", palette_name((DmgPalette) v));
+		else if (id == SET_MODEL) snprintf(buf, n, "%s", (Model)v == CGB ? "CGB" : "DMG");
 		break;
 	case SETTING_INT:
 	default:
@@ -166,6 +170,7 @@ void init_config_defaults (Config *cfg)
 	cfg->use_acel = 1;
 	cfg->turbo_speed = 3;
 	cfg->turbo_hold = 1;
+	cfg->model = DMG;
 }
 
 int find_conflicting_kb_action (const Keymap *k, Keybind kb, Action exclude)
@@ -608,6 +613,18 @@ static void load_input (Config *cfg, const char *s)
 		cfg->use_acel = (uint8_t)(value[0]=='1' || value[0]=='t' || value[0]=='T');
 }
 
+static void load_model (Config *cfg, const char *s)
+{
+	char field[32];
+	char value[32];
+	if (sscanf(s, " %31[^= ] = %31s", field, value) != 2) return;
+
+	if (!strcmp(field, "model")) {
+		if (!strcasecmp(value, "CGB")) cfg->model = CGB;
+		else cfg->model = DMG;
+	}
+}
+
 static void load_turbo (Config *cfg, const char *s)
 {
 	char field[32];
@@ -704,6 +721,7 @@ void load_config (Config *cfg)
 		else if (!strcmp(section, "video"))	load_video (cfg, s);
 		else if (!strcmp(section, "input"))	load_input (cfg, s);
 		else if (!strcmp(section, "turbo"))	load_turbo (cfg, s);
+		else if (!strcmp(section, "model"))	load_model (cfg, s);
 	}
 	fclose(f);
 }
@@ -711,6 +729,9 @@ void load_config (Config *cfg)
 static void write_cfg_file (Config *cfg, FILE *f)
 {
 	fprintf(f, "; r2boy configuration\n\n");
+
+	fprintf(f, "[model]\n");
+	fprintf(f, "model = %s\n\n", cfg->model == CGB ? "CGB" : "DMG");
 
 	fprintf(f, "[audio]\n");
 	fprintf(f, "volume = %d\n", atomic_load(&cfg->volume));

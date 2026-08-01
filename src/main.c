@@ -38,7 +38,7 @@ static int check_regs (GB *gb, const char *romfile)
 	return 1;
 }
 
-static int run_test (const char *romfile)
+static int run_test (const char *romfile, Model model)
 {
 	GB *gb = malloc(sizeof(GB));
 	if (gb == NULL) {
@@ -46,7 +46,7 @@ static int run_test (const char *romfile)
 		return 1;
 	}
 
-	init_test (gb, romfile);
+	init_test(gb, romfile, model);
 	if (!gb->running) {
 		fprintf(stderr, "FAIL: %s (could not load ROM)\n", romfile);
 		cleanup_core(gb, romfile);
@@ -107,31 +107,35 @@ static inline void print_usage (const char *prog)
 	printf("        Default: roms/bios.bin\n");
 	printf("        If the file cannot be loaded, the emulator boots without a Boot ROM.\n\n");
 
-        printf("    --link-host <PORT>\n");
-        printf("        Host a Game Link session and listen for an incoming connection\n");
-        printf("        on the specified TCP port.\n\n");
+	printf("    --link-host <PORT>\n");
+	printf("        Host a Game Link session and listen for an incoming connection\n");
+	printf("        on the specified TCP port.\n\n");
 
-        printf("    --link-connect <IP:PORT>\n");
-        printf("        Connect to a remote Game Link host using the specified\n");
-        printf("        IP address and TCP port.\n\n");
+	printf("    --link-connect <IP:PORT>\n");
+	printf("        Connect to a remote Game Link host using the specified\n");
+	printf("        IP address and TCP port.\n\n");
 
-        printf("    --printer\n");
-        printf("        Use the Game Boy Printer. It will generate the output on <ROM>_NNN.bmp\n");
-        printf("        Can't be used at the same time that --link-host/--link-connect.\n\n");
+	printf("    --printer\n");
+	printf("        Use the Game Boy Printer. It will generate the output on <ROM>_NNN.bmp\n");
+	printf("        Can't be used at the same time that --link-host/--link-connect.\n\n");
 
-        printf("    --volume <0..100>\n");
-        printf("        Set the audio output volume. Default: 100.\n\n");
+	printf("    --volume <0..100>\n");
+	printf("        Set the audio output volume. Default: 100.\n\n");
 
-        printf("    --mute\n");
-        printf("        Start with audio muted.\n\n");
+	printf("    --mute\n");
+	printf("        Start with audio muted.\n\n");
 
-        printf("    --palette <NAME>\n");
-        printf("        Select a built-in color palette. NAME is one of:\n");
-        printf("        \"DMG\", \"pocket\", \"BGB\", \"choco\", \"pocket_green\", \"basic\"\n\n");
+	printf("    --palette <NAME>\n");
+	printf("        Select a built-in color palette. NAME is one of:\n");
+	printf("        \"DMG\", \"pocket\", \"BGB\", \"choco\", \"pocket_green\", \"basic\"\n\n");
 
-        printf("    --config\n");
-        printf("        Run an interactive visual window for change configuration and key mapping.\n");
-        printf("        The mapping and configuration is persisted to ~/.config/r2boy/config.ini\n\n");
+	printf("    --model <MODEL>\n");
+	printf("        Select a Game Boy model to run the ROM. Supported models:\n");
+	printf("        \"DMG\", \"CGB\"\n\n");
+
+	printf("    --config\n");
+	printf("        Run an interactive visual window for change configuration and key mapping.\n");
+	printf("        The mapping and configuration is persisted to ~/.config/r2boy/config.ini\n\n");
 
 	printf("DEFAULT KEYBOARD CONTROLS:\n");
 	printf("    Arrow Keys              D-Pad\n");
@@ -173,6 +177,7 @@ typedef struct {
 	char *romfile;
 	char *biosfile;
 	int debug;
+	int model;
 
 	int printer;
 	int link_host_port;
@@ -198,11 +203,13 @@ static Args parse_args (int argc, char *argv[])
 		{"palette", required_argument, 0, 'P'},
 		{"config", no_argument, 0, 'R'},
 		{"printer", no_argument, 0, 'X'},
+		{"model", required_argument, 0, 'm'},
 		{0, 0, 0, 0}
 	};
 
 	Args args = {
-		.biosfile = "roms/bios.bin",
+		.biosfile = NULL,
+		.model = -1,
 		.debug = 0,
 		.printer = 0,
 		.link_host_port = 0,
@@ -211,9 +218,10 @@ static Args parse_args (int argc, char *argv[])
 		.mute = -1,
 		.palette = NULL,
 	};
+	char *model_arg = NULL;
 
 	int opt;
-	while ((opt = getopt_long(argc, argv, "hvdb:H:C:V:MP:R", long_options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "hvdb:H:C:V:MP:Rm:", long_options, NULL)) != -1) {
 		switch (opt)
 		{
 		case 'd': {
@@ -226,6 +234,8 @@ static Args parse_args (int argc, char *argv[])
 			args.biosfile = optarg;
 			break;
 		}
+		case 'm': model_arg = optarg; break;
+
 		case 'C': args.link_connect_addr = optarg; break;
 		case 'H': {
 			uint16_t port;
@@ -265,6 +275,16 @@ static Args parse_args (int argc, char *argv[])
 		exit(1);
 	}
 	args.romfile = argv[optind];
+
+	if (model_arg) {
+		if (!strcasecmp(model_arg, "CGB")) args.model = (int)CGB;
+		else if (!strcasecmp(model_arg, "DMG")) args.model = (int)DMG;
+		else fprintf(stderr, "unknown model '%s', ignored (use DMG or CGB)\n", model_arg);
+	}
+	if (!args.biosfile) {
+		args.biosfile = (args.model == CGB) ? "roms/cgb_bios.bin" : "roms/bios.bin";
+		printf("BIOS (%s): %s\n", (args.model == CGB) ? "CGB" : "DMG", args.biosfile);
+	}
 	return args;
 }
 
@@ -309,9 +329,9 @@ static void init_link (GB *gb, Args args)
 	}
 }
 
-static void init_config (GB *gb, Args args)
+static void init_config (GB *gb, Config *cfg, Args args)
 {
-	load_config(&gb->cfg);
+	gb->cfg = *cfg;
 	gb->ppu.palette = gb->cfg.palette;
 
 	if (args.volume >= 0)
@@ -332,8 +352,8 @@ static void init_config (GB *gb, Args args)
 	fprintf(stderr, "Unknown palette: %s (ignored)\n", args.palette);
 }
 
-static int init_emulator (GB *gb, const char *romfile, const char *biosfile) {
-	init(gb, romfile, biosfile);
+static int init_emulator (GB *gb, const char *romfile, const char *biosfile, Model model) {
+	init(gb, romfile, biosfile, model);
 	if (!gb->running) {
 		cleanup(gb, romfile);
 		return 0;
@@ -495,8 +515,7 @@ int main (int argc, char *argv[])
 	Args args = parse_args(argc, argv);
 
 	if (args.debug)
-		return run_test(args.romfile);
-
+		return run_test(args.romfile, args.model);
 
 	GB *gb = malloc(sizeof(GB));
 	if (!gb) {
@@ -504,11 +523,15 @@ int main (int argc, char *argv[])
 		return 1;
 	}
 
-	if (!init_emulator(gb, args.romfile, args.biosfile)) {
+	Config *cfg = malloc(sizeof(Config));
+	load_config(cfg);
+	if (args.model != -1) cfg->model = (Model)args.model;
+	if (!init_emulator(gb, args.romfile, args.biosfile, cfg->model)) {
 		free(gb);
 		return 1;
 	}
-	init_config(gb, args);
+	init_config(gb, cfg, args);
+	free(cfg);
 	init_link(gb, args);
 	SDL_PauseAudioDevice(gb->audio.dev, 0);
 	start_save_thread(gb, args.romfile);

@@ -4,17 +4,14 @@
 #include <string.h>
 #include <time.h>
 
-static int load_bios (GB *gb, const char *filename)
+static int load_bios (GB *gb, const char *filename, size_t size)
 {
 	if (!filename) return 0;
-
 	FILE *f = fopen(filename, "rb");
 	if (!f) return 0;
-
-	size_t n = fread(gb->memory.bios, 1, 0x100, f);
+	size_t n = fread(gb->memory.bios, 1, size, f);
 	fclose(f);
-
-	return n == 0x100;
+	return n == size;
 }
 
 static void reset_cartucho (Cartucho *c)
@@ -38,12 +35,12 @@ static void reset_cartucho (Cartucho *c)
 static void reset_components (GB *gb)
 {
 	memset(&gb->ppu, 0, sizeof(PPU));
-	init_ppu(&gb->ppu);
+	init_ppu(&gb->ppu, gb->model);
 	gb->ppu.palette = gb->cfg.palette;
 	gb->ppu.lcd_was_off = 1;
 
 	memset(&gb->apu, 0, sizeof(APU));
-	init_apu(&gb->apu);
+	init_apu(&gb->apu, gb->model);
 	gb->apu.sample_rate = gb->audio.sample_rate;
 
 	memset(&gb->cpu, 0, sizeof(CPU));
@@ -77,17 +74,31 @@ static void reset_rest (GB *gb)
 	}
 }
 
+static void init_cgb_palette_ram (GB *gb)
+{
+	if (gb->model != CGB) return;
+	memset(gb->memory.bg_palette_ram, 0xFF, sizeof(gb->memory.bg_palette_ram));
+	memset(gb->memory.obj_palette_ram, 0xFF, sizeof(gb->memory.obj_palette_ram));
+}
+
+static void reset_regs (GB *gb)
+{
+	init_ppu_reg(&gb->ppu);
+	init_apu_reg(&gb->apu);
+	init_cpu(&gb->cpu, gb->model);
+	init_cgb_palette_ram(gb);
+	gb->timer.div = (gb->model == CGB) ? 0x2678 : 0xABCC;
+	gb->joypad.joyp = (gb->model == CGB) ? 0x30 : 0xCF;
+	gb->memory.wram_bank = (gb->model == CGB) ? 0x07 : 0;
+	gb->timer.tac = 0xF8;
+	gb->serial.SC = 0x7E;
+	gb->boot_rom_enabled = 0;
+}
+
 static void reset_bios (GB *gb)
 {
 	if (!gb->hay_bios) {
-		init_ppu_reg(&gb->ppu);
-		init_apu_reg(&gb->apu);
-		init_cpu(&gb->cpu);
-		gb->timer.div = 0xABCC;
-		gb->serial.SC = 0x7E;
-		gb->timer.tac = 0xF8;
-		gb->joypad.joyp = 0xCF;
-		gb->boot_rom_enabled = 0;
+		reset_regs(gb);
 	} else {
 		gb->cpu.pc = 0;
 		gb->boot_rom_enabled = 1;
@@ -106,39 +117,32 @@ void reset_gb (GB *gb)
 	gb->on = 1;
 }
 
-static int init_core (GB *gb, const char *romfile, const char *biosfile)
+static int init_core (GB *gb, const char *romfile, const char *biosfile, Model model)
 {
 	memset(gb, 0, sizeof(GB));
 	gb->romfile = romfile;
+	gb->model = model;
 
 	pthread_mutex_init(&gb->save.lock, NULL);
 	pthread_cond_init(&gb->save.cond, NULL);
 	atomic_store(&gb->save.request, 0);
 	atomic_store(&gb->save.thread_run, 0);
 
-	init_ppu(&gb->ppu);
-	init_apu(&gb->apu);
+	init_ppu(&gb->ppu, model);
+	init_apu(&gb->apu, model);
 	init_opcodes(&gb->opcodes);
 	init_printer(&gb->printer);
 
 	init_config_defaults(&gb->cfg);
 
-	if (!load_bios(gb, biosfile)) {
+	size_t bios_size = (model == DMG) ? 0x100 : 0x900;
+	if (!load_bios(gb, biosfile, bios_size)) {
 
-		init_ppu_reg(&gb->ppu);
-		init_apu_reg(&gb->apu);
-		init_cpu(&gb->cpu);
-		gb->timer.div = 0xABCC;
-		gb->serial.SC = 0x7E;
-		gb->timer.tac = 0xF8;
-		gb->joypad.joyp = 0xCF;
-		gb->boot_rom_enabled = 0;
+		reset_regs(gb);
 		gb->hay_bios = 0;
 		if (biosfile != NULL)
 			printf("Could not load BOOT ROM %s. Running without BIOS\n", biosfile);
-
 	} else {
-
 		printf("Using BOOT ROM %s\n", biosfile);
 		gb->boot_rom_enabled = 1;
 		gb->hay_bios = 1;
@@ -156,9 +160,9 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile)
 	return 0;
 }
 
-void init (GB *gb, const char *romfile, const char *biosfile)
+void init (GB *gb, const char *romfile, const char *biosfile, Model model)
 {
-	if (init_core(gb, romfile, biosfile)) {
+	if (init_core(gb, romfile, biosfile, model)) {
 		gb->running = 0;
 		return;
 	}
@@ -173,9 +177,9 @@ void init (GB *gb, const char *romfile, const char *biosfile)
 	gb->on = 1;
 }
 
-void init_test (GB *gb, const char *romfile)
+void init_test (GB *gb, const char *romfile, Model model)
 {
-	if (init_core(gb, romfile, NULL)) {
+	if (init_core(gb, romfile, NULL, model)) {
 		gb->running = 0;
 		return;
 	}
@@ -251,7 +255,7 @@ void gb_step (GB *gb)
 		return;
 	}
 
-	if (gb->boot_rom_disable_pending && gb->cpu.pc >= 0x100) {
+	if (gb->boot_rom_disable_pending && gb->cpu.pc == 0x100) {
 		gb->boot_rom_enabled = 0;
 		gb->boot_rom_disable_pending = 0;
 	}

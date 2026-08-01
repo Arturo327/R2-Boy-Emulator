@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "cpu/opcodes/opcodes.h"
 #include "bus/bus.h"
+#include "model.h"
 
 typedef struct GB GB;
 
@@ -61,6 +62,6 @@ typedef struct CPU {
 } CPU;
 
 void cpu_step (CPU *cpu);
-void init_cpu (CPU *cpu);
+void init_cpu (CPU *cpu, Model model);
 
 #endif

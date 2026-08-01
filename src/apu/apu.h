@@ -2,6 +2,7 @@
 #define APU_H
 
 #include <stdint.h>
+#include "model.h"
 
 #define APU_BUFFER_LEN 4096
 
@@ -75,12 +76,13 @@ typedef struct APU {
 
 	int16_t buffer[APU_BUFFER_LEN];
 	int buffer_pos;
+	Model model;
 
 	int32_t accum_l, accum_r;
 	uint32_t accum_n;
 } APU;
 
-void init_apu (APU *apu);
+void init_apu (APU *apu, Model model);
 void init_apu_reg (APU *apu);
 
 void apu_step (APU *apu);
@@ -91,5 +93,8 @@ void apu_write_reg (APU *apu, uint16_t addr, uint8_t val);
 
 uint8_t apu_wave_ram_read (APU *apu, uint16_t addr);
 void apu_wave_ram_write (APU *apu, uint16_t addr, uint8_t val);
+
+uint8_t apu_pcm12 (APU *apu);
+uint8_t apu_pcm34 (APU *apu);
 
 #endif

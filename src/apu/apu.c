@@ -8,10 +8,10 @@ static const uint8_t DUTY_TABLE[4] = { 0x01, 0x81, 0x87, 0x7E };
 static const uint16_t NOISE_DIVISOR[8] = {8,16,32,48,64,80,96,112};
 static const uint8_t WAVE_SHIFT[4] = {4, 0, 1, 2};
  
-void init_apu (APU *apu)
+void init_apu (APU *apu, Model model)
 {
-	memset(apu, 0, sizeof(APU));
 	apu->sample_rate = 44100;
+	apu->model = model;
 }
  
 void init_apu_reg (APU *apu)
@@ -557,6 +557,40 @@ void apu_write_reg (APU *apu, uint16_t addr, uint8_t val)
 		break;
 	}
 	}
+}
+
+uint8_t apu_pcm12 (APU *apu)
+{
+	uint8_t ch1 = 0;
+	if (apu->ch1.ch.enabled) {
+		uint8_t bit = (DUTY_TABLE[apu->nr11 >> 6] >> apu->ch1.ch.duty_step) & 1;
+		ch1 = bit ? apu->ch1.ch.volume : 0;
+	}
+
+	uint8_t ch2 = 0;
+	if (apu->ch2.enabled) {
+		uint8_t bit = (DUTY_TABLE[apu->nr21 >> 6] >> apu->ch2.duty_step) & 1;
+		ch2 = bit ? apu->ch2.volume : 0;
+	}
+
+	return (uint8_t)((ch2 << 4) | ch1);
+}
+
+uint8_t apu_pcm34 (APU *apu)
+{
+	uint8_t ch3 = 0;
+	if (apu->ch3.enabled) {
+		uint8_t shift = WAVE_SHIFT[(apu->nr32 >> 5) & 0x03];
+		ch3 = apu->ch3.sample_buffer >> shift;
+	}
+
+	uint8_t ch4 = 0;
+	if (apu->ch4.ch.enabled) {
+		uint8_t bit = ~(apu->ch4.lfsr) & 1;
+		ch4 = bit ? apu->ch4.ch.volume : 0;
+	}
+
+	return (uint8_t)((ch4 << 4) | ch3);
 }
 
 uint8_t apu_wave_ram_read (APU *apu, uint16_t addr)

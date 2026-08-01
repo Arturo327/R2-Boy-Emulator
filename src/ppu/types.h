@@ -111,9 +111,12 @@ typedef struct PPU {
 
 	Bus *bus;
 	DmgPalette palette;
+	Model model;
 
 	uint8_t stat_line;
-	uint8_t lcdc, stat, scy, scx, ly, lyc, dma, bgp, obp0, obp1, wy, wx;
+	uint8_t lcdc, stat, scy, scx, ly, lyc, dma, wy, wx;
+	uint8_t bgp, obp0, obp1;	// DMG only
+	uint8_t opri, bcps, ocps;	// CGB only
 } PPU;
 
 #endif

@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdatomic.h>
 
+#include "model.h"
 #include "cpu/cpu.h"
 #include "bus/bus.h"
 #include "ppu/ppu.h"
@@ -37,11 +38,16 @@ typedef struct Joypad {
 
 typedef struct Memory {
 	Cartucho cart;
-	uint8_t bios[0x100];
+	uint8_t bios[0x900];
 	uint8_t vram[0x2000];
 	uint8_t wram[0x2000];
 	uint8_t oam[0xA0];
 	uint8_t hram[0x7F];
+	// only CGB
+	uint8_t vram_bank, wram_bank;
+	uint8_t ff72, ff73, ff75;
+	uint8_t bg_palette_ram[64];
+	uint8_t obj_palette_ram[64];
 } Memory;
 
 typedef struct DMA {
@@ -87,13 +93,14 @@ typedef struct GB {
 	uint8_t state_load_pending;
 	uint8_t state_num;
 
+	Model model;
 	Config cfg;
 	AutoSave save;
 } GB;
 
 void reset_gb (GB *gb);
-void init (GB *gb, const char *romfile, const char *biosfile);
-void init_test (GB *gb, const char *romfile);
+void init (GB *gb, const char *romfile, const char *biosfile, Model model);
+void init_test (GB *gb, const char *romfile, Model model);
 
 void cleanup (GB *gb, const char *romfile);
 void cleanup_core (GB *gb, const char *romfile);

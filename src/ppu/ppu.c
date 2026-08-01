@@ -17,15 +17,19 @@ void init_ppu_reg (PPU *ppu)
 	ppu->bgp = 0xFC;
 	ppu->obp0 = 0xFF;
 	ppu->obp1 = 0xFF;
+	ppu->bcps = 0x88;
+	ppu->ocps = 0x90;
+	ppu->opri = 0xFF;
 	ppu->lyc = 0;
 }
 
-void init_ppu (PPU *ppu)
+void init_ppu (PPU *ppu, Model model)
 {
 	ppu->mode = OAM_SCAN;
 	ppu->bus = NULL;
 	ppu->sp.pending = -1;
 	ppu->palette = PAL_DEFAULT;
+	ppu->model = model;
 }
 
 static void update_stat_line_ex (PPU *ppu, int force_mode2)

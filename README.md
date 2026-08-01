@@ -72,10 +72,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 
 R2-Boy works correctly and runs every DMG compatible game I tested.
 
-This project is under active development.
-
-Planned:
-- CGB (Game Boy Color) support
+This project is under active development. I am currently working on CGB (Game Boy Color) compatibility.
 
 ---
 
@@ -124,6 +121,7 @@ Common options:
 | :--- | :--- |
 | `-d`, `--debug`              | Headless mode; verify CPU registers (test ROMs) |
 | `-b`, `--bios <file>`        | Use a specific Game Boy boot ROM (default `roms/bios.bin`) |
+| `--model <MODEL>`            | Set the Game Boy model to run the game: DMG or CGB (CGB is not finished and games won't work properly) |
 | `--volume <0..100>`          | Set the audio output volume |
 | `--mute`                     | Start with audio muted |
 | `--palette <NAME>`           | Use a built-in palette: `DMG`, `pocket`, `BGB`, `choco`, `pocket_green`, `basic` |
@@ -190,7 +188,7 @@ R2-Boy ships six built-in DMG color palettes. The default reproduces the warm gr
 
 ## Configuration
 
-R2-Boy keeps its config in `~/.config/r2boy/config.ini` (or `$XDG_CONFIG_HOME/r2boy/config.ini` if set). Four sections are written. It includes keyboard and gamepad mappings, volume control, palette, input and turbo.
+R2-Boy keeps its config in `~/.config/r2boy/config.ini` (or `$XDG_CONFIG_HOME/r2boy/config.ini` if set). Seven sections are written. It includes keyboard and gamepad mappings, volume control, palette, input, emulated model and turbo.
 
 Keyboard bindings support modifier chords written as `Ctrl+Shift+X` style tokens. Any combination of the prefixes `Ctrl`, `Shift`, `Alt`, `GUI` (also accepted: `Control`, `Option`, `Cmd`, `Super`, `Meta`) may precede a scancode name. A bare token like `X` parses as `mods=0` (matches any modifier state, the legacy behaviour). The special value `NONE` (or `—`) means no binding for that action.
 
@@ -203,7 +201,7 @@ Keyboard bindings support modifier chords written as `Ctrl+Shift+X` style tokens
 
 The `--config` flag opens a **visual SDL window** with two screens:
 - One for a list of all 26 actions and their current keyboard + gamepad bindings
-- The other one is for other configurations, like turbo speed, palette, volume...
+- The other one is for other configurations, like model, turbo speed, palette, volume...
 
 Keyboard keys are captured via SDL `SDL_KEYDOWN` (so layout-independent scancodes and modifier chords work); gamepad buttons are captured via `SDL_CONTROLLERBUTTONDOWN`.
 

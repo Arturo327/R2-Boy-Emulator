@@ -5,6 +5,7 @@
 #include <stdatomic.h>
 #include <SDL2/SDL.h>
 #include "frontend/config_ui.h"
+#include "model.h"
 
 typedef struct Config Config;
 
@@ -71,6 +72,7 @@ extern const ActionMeta ACTIONS[ACT_COUNT];
 typedef struct Config {
 	Keymap keymap;
 	Padmap padmap;
+	Model model;
 	uint8_t turbo;
 	uint8_t turbo_speed;
 	uint8_t turbo_hold;
@@ -87,6 +89,7 @@ typedef enum {
 	SET_USE_ACCEL,
 	SET_TURBO_SPEED,
 	SET_TURBO_HOLD,
+	SET_MODEL,
 	SET_COUNT
 } SettingId;
 

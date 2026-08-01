@@ -1,7 +1,9 @@
 #include "cpu/cpu.h"
+#include "model.h"
 #include <stdlib.h>
 
-void init_cpu (CPU *cpu) {
+static void init_dmg_regs (CPU *cpu)
+{
 	cpu->a = 0x01;
 	cpu->f = 0xB0;
 	cpu->b = 0x00;
@@ -10,17 +12,33 @@ void init_cpu (CPU *cpu) {
 	cpu->e = 0xD8;
 	cpu->h = 0x01;
 	cpu->l = 0x4D;
+}
+
+static void init_cgb_regs (CPU *cpu)
+{
+	cpu->a = 0x11;
+	cpu->f = 0x80;
+	cpu->b = 0x00;
+	cpu->c = 0x00;
+	cpu->d = 0x00;
+	cpu->e = 0x08;
+	cpu->h = 0x00;
+	cpu->l = 0x7C;
+}
+
+void init_cpu (CPU *cpu, Model model)
+{
+	if (model == CGB) init_cgb_regs(cpu);
+	else init_dmg_regs(cpu);
 
 	cpu->sp = 0xFFFE;
 	cpu->pc = 0x100;
-	cpu->halted = 0;
-	cpu->halt_bug = 0;
 
 	cpu->bus = NULL;
 }
 
-static int handle_interrupts (CPU *cpu) {
-
+static int handle_interrupts (CPU *cpu)
+{
 	Bus *bus = cpu->bus;
 	Interrupts *in = bus->interrupts;
 	uint8_t fired = in->IE & in->IF & 0x1F;

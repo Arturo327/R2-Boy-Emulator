@@ -13,7 +13,7 @@ SRC := $(shell find src -name '*.c')
 OBJ := $(patsubst src/%.c,$(BUILD_DIR)/%.o,$(SRC))
 DEP := $(OBJ:.o=.d)
 
-.PHONY: all test test_mbc clean clean_sav
+.PHONY: all test test_mbc test_cgb clean clean_sav
 
 all: $(TARGET)
 
@@ -39,6 +39,12 @@ debug:
 test: $(TARGET)
 	@find tests/mooneye/acceptance/ -name "*.gb" | while read rom; do \
 		./build/r2boy -d "$$rom" | grep -e "PASS" -e "FAIL"; \
+	done
+	@find tests/mooneye/acceptance/ -name "*.sav" -delete
+
+test_cgb: $(TARGET)
+	@find tests/mooneye/cgb/ -name "*.gb" | while read rom; do \
+		./build/r2boy --model CGB -d "$$rom" | grep -e "PASS" -e "FAIL"; \
 	done
 	@find tests/mooneye/acceptance/ -name "*.sav" -delete
 
