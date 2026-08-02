@@ -27,6 +27,13 @@ static void stop (GB *gb) {				// 0x10
 
 	gb->cpu.pc++;
 	div_reset(gb);
+
+	if (gb->model == CGB && (gb->memory.key1 & 0x01)) {
+		gb->memory.key1 ^= 0x80;
+		gb->memory.key1 &= ~0x01;
+		return;
+	}
+
 	gb->cpu.stopped = 1;
 }
 

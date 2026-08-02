@@ -40,6 +40,11 @@ typedef struct SpritePixel {
 	int16_t src_x;
 } SpritePixel;
 
+typedef struct BgPixel {
+	uint8_t color;
+	uint8_t attr;
+} BgPixel;
+
 typedef struct SpriteFetcher {
 	Sprite sprites[10];
 	uint8_t num_sprites;
@@ -62,10 +67,11 @@ typedef struct SpriteFetcher {
 } SpriteFetcher;
 
 typedef struct BgFetcher {
-	uint8_t fifo[16];
+	BgPixel fifo[16];
 	uint8_t num_fifo;
 	uint8_t fifo_head;
 	uint8_t buffer[8];
+	uint8_t buffer_attr;
 
 	uint8_t discard;
 	uint8_t discard_px;
@@ -77,6 +83,7 @@ typedef struct BgFetcher {
 	uint8_t fetcher_t;
 	uint8_t fetcher_tile_id;
 	uint8_t fetcher_bit_y;
+	uint8_t fetcher_attr;
 } BgFetcher;
 
 typedef struct PPU {

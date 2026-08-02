@@ -503,8 +503,8 @@ static int init_emulator (GB *gb, Args args)
 		cfg->model = (Model)args.model;
 
 	if (!args.biosfile) {
-		args.biosfile = (args.model == CGB) ? "roms/cgb_bios.bin" : "roms/bios.bin";
-		printf("BIOS (%s): %s\n", (args.model == CGB) ? "CGB" : "DMG", args.biosfile);
+		args.biosfile = (cfg->model == CGB) ? "roms/cgb_bios.bin" : "roms/bios.bin";
+		printf("BIOS (%s): %s\n", (cfg->model == CGB) ? "CGB" : "DMG", args.biosfile);
 	}
 
 	init(gb, args.romfile, args.biosfile, cfg->model);

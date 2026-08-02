@@ -89,7 +89,7 @@ static void reset_regs (GB *gb)
 	init_cgb_palette_ram(gb);
 	gb->timer.div = (gb->model == CGB) ? 0x2678 : 0xABCC;
 	gb->joypad.joyp = (gb->model == CGB) ? 0x30 : 0xCF;
-	gb->memory.wram_bank = (gb->model == CGB) ? 0x07 : 0;
+	gb->memory.wram_bank = 1;
 	gb->timer.tac = 0xF8;
 	gb->serial.SC = 0x7E;
 	gb->boot_rom_enabled = 0;
@@ -107,7 +107,11 @@ static void reset_bios (GB *gb)
 
 void reset_gb (GB *gb)
 {
-	memset(gb->memory.vram, 0, sizeof(Memory) - offsetof(Memory, vram));
+	memset(gb->memory.vram, 0, gb->model == CGB ? 0x4000 : 0x2000);
+	memset(gb->memory.wram, 0, gb->model == CGB ? 0x8000 : 0x2000);
+	memset((uint8_t *)&gb->memory + offsetof(Memory, oam), 0,
+			sizeof(Memory) - offsetof(Memory, oam));
+
 	reset_components(gb);
 
 	reset_bios(gb);
@@ -115,6 +119,33 @@ void reset_gb (GB *gb)
 
 	reset_rest(gb);
 	gb->on = 1;
+}
+
+static int alloc_memory_banks (Memory *mem, Model model)
+{
+	uint16_t vram_size = (model == CGB) ? 0x4000 : 0x2000;
+	uint16_t wram_size = (model == CGB) ? 0x8000 : 0x2000;
+	uint16_t bios_size = (model == CGB) ? 0x900 : 0x100;
+
+	mem->vram = calloc(1, vram_size);
+	mem->wram = calloc(1, wram_size);
+	mem->bios = calloc(1, bios_size);
+
+	if (!mem->vram || !mem->wram || !mem->bios) {
+		fprintf(stderr, "Not enough memory for the Game Boy Memory\n");
+		return 0;
+	}
+	return 1;
+}
+
+static void free_memory_banks (Memory *mem)
+{
+	free(mem->vram);
+	free(mem->wram);
+	free(mem->bios);
+	mem->vram = NULL;
+	mem->wram = NULL;
+	mem->bios = NULL;
 }
 
 static void check_model_compatibility (GB *gb)
@@ -139,6 +170,9 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile, Model m
 	pthread_cond_init(&gb->save.cond, NULL);
 	atomic_store(&gb->save.request, 0);
 	atomic_store(&gb->save.thread_run, 0);
+
+	if (!alloc_memory_banks(&gb->memory, model))
+		return 1;
 
 	init_ppu(&gb->ppu, model);
 	init_apu(&gb->apu, model);
@@ -207,6 +241,7 @@ void cleanup_core (GB *gb)
 	pthread_mutex_unlock(&gb->save.lock);
 
 	free_cart(&gb->memory.cart);
+	free_memory_banks(&gb->memory);
 	pthread_cond_destroy(&gb->save.cond);
 	pthread_mutex_destroy(&gb->save.lock);
 }
@@ -279,6 +314,9 @@ void gb_step (GB *gb)
 	}
 
 	cpu_step(&gb->cpu);
+	if (gb->memory.key1 & 0x80)
+		cpu_step(&gb->cpu);
+
 	dma_step(gb);
 
 	save_state_step(gb);

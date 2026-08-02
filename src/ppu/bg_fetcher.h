@@ -5,7 +5,7 @@
 #include <bus/bus.h>
 #include "ppu/types.h"
 
-uint8_t bg_fifo_pop (PPU *ppu);
+BgPixel bg_fifo_pop (PPU *ppu);
 void bg_fetch (PPU *ppu);
 
 #endif

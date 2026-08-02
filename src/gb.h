@@ -38,9 +38,9 @@ typedef struct Joypad {
 
 typedef struct Memory {
 	Cartucho cart;
-	uint8_t bios[0x900];
-	uint8_t vram[0x2000];
-	uint8_t wram[0x2000];
+	uint8_t *bios;
+	uint8_t *vram;
+	uint8_t *wram;
 	uint8_t oam[0xA0];
 	uint8_t hram[0x7F];
 	// only CGB

@@ -149,10 +149,13 @@ static void io_memory (SaveState *s, GB *gb)
 {
 	Memory *mem = &gb->memory;
 	io_cart(s, gb);
-	io_buf(s, mem->vram, sizeof(mem->vram));
-	io_buf(s, mem->wram, sizeof(mem->wram));
+	io_buf(s, mem->vram, gb->model == CGB ? 0x4000 : 0x2000);
+	io_buf(s, mem->wram, gb->model == CGB ? 0x8000 : 0x2000);
 	io_buf(s, mem->oam,  sizeof(mem->oam));
 	io_buf(s, mem->hram, sizeof(mem->hram));
+	if (gb->model != CGB) return;
+	io_buf(s, mem + offsetof(Memory, vram_bank),
+			sizeof(Memory) - offsetof(Memory, vram_bank));
 }
  
 static void io_serial (SaveState *s, Serial *serial)
@@ -222,6 +225,7 @@ int save_state (GB *gb)
 	StateHeader hdr;
 	memset(&hdr, 0, sizeof(hdr));
 	hdr.magic = SAVESTATE_MAGIC;
+	hdr.model = (gb->model == CGB) ? SAVESTATE_CGB : SAVESTATE_DMG;
 	hdr.rom_size = gb->memory.cart.rom_size;
 	memcpy(hdr.title, gb->memory.cart.title, sizeof(hdr.title));
  
@@ -276,6 +280,10 @@ static int validate_header (StateHeader *hdr, GB *gb, const char *path)
 {
 	if (hdr->magic != SAVESTATE_MAGIC) {
 		fprintf(stderr, "SaveState: %s is not a valid savestate file\n", path);
+		return 0;
+	}
+	if (hdr->model != (gb->model == CGB ? SAVESTATE_CGB : SAVESTATE_DMG)) {
+		fprintf(stderr, "SaveState: %s is from another Game Boy model\n", path);
 		return 0;
 	}
 	if (hdr->rom_size != gb->memory.cart.rom_size) {

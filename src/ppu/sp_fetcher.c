@@ -45,30 +45,36 @@ void start_sprites (PPU *ppu) {
 static void get_sp_addr (PPU *ppu)
 {
 	ppu->sp.sel_sprite = ppu->sp.pending;
+	Sprite *sp = &ppu->sp.sprites[ppu->sp.sel_sprite];
 
-	int line = (int)ppu->ly - ((int)ppu->sp.sprites[ppu->sp.sel_sprite].y - 16);
+	int line = (int)ppu->ly - ((int)sp->y - 16);
 
 	uint8_t sp_h = (ppu->lcdc & SP_SIZE) ? 16 : 8;
-	uint8_t tile_line = (ppu->sp.sprites[ppu->sp.sel_sprite].flags & Y_FLIP) ?
-		(sp_h - 1 - line) : line;
+	uint8_t tile_line = (sp->flags & Y_FLIP) ? (sp_h - 1 - line) : line;
 
-	uint8_t tile = ppu->sp.sprites[ppu->sp.sel_sprite].tile;
+	uint8_t tile = sp->tile;
 	if (ppu->lcdc & SP_SIZE) tile &= 0xFE;
+
 	ppu->sp.addr = tile << 4;
 	ppu->sp.addr += tile_line << 1;
+	if (ppu->model == CGB && (sp->flags & 0x08))
+		ppu->sp.addr += 0x2000;
 }
 
 static void fetch_tile_low (PPU *ppu, GB *gb)
 {
+	Sprite *sp = &ppu->sp.sprites[ppu->sp.sel_sprite];
 	uint8_t l = gb->memory.vram[ppu->sp.addr];
+	int cgb_colors = ppu->model == CGB && !(gb->memory.key0 & 0x04);
+
 	for (int i = 0; i < 8; i++) {
-		uint8_t bit = (ppu->sp.sprites[ppu->sp.sel_sprite].flags & X_FLIP) ?
-			i : 7 - i;
+		uint8_t bit = (sp->flags & X_FLIP) ? i : 7 - i;
 		ppu->sp.buff[i].color = (l >> bit) & 1;
-		ppu->sp.buff[i].pal = (ppu->sp.sprites[ppu->sp.sel_sprite].flags & PALETTE) ?
-			ppu->obp1 : ppu->obp0;
+		ppu->sp.buff[i].pal = cgb_colors ? (sp->flags & 0x07)
+			: ((sp->flags & PALETTE) ? ppu->obp1 : ppu->obp0);
 	}
 }
+
 
 static void fetch_tile_high (PPU *ppu, GB *gb)
 {

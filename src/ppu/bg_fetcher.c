@@ -1,8 +1,15 @@
 #include "ppu/bg_fetcher.h"
 #include "gb.h"
 
-uint8_t bg_fifo_pop (PPU *ppu) {
-	uint8_t out = ppu->bg.fifo[ppu->bg.fifo_head];
+#define ATTR_PAL 0x07
+#define ATTR_BANK 0x08
+#define ATTR_XFLIP 0x20
+#define ATTR_YFLIP 0x40
+#define ATTR_PRIO 0x80
+
+BgPixel bg_fifo_pop (PPU *ppu)
+{
+	BgPixel out = ppu->bg.fifo[ppu->bg.fifo_head];
 	ppu->bg.fifo_head = (ppu->bg.fifo_head + 1) & 15;
 	ppu->bg.num_fifo--;
 	return out;
@@ -46,39 +53,61 @@ static void fetch_tile_id (GB *gb, PPU *ppu)
 
 	uint16_t tile_map_addr = tile_map_base + (tile_y << 5) + tile_x;
 	ppu->bg.fetcher_tile_id = gb->memory.vram[tile_map_addr];
+
+	ppu->bg.fetcher_attr = 0;
+	if (ppu->model == CGB) {
+		ppu->bg.fetcher_attr = gb->memory.vram[0x2000 + tile_map_addr];
+		if (ppu->bg.fetcher_attr & ATTR_YFLIP)
+			ppu->bg.fetcher_bit_y = 7 - ppu->bg.fetcher_bit_y;
+	}
+
 	ppu->fetch_x += 8;
+}
+
+static uint16_t bg_tile_addr (PPU *ppu)
+{
+	uint16_t addr;
+	if (ppu->lcdc & BG_WIN_TILES)
+		addr = ppu->bg.fetcher_tile_id << 4;
+	else
+		addr = 0x1000 + (((int16_t)(int8_t)ppu->bg.fetcher_tile_id) << 4);
+
+	if (ppu->bg.fetcher_attr & ATTR_BANK)
+		addr += 0x2000;
+	return addr;
 }
 
 static void fetch_tile_low (GB *gb, PPU *ppu)
 {
-	uint16_t tile_addr = 0;
-	if (ppu->lcdc & BG_WIN_TILES) tile_addr = ppu->bg.fetcher_tile_id << 4;
-	else tile_addr = 0x1000 + (((int16_t)(int8_t)ppu->bg.fetcher_tile_id) << 4);
+	uint16_t tile_addr = bg_tile_addr(ppu);
 	uint8_t l = gb->memory.vram[tile_addr + (ppu->bg.fetcher_bit_y << 1)];
+	uint8_t flip = ppu->bg.fetcher_attr & ATTR_XFLIP;
 
 	for (int i = 0; i < 8; i++) {
-		int bit = 7 - i;
+		int bit = flip ? i : 7 - i;
 		ppu->bg.buffer[i] = (l >> bit) & 1;
 	}
 }
 
 static void fetch_tile_high (GB *gb, PPU *ppu)
 {
-	uint16_t tile_addr = 0;
-	if (ppu->lcdc & BG_WIN_TILES) tile_addr = ppu->bg.fetcher_tile_id << 4;
-	else tile_addr = 0x1000 + (((int16_t)(int8_t)ppu->bg.fetcher_tile_id) << 4);
+	uint16_t tile_addr = bg_tile_addr(ppu);
 	uint8_t h = gb->memory.vram[tile_addr + (ppu->bg.fetcher_bit_y << 1) + 1];
+	uint8_t flip = ppu->bg.fetcher_attr & ATTR_XFLIP;
 
 	for (int i = 0; i < 8; i++) {
-		int bit = 7 - i;
+		int bit = flip ? i : 7 - i;
 		ppu->bg.buffer[i] |= ((h >> bit) & 1) << 1;
 	}
+	ppu->bg.buffer_attr = ppu->bg.fetcher_attr;
 }
 
 static void push (PPU *ppu)
 {
 	for (int i = 0; i < 8; i++) {
-		ppu->bg.fifo[(ppu->bg.fifo_head + ppu->bg.num_fifo) & 15] = ppu->bg.buffer[i];
+		uint8_t idx = (ppu->bg.fifo_head + ppu->bg.num_fifo) & 15;
+		ppu->bg.fifo[idx].color = ppu->bg.buffer[i];
+		ppu->bg.fifo[idx].attr = ppu->bg.buffer_attr;
 		ppu->bg.num_fifo++;
 	}
 	ppu->bg.fetcher_t = 0;

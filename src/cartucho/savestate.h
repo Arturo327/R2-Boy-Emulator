@@ -5,11 +5,14 @@
 #include <stdio.h>
 
 #define SAVESTATE_MAGIC 0x59423252u
+#define SAVESTATE_CGB 0x00636762u
+#define SAVESTATE_DMG 0x00646D67u
 
 typedef struct GB GB;
 
 typedef struct {
 	uint32_t magic;
+	uint32_t model;
 	uint32_t rom_size;
 	char title[17];
 } StateHeader;

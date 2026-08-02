@@ -118,13 +118,27 @@ void oam_bug (GB *gb, uint16_t val, int is_write)
 		oam[curr + i] = oam[prev + i];
 }
 
+static uint32_t vram_map (GB *gb, uint32_t offset)
+{
+	return ((uint32_t)gb->memory.vram_bank << 13) + offset;
+}
+
+static uint32_t wram_map (GB *gb, uint32_t offset)
+{
+	if (offset < 0x1000)
+		return offset;
+
+	uint32_t bank = gb->memory.wram_bank ? gb->memory.wram_bank : 1;
+	return (bank << 12) + (offset - 0x1000);
+}
+
 uint8_t dma_read_source (GB *gb, uint16_t addr)
 {
 	if (addr < 0x8000) return gb->memory.cart.read_rom(gb, addr);
-	if (addr < 0xA000) return gb->memory.vram[addr - 0x8000];
+	if (addr < 0xA000) return gb->memory.vram[vram_map(gb, addr - 0x8000)];
 	if (addr < 0xC000) return gb->memory.cart.read_ram(gb, addr);
-	if (addr < 0xE000) return gb->memory.wram[addr - 0xC000];
-	return gb->memory.wram[addr - 0xE000];
+	if (addr < 0xE000) return gb->memory.wram[wram_map(gb, addr - 0xC000)];
+	return gb->memory.wram[wram_map(gb, addr - 0xE000)];
 }
 
 static uint8_t read_cgb_regs (GB *gb, uint16_t addr)
@@ -173,7 +187,7 @@ static void write_cgb_regs (GB *gb, uint16_t addr, uint8_t val)
 		break;
 	case 0xFF6C: gb->ppu.opri = val; break;
 	case 0xFF4C: if (gb->boot_rom_enabled) gb->memory.key0 = val & 0x04; break;
-	case 0xFF4D: gb->memory.key1 = val & 0x01; break;
+	case 0xFF4D: gb->memory.key1 = (gb->memory.key1 & 0x80) | (val & 0x01); break;
 	}
 }
 
@@ -194,7 +208,7 @@ static uint8_t bus_read8 (void *ctx, uint16_t addr)
 
 	if (addr < 0xA000) {
 		if (gb->ppu.mode == DRAWING || gb->ppu.vram_pre_block) return 0xFF;
-		return gb->memory.vram[addr - 0x8000];
+		return gb->memory.vram[vram_map(gb, addr - 0x8000)];
 	}
 
 	if (addr < 0xC000) {
@@ -202,11 +216,11 @@ static uint8_t bus_read8 (void *ctx, uint16_t addr)
 	}
 
 	if (addr < 0xE000) {
-		return gb->memory.wram[addr - 0xC000];
+		return gb->memory.wram[wram_map(gb, addr - 0xC000)];
 	}
 
 	if (addr < 0xFE00) {
-		return gb->memory.wram[addr - 0xE000];
+		return gb->memory.wram[wram_map(gb, addr - 0xE000)];
 	}
 
 	if (addr < 0xFEA0) {
@@ -286,7 +300,7 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 
 	if (addr < 0xA000) {
 		if (gb->ppu.mode == DRAWING) return;
-		gb->memory.vram[addr - 0x8000] = val;
+		gb->memory.vram[vram_map(gb, addr - 0x8000)] = val;
 		return;
 	}
 
@@ -296,12 +310,12 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 	}
 
 	if (addr < 0xE000) {
-		gb->memory.wram[addr - 0xC000] = val;
+		gb->memory.wram[wram_map(gb, addr - 0xC000)] = val;
 		return;
 	}
 
 	if (addr < 0xFE00) {
-		gb->memory.wram[addr - 0xE000] = val;
+		gb->memory.wram[wram_map(gb, addr - 0xE000)] = val;
 		return;
 	}
 
