@@ -65,13 +65,16 @@ static void fetch_tile_low (PPU *ppu, GB *gb)
 {
 	Sprite *sp = &ppu->sp.sprites[ppu->sp.sel_sprite];
 	uint8_t l = gb->memory.vram[ppu->sp.addr];
-	int cgb_colors = cgb_colors_active(ppu, gb);
 
 	for (int i = 0; i < 8; i++) {
 		uint8_t bit = (sp->flags & X_FLIP) ? i : 7 - i;
 		ppu->sp.buff[i].color = (l >> bit) & 1;
-		ppu->sp.buff[i].pal = cgb_colors ? (sp->flags & 0x07)
-			: ((sp->flags & PALETTE) ? ppu->obp1 : ppu->obp0);
+		if (gb->model == CGB && (gb->memory.key0 & 0x04))
+			ppu->sp.buff[i].pal = (sp->flags & PALETTE) >> 4;
+		else if (gb->model == CGB)
+			ppu->sp.buff[i].pal = sp->flags & 0x07;
+		else if (gb->model == DMG)
+			ppu->sp.buff[i].pal = ((sp->flags & PALETTE) ? ppu->obp1 : ppu->obp0);
 	}
 }
 

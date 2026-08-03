@@ -38,7 +38,7 @@ debug:
 
 test: $(TARGET)
 	@find tests/mooneye/acceptance/ -name "*.gb" | while read rom; do \
-		./build/r2boy -d "$$rom" | grep -e "PASS" -e "FAIL"; \
+		./build/r2boy --model DMG -d "$$rom" | grep -e "PASS" -e "FAIL"; \
 	done
 	@find tests/mooneye/acceptance/ -name "*.sav" -delete
 

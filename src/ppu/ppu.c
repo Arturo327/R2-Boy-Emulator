@@ -157,16 +157,27 @@ int cgb_colors_active (PPU *ppu, GB *gb)
 
 static uint32_t decode_bg_color (PPU *ppu, GB *gb, BgPixel bgpx)
 {
-	if (!cgb_colors_active(ppu, gb))
+	if (gb->model == DMG)
 		return dmg_decode_color(ppu->palette, bgpx.color, ppu->bgp);
+
+	if (gb->memory.key0 & 0x04) {
+		uint8_t col = (ppu->bgp >> (bgpx.color << 1)) & 0x03;
+		return cgb_decode_color(gb->memory.bg_palette_ram, 0, col);
+	}
 
 	return cgb_decode_color(gb->memory.bg_palette_ram, bgpx.attr & 0x07, bgpx.color);
 }
 
 static uint32_t decode_obj_color (PPU *ppu, GB *gb, uint8_t color_id, uint8_t pal)
 {
-	if (!cgb_colors_active(ppu, gb))
+	if (gb->model == DMG)
 		return dmg_decode_color(ppu->palette, color_id, pal);
+
+	if (gb->memory.key0 & 0x04) {
+		uint8_t obp = pal ? ppu->obp1 : ppu->obp0;
+		uint8_t col = (obp >> (color_id << 1)) & 0x03;
+		return cgb_decode_color(gb->memory.obj_palette_ram, pal ? 1 : 0, col);
+	}
 
 	return cgb_decode_color(gb->memory.obj_palette_ram, pal & 0x07, color_id);
 }
@@ -221,8 +232,12 @@ static void draw_pixel (PPU *ppu)
 	if (ppu->sp.num_fifo > 0) {
 		SpritePixel sp = get_sp_pixel(ppu);
 		final_pixel = solve_priority(ppu, gb, sp, bgpx);
-	} else if (!cgb_active && !bg_enabled) {
+	} else if (!bg_enabled && ppu->model == DMG) {
 		final_pixel = PALETTES[ppu->palette][0];
+	} else if (!bg_enabled && !cgb_active) {
+		bgpx.attr &= ~0x07;
+		bgpx.color = 0;
+		final_pixel = decode_bg_color(ppu, gb, bgpx);
 	} else {
 		final_pixel = decode_bg_color(ppu, gb, bgpx);
 	}
@@ -316,47 +331,41 @@ static void scan_oam (PPU *ppu, int x)
 
 static void burn_line (PPU *ppu, uint8_t ly)
 {
+	if (ly >= 144) return;
 	int offset = ly * 160;
 	int n = offset + 160;
 	for (int i = offset; i < n; i++) {
-		ppu->framebuffer[i] = PALETTES[ppu->palette][3];
+		uint32_t col = ppu->model == DMG ? PALETTES[ppu->palette][3] : 0xFF000000;
+		ppu->framebuffer[i] = col;
 	}
 }
 
-static void color_screen_whiter (PPU *ppu)
+static void color_screen (PPU *ppu, uint32_t color)
 {
 	int pixels = sizeof(ppu->framebuffer) / sizeof(ppu->framebuffer[0]);
 	for (int i = 0; i < pixels; i++) {
-		ppu->framebuffer[i] = PALETTES[ppu->palette][4];
-	}
-}
-
-static void color_screen_white (PPU *ppu)
-{
-	int pixels = sizeof(ppu->framebuffer) / sizeof(ppu->framebuffer[0]);
-	for (int i = 0; i < pixels; i++) {
-		ppu->framebuffer[i] = PALETTES[ppu->palette][0];
+		ppu->framebuffer[i] = color;
 	}
 }
 
 void shutdown_screen (PPU *ppu)
 {
-	color_screen_whiter(ppu);
+	color_screen(ppu, PALETTES[ppu->palette][4]);
 	ppu->shutdown_pending = 1;
 	ppu->shutdown_frame = 0;
 }
 
 int ppu_shutdown_step (PPU *ppu)
 {
-	if (!ppu->shutdown_frame) color_screen_white(ppu);
-	burn_line(ppu, 72);
+	if (!ppu->shutdown_frame) color_screen(ppu, ppu->model == DMG ? PALETTES[ppu->palette][0] : 0xFFFFFFFF);
+	if (ppu->model == DMG) burn_line(ppu, ppu->ly);
 
 	ppu->shutdown_frame++;
 	ppu->ready = 1;
 
 	if (ppu->shutdown_frame >= 20) {
 		ppu->shutdown_pending = 0;
-		color_screen_whiter(ppu);
+		color_screen(ppu, ppu->model == DMG ? PALETTES[ppu->palette][4] : 0xFFFFFFFF);
 	}
 	return 1;
 }
@@ -364,21 +373,21 @@ int ppu_shutdown_step (PPU *ppu)
 static void turn_lcd_off (PPU *ppu)
 {
 	if (!ppu->lcd_was_off) {
-		color_screen_whiter(ppu);
+		color_screen(ppu, ppu->model == DMG ? PALETTES[ppu->palette][4] : 0xFFFFFFFF);
 		if (ppu->mode != VBLANK) burn_line(ppu, ppu->ly);
 		ppu->ready = 1;
 	} else {
 		ppu->ready = 0;
 	}
-	ppu->ly = 0;
 	ppu->bg.window_line = 0;
 	ppu->dots = 0;
 	ppu->mode = HBLANK;
 	ppu->stat = (ppu->stat & 0xFC) | HBLANK;
 	ppu->hblank_pending = 0;
 	ppu->lcd_was_off = 1;
-	ppu->x = 0;
 	ppu->lyc_delay = 0;
+	ppu->x = 0;
+	ppu->ly = 0;
 	ppu->oam_pre_block = 0;
 	ppu->vram_pre_block = 0;
 }
@@ -392,14 +401,17 @@ static void turn_lcd_on (PPU *ppu)
 	check_lyc(ppu);
 	ppu->first_line = 1;
 	ppu->hblank_pending = 0;
-	ppu->x = 0;
 }
 
 static void stop_glitch (PPU *ppu)
 {
-	color_screen_whiter(ppu);
-	if (ppu->mode != VBLANK)
-		burn_line(ppu, ppu->ly);
+	if (ppu->model == DMG) {
+		if (!(ppu->lcdc & PPU_ENABLE))
+			burn_line(ppu, 70);
+	} else {
+		if ((ppu->lcdc & PPU_ENABLE) && ppu->mode != VBLANK)
+			color_screen(ppu, 0xFF000000);
+	}
 	ppu->ready = 1;
 }
 

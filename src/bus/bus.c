@@ -217,7 +217,6 @@ static void write_cgb_regs (GB *gb, uint16_t addr, uint8_t val)
 	// PPU
 	case 0xFF68: gb->ppu.bcps = val & 0xBF; break;
 	case 0xFF69:
-		if (gb->memory.key0 & 0x04) break;
 		if (gb->ppu.mode != DRAWING)
 			gb->memory.bg_palette_ram[gb->ppu.bcps & 0x3F] = val;
 		if (gb->ppu.bcps & 0x80)
@@ -226,7 +225,6 @@ static void write_cgb_regs (GB *gb, uint16_t addr, uint8_t val)
 
 	case 0xFF6A: gb->ppu.ocps = val & 0xBF; break;
 	case 0xFF6B:
-		if (gb->memory.key0 & 0x04) break;
 		if (gb->ppu.mode != DRAWING)
 			gb->memory.obj_palette_ram[gb->ppu.ocps & 0x3F] = val;
 		if (gb->ppu.ocps & 0x80)
