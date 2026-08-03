@@ -81,6 +81,13 @@ static void init_cgb_palette_ram (GB *gb)
 	memset(gb->memory.obj_palette_ram, 0xFF, sizeof(gb->memory.obj_palette_ram));
 }
 
+static void detect_dmg_mode (GB *gb)
+{
+	if (gb->model != CGB) return;
+	uint8_t cgb_flag = gb->memory.cart.rom[find_header_base(&gb->memory.cart) + 0x143];
+	gb->memory.key0 = (cgb_flag == 0x80 || cgb_flag == 0xC0) ? 0x00 : 0x04;
+}
+
 static void reset_regs (GB *gb)
 {
 	init_ppu_reg(&gb->ppu);
@@ -99,6 +106,7 @@ static void reset_bios (GB *gb)
 {
 	if (!gb->hay_bios) {
 		reset_regs(gb);
+		detect_dmg_mode(gb);
 	} else {
 		gb->cpu.pc = 0;
 		gb->boot_rom_enabled = 1;
@@ -150,12 +158,10 @@ static void free_memory_banks (Memory *mem)
 
 static void check_model_compatibility (GB *gb)
 {
+	if (!gb->hay_bios)
+		detect_dmg_mode(gb);
+
 	uint8_t cgb_flag = gb->memory.cart.rom[find_header_base(&gb->memory.cart) + 0x143];
-	int cgb_aware = (cgb_flag == 0x80 || cgb_flag == 0xC0);
-
-	if (!gb->hay_bios && gb->model == CGB && !cgb_aware)
-		gb->memory.key0 = 0x04;
-
 	if (cgb_flag != 0xC0 || gb->model == CGB) return;
 	fprintf(stderr, "WARNING: %s is a Game Boy Color exclusive ROM\n", gb->romfile);
 }
@@ -293,14 +299,14 @@ static void stop_step (GB *gb)
 	gb->clock += 4;
 }
 
-void gb_step (GB *gb)
+static int handle_states (GB *gb)
 {
 	if (!gb->on) {
 		if (gb->ppu.shutdown_pending) {
 			ppu_shutdown_step(&gb->ppu);
 			gb->clock += TICKS_PER_FRAME;
 		}
-		return;
+		return 1;
 	}
 
 	if (gb->boot_rom_disable_pending && gb->cpu.pc == 0x100) {
@@ -308,21 +314,26 @@ void gb_step (GB *gb)
 		gb->boot_rom_disable_pending = 0;
 	}
 
-	if (gb->cpu.stopped) {
-		stop_step(gb);
-		return;
+	if (gb->cpu.speed_switch_delay > 0) {
+		if (gb->cpu.speed_switch_delay > 4)
+			gb->cpu.speed_switch_delay -= 4;
+		else gb->cpu.speed_switch_delay = 0;
+		gb->clock += 4;
+		return 1;
 	}
 
+	if (gb->cpu.stopped) {
+		stop_step(gb);
+		return 1;
+	}
+	return 0;
+}
+
+static void handle_cpu_step (GB *gb)
+{
 	cpu_step(&gb->cpu);
-	if (gb->memory.key1 & 0x80)
-		cpu_step(&gb->cpu);
 
 	dma_step(gb);
-
-	save_state_step(gb);
-	printer_step(&gb->printer);
-	if (gb->memory.cart.mbc_type == CAM)
-		cam_step(gb);
 
 	uint16_t old_div = gb->timer.div;
 	if (timer_step(&gb->timer))
@@ -330,6 +341,20 @@ void gb_step (GB *gb)
 
 	if (serial_step(&gb->serial, old_div, gb->timer.div))
 		gb->interrupts.IF |= 0x08;
+}
+
+void gb_step (GB *gb)
+{
+	if (handle_states(gb)) return;
+
+	handle_cpu_step(gb);
+	if (gb->memory.key1 & 0x80)
+		handle_cpu_step(gb);
+
+	save_state_step(gb);
+	printer_step(&gb->printer);
+	if (gb->memory.cart.mbc_type == CAM)
+		cam_step(gb);
 
 	ppu_step(&gb->ppu);
 	apu_step(&gb->apu);

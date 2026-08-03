@@ -13,6 +13,7 @@ void init_ppu_reg (PPU *ppu);
 void shutdown_screen (PPU *ppu);
 int ppu_shutdown_step (PPU *ppu);
 
+int cgb_colors_active (PPU *ppu, GB *gb);
 void check_lyc (PPU *ppu);
 void update_stat_line (PPU *ppu);
 void ppu_step (PPU *ppu);

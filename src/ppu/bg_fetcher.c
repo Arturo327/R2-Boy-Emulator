@@ -55,7 +55,7 @@ static void fetch_tile_id (GB *gb, PPU *ppu)
 	ppu->bg.fetcher_tile_id = gb->memory.vram[tile_map_addr];
 
 	ppu->bg.fetcher_attr = 0;
-	if (ppu->model == CGB) {
+	if (cgb_colors_active(ppu, gb)) {
 		ppu->bg.fetcher_attr = gb->memory.vram[0x2000 + tile_map_addr];
 		if (ppu->bg.fetcher_attr & ATTR_YFLIP)
 			ppu->bg.fetcher_bit_y = 7 - ppu->bg.fetcher_bit_y;

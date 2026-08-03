@@ -87,6 +87,7 @@ static int ch3_wave_window (APU *apu, uint8_t *byte)
 
 static int ch3_trigger_corrupt_byte (APU *apu, uint8_t *byte)
 {
+	if (apu->model == CGB) return 0;
 	if (!apu->ch3.enabled) return 0;
 	if (apu->ch3.freq_timer == 0) return 0;
 	*byte = ((apu->ch3.position + 1) & 31) >> 1;

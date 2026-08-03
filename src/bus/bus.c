@@ -88,6 +88,7 @@ static void oam_bug_rw (GB *gb)
 
 void oam_bug (GB *gb, uint16_t val, int is_write)
 {
+	if (gb->model == CGB) return;
 	if ((val & 0xFF00) != 0xFE00) return;
 	if (gb->ppu.mode != OAM_SCAN) return;
 	if (gb->ppu.dots >= 80) return;
@@ -147,15 +148,32 @@ static uint8_t read_cgb_regs (GB *gb, uint16_t addr)
 	{
 	case 0xFF72: return gb->memory.ff72;
 	case 0xFF73: return gb->memory.ff73;
+	case 0xFF74:
+		if (gb->memory.key0 & 0x04) return 0xFF;
+		return gb->memory.ff74;
 	case 0xFF75: return gb->memory.ff75 | 0x8F;
 	case 0xFF76: return apu_pcm12(&gb->apu);
 	case 0xFF77: return apu_pcm34(&gb->apu);
 	case 0xFF68: return gb->ppu.bcps | 0x40;
-	case 0xFF4F: return gb->memory.vram_bank | 0xFE;
 	case 0xFF69:
+		if (gb->memory.key0 & 0x04) return 0xFF;
 		if (gb->ppu.mode == DRAWING) return 0xFF;
 		return gb->memory.bg_palette_ram[gb->ppu.bcps & 0x3F];
 	case 0xFF6A: return gb->ppu.ocps | 0x40;
+	case 0xFF6B:
+		if (gb->memory.key0 & 0x04) return 0xFF;
+		if (gb->ppu.mode == DRAWING) return 0xFF;
+		return gb->memory.obj_palette_ram[gb->ppu.ocps & 0x3F];
+	case 0xFF6C:
+		if (gb->memory.key0 & 0x04) return 0xFF;
+		return gb->ppu.opri;
+	case 0xFF4F: return gb->memory.vram_bank | 0xFE;
+	case 0xFF70:
+		if (gb->memory.key0 & 0x04) return 0xFF;
+		return gb->memory.wram_bank | 0xF8;
+	case 0xFF4D:
+		if (gb->memory.key0 & 0x04) return 0xFF;
+		return gb->memory.key1 | 0x7E;
 
 	default: return 0xFF;
 	}
@@ -167,11 +185,22 @@ static void write_cgb_regs (GB *gb, uint16_t addr, uint8_t val)
 	{
 	case 0xFF72: gb->memory.ff72 = val; break;
 	case 0xFF73: gb->memory.ff73 = val; break;
+	case 0xFF74:
+		if (gb->memory.key0 & 0x04) break;
+		gb->memory.ff74 = val;
+		break;
 	case 0xFF75: gb->memory.ff75 = val & 0x70; break;
+	case 0xFF4F:
+		if (gb->memory.key0 & 0x04) break;
+		gb->memory.vram_bank = val & 0x01;
+		break;
+	case 0xFF70:
+		if (gb->memory.key0 & 0x04) break;
+		gb->memory.wram_bank = val & 0x07;
+		break;
 	case 0xFF68: gb->ppu.bcps = val & 0xBF; break;
-	case 0xFF4F: gb->memory.vram_bank = val & 0x01; break;
-	case 0xFF70: gb->memory.wram_bank = val & 0x07; break;
 	case 0xFF69:
+		if (gb->memory.key0 & 0x04) break;
 		if (gb->ppu.mode != DRAWING)
 			gb->memory.bg_palette_ram[gb->ppu.bcps & 0x3F] = val;
 		if (gb->ppu.bcps & 0x80)
@@ -180,12 +209,13 @@ static void write_cgb_regs (GB *gb, uint16_t addr, uint8_t val)
 
 	case 0xFF6A: gb->ppu.ocps = val & 0xBF; break;
 	case 0xFF6B:
+		if (gb->memory.key0 & 0x04) break;
 		if (gb->ppu.mode != DRAWING)
 			gb->memory.obj_palette_ram[gb->ppu.ocps & 0x3F] = val;
 		if (gb->ppu.ocps & 0x80)
 			gb->ppu.ocps = (gb->ppu.ocps & 0x80) | ((gb->ppu.ocps + 1) & 0x3F);
 		break;
-	case 0xFF6C: gb->ppu.opri = val; break;
+	case 0xFF6C: gb->ppu.opri = val & 0x01; break;
 	case 0xFF4C: if (gb->boot_rom_enabled) gb->memory.key0 = val & 0x04; break;
 	case 0xFF4D: gb->memory.key1 = (gb->memory.key1 & 0x80) | (val & 0x01); break;
 	}

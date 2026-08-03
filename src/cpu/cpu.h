@@ -53,6 +53,7 @@ typedef struct CPU {
 	uint8_t halt_bug;
 	uint8_t stopped;
 	uint8_t locked;
+	uint16_t speed_switch_delay;
 
 	int8_t instr_head;
 	int8_t instr_tail;

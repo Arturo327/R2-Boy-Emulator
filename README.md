@@ -1,4 +1,4 @@
-# R2-Boy - DMG Emulator
+# R2-Boy - Game Boy Emulator
 
 <figure align="center">
   <img src="screenshots/pokemon.gif" alt="R2-Boy running Pokémon Red" width="640">
@@ -370,9 +370,12 @@ The emulator aims to emulate the Game Boy hardware at the cycle level whenever p
 R2-Boy currently passes:
 - All Blargg's test ROMs
 - All Mooneye tests ROMs
-- dmg-acid2
+- dmg-acid2 in DMG mode
+- cgb-acid2 in CGB mode
 
-It also fails the Blargg's CGB specific ROMs `cgb_sound` and `interrupt_time` exactly like a real DMG.
+In DMG mode, it fails the Blargg's CGB specific ROMs `cgb_sound` and `interrupt_time` exactly like a real DMG.
+
+In CGB mode, it stills fails some CGB specific test ROMs like Blargg's `cgb_sound` and Mooneye's `vblank_stat_intr-C`.
 
 ---
 

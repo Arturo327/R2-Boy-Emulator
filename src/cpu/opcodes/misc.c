@@ -19,6 +19,14 @@ static void illegal_opcode (GB *gb)
 // --------------------- STOP ------------------------
 
 static void stop (GB *gb) {				// 0x10
+	if (gb->model == CGB && (gb->memory.key1 & 0x01)) {
+		gb->memory.key1 = (gb->memory.key1 ^ 0x80) & 0x80;
+		gb->cpu.pc++;
+		div_reset(gb);
+		gb->cpu.speed_switch_delay = 2050;
+		return;
+	}
+
 	if (gb->ppu.lcdc & 0x80)
 		gb->ppu.stop_glitch_pending = 1;
 
@@ -27,13 +35,6 @@ static void stop (GB *gb) {				// 0x10
 
 	gb->cpu.pc++;
 	div_reset(gb);
-
-	if (gb->model == CGB && (gb->memory.key1 & 0x01)) {
-		gb->memory.key1 ^= 0x80;
-		gb->memory.key1 &= ~0x01;
-		return;
-	}
-
 	gb->cpu.stopped = 1;
 }
 

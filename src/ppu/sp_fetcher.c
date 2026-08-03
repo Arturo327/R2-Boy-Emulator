@@ -42,7 +42,7 @@ void start_sprites (PPU *ppu) {
 	}
 }
 
-static void get_sp_addr (PPU *ppu)
+static void get_sp_addr (PPU *ppu, int cgb_active)
 {
 	ppu->sp.sel_sprite = ppu->sp.pending;
 	Sprite *sp = &ppu->sp.sprites[ppu->sp.sel_sprite];
@@ -57,7 +57,7 @@ static void get_sp_addr (PPU *ppu)
 
 	ppu->sp.addr = tile << 4;
 	ppu->sp.addr += tile_line << 1;
-	if (ppu->model == CGB && (sp->flags & 0x08))
+	if (cgb_active && (sp->flags & 0x08))
 		ppu->sp.addr += 0x2000;
 }
 
@@ -65,7 +65,7 @@ static void fetch_tile_low (PPU *ppu, GB *gb)
 {
 	Sprite *sp = &ppu->sp.sprites[ppu->sp.sel_sprite];
 	uint8_t l = gb->memory.vram[ppu->sp.addr];
-	int cgb_colors = ppu->model == CGB && !(gb->memory.key0 & 0x04);
+	int cgb_colors = cgb_colors_active(ppu, gb);
 
 	for (int i = 0; i < 8; i++) {
 		uint8_t bit = (sp->flags & X_FLIP) ? i : 7 - i;
@@ -106,7 +106,8 @@ static void push_sprite (PPU *ppu)
 	for (int i = 0; i < 8; i++) {
 		uint8_t idx = (head + i) & 7;
 		if (!ppu->sp.buff[i].color) continue;
-		if (ppu->sp.fifo[idx].color != 0 && ppu->sp.fifo[idx].src_x < start_x) continue;
+		if (ppu->sp.fifo[idx].color != 0 && (ppu->model == DMG || ppu->opri) &&
+				ppu->sp.fifo[idx].src_x < start_x) continue;
 		ppu->sp.buff[i].src_x = start_x;
 		ppu->sp.fifo[idx] = ppu->sp.buff[i];
 	}
@@ -121,7 +122,8 @@ void sprite_fetch (PPU *ppu)
 	GB *gb = (GB *)ppu->bus->ctx;
 
 	if (ppu->sp.step == 0) {
-		get_sp_addr(ppu);
+		int cgb_colors = cgb_colors_active(ppu, gb);
+		get_sp_addr(ppu, cgb_colors);
 
 	} else if (ppu->sp.step == 2) {
 		fetch_tile_low(ppu, gb);

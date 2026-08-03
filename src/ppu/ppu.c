@@ -19,7 +19,6 @@ void init_ppu_reg (PPU *ppu)
 	ppu->obp1 = 0xFF;
 	ppu->bcps = 0x88;
 	ppu->ocps = 0x90;
-	ppu->opri = 0xFF;
 	ppu->lyc = 0;
 }
 
@@ -146,7 +145,7 @@ static uint32_t cgb_decode_color (const uint8_t *pal_ram, uint8_t pal_num, uint8
 	return 0xFF000000u | ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
 }
 
-static int cgb_colors_active (PPU *ppu, GB *gb)
+int cgb_colors_active (PPU *ppu, GB *gb)
 {
 	return ppu->model == CGB && !(gb->memory.key0 & 0x04);
 }
@@ -171,7 +170,7 @@ static uint32_t solve_priority (PPU *ppu, GB *gb, SpritePixel sp, BgPixel bgpx)
 {
 	if (sp.color == 0) return decode_bg_color(ppu, gb, bgpx);
 
-	if (ppu->model == CGB) {
+	if (cgb_colors_active(ppu, gb)) {
 		uint8_t bg_enabled = ppu->lcdc & BG_WIN_PRIO;
 		if (!bg_enabled) return decode_obj_color(ppu, gb, sp.color, sp.pal);
 
@@ -211,12 +210,13 @@ static void draw_pixel (PPU *ppu)
 	uint32_t final_pixel;
 
 	uint8_t bg_enabled = ppu->lcdc & BG_WIN_PRIO;
-	if (ppu->model != CGB && !bg_enabled) bgpx.color = 0;
+	int cgb_active = cgb_colors_active(ppu, gb);
+	if (cgb_active && !bg_enabled) bgpx.color = 0;
 
 	if (ppu->sp.num_fifo > 0) {
 		SpritePixel sp = get_sp_pixel(ppu);
 		final_pixel = solve_priority(ppu, gb, sp, bgpx);
-	} else if (ppu->model != CGB && !bg_enabled) {
+	} else if (cgb_active && !bg_enabled) {
 		final_pixel = PALETTES[ppu->palette][0];
 	} else {
 		final_pixel = decode_bg_color(ppu, gb, bgpx);

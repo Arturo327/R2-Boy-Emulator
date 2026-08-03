@@ -45,7 +45,7 @@ typedef struct Memory {
 	uint8_t hram[0x7F];
 	// only CGB
 	uint8_t vram_bank, wram_bank;
-	uint8_t ff72, ff73, ff75;
+	uint8_t ff72, ff73, ff74, ff75;
 	uint8_t key0, key1;
 	uint8_t bg_palette_ram[64];
 	uint8_t obj_palette_ram[64];
