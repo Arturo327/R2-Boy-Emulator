@@ -45,6 +45,7 @@ static void reset_components (GB *gb)
 
 	memset(&gb->cpu, 0, sizeof(CPU));
 	memset(&gb->dma, 0, sizeof(DMA));
+	memset(&gb->hdma, 0, sizeof(HDMA));
 	memset(&gb->timer, 0, sizeof(Timer));
 	memset(&gb->serial, 0, sizeof(Serial));
 	memset(&gb->interrupts, 0, sizeof(Interrupts));
@@ -260,21 +261,6 @@ void cleanup (GB *gb)
 	cleanup_core(gb);
 }
 
-static void dma_step (GB *gb)
-{
-	if (gb->dma.delay > 0) {
-		gb->dma.delay--;
-		if (gb->dma.delay == 0)
-			gb->dma.active = 1;
-
-	} else if (gb->dma.active) {
-		gb->memory.oam[gb->dma.index] = dma_read_source(gb, gb->dma.src + gb->dma.index);
-		gb->dma.index++;
-		if (gb->dma.index >= 0xA0)
-			gb->dma.active = 0;
-	}
-}
-
 static void save_state_step (GB *gb)
 {
 	if (!can_save_state(gb)) return;
@@ -331,7 +317,8 @@ static int handle_states (GB *gb)
 
 static void handle_cpu_step (GB *gb)
 {
-	cpu_step(&gb->cpu);
+	if (!gb->hdma.stall)
+		cpu_step(&gb->cpu);
 
 	dma_step(gb);
 
@@ -350,6 +337,9 @@ void gb_step (GB *gb)
 	handle_cpu_step(gb);
 	if (gb->memory.key1 & 0x80)
 		handle_cpu_step(gb);
+
+	if (gb->hdma.stall > 4) gb->hdma.stall -= 4;
+	else gb->hdma.stall = 0;
 
 	save_state_step(gb);
 	printer_step(&gb->printer);

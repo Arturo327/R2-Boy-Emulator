@@ -154,7 +154,7 @@ static void io_memory (SaveState *s, GB *gb)
 	io_buf(s, mem->oam,  sizeof(mem->oam));
 	io_buf(s, mem->hram, sizeof(mem->hram));
 	if (gb->model != CGB) return;
-	io_buf(s, mem + offsetof(Memory, vram_bank),
+	io_buf(s, (uint8_t *)mem + offsetof(Memory, vram_bank),
 			sizeof(Memory) - offsetof(Memory, vram_bank));
 }
  
@@ -185,6 +185,7 @@ static int state_io (GB *gb, FILE *f, int saving)
 	io_buf(&ss, &gb->joypad, sizeof(Joypad));
 	io_serial(&ss, &gb->serial);
 	io_buf(&ss, &gb->dma, sizeof(DMA));
+	if (gb->model == CGB) io_buf(&ss, &gb->hdma, sizeof(HDMA));
 	io_num(&ss, &gb->boot_rom_enabled);
 	io_num(&ss, &gb->boot_rom_disable_pending);
 	io_num(&ss, &gb->clock);

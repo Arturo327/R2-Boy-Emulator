@@ -119,7 +119,7 @@ void oam_bug (GB *gb, uint16_t val, int is_write)
 		oam[curr + i] = oam[prev + i];
 }
 
-static uint32_t vram_map (GB *gb, uint32_t offset)
+uint32_t vram_map (GB *gb, uint32_t offset)
 {
 	return ((uint32_t)gb->memory.vram_bank << 13) + offset;
 }
@@ -152,8 +152,12 @@ static uint8_t read_cgb_regs (GB *gb, uint16_t addr)
 		if (gb->memory.key0 & 0x04) return 0xFF;
 		return gb->memory.ff74;
 	case 0xFF75: return gb->memory.ff75 | 0x8F;
+
+	// APU
 	case 0xFF76: return apu_pcm12(&gb->apu);
 	case 0xFF77: return apu_pcm34(&gb->apu);
+
+	// PPU
 	case 0xFF68: return gb->ppu.bcps | 0x40;
 	case 0xFF69:
 		if (gb->memory.key0 & 0x04) return 0xFF;
@@ -167,10 +171,19 @@ static uint8_t read_cgb_regs (GB *gb, uint16_t addr)
 	case 0xFF6C:
 		if (gb->memory.key0 & 0x04) return 0xFF;
 		return gb->ppu.opri;
+
+	// BANK
 	case 0xFF4F: return gb->memory.vram_bank | 0xFE;
 	case 0xFF70:
 		if (gb->memory.key0 & 0x04) return 0xFF;
 		return gb->memory.wram_bank | 0xF8;
+
+	// DMA
+	case 0xFF55:
+		if (gb->memory.key0 & 0x04) return 0xFF;
+		return hdma_read_ff55(gb);
+
+	// KEY
 	case 0xFF4D:
 		if (gb->memory.key0 & 0x04) return 0xFF;
 		return gb->memory.key1 | 0x7E;
@@ -190,6 +203,8 @@ static void write_cgb_regs (GB *gb, uint16_t addr, uint8_t val)
 		gb->memory.ff74 = val;
 		break;
 	case 0xFF75: gb->memory.ff75 = val & 0x70; break;
+
+	// BANK
 	case 0xFF4F:
 		if (gb->memory.key0 & 0x04) break;
 		gb->memory.vram_bank = val & 0x01;
@@ -198,6 +213,8 @@ static void write_cgb_regs (GB *gb, uint16_t addr, uint8_t val)
 		if (gb->memory.key0 & 0x04) break;
 		gb->memory.wram_bank = val & 0x07;
 		break;
+
+	// PPU
 	case 0xFF68: gb->ppu.bcps = val & 0xBF; break;
 	case 0xFF69:
 		if (gb->memory.key0 & 0x04) break;
@@ -216,8 +233,20 @@ static void write_cgb_regs (GB *gb, uint16_t addr, uint8_t val)
 			gb->ppu.ocps = (gb->ppu.ocps & 0x80) | ((gb->ppu.ocps + 1) & 0x3F);
 		break;
 	case 0xFF6C: gb->ppu.opri = val & 0x01; break;
+
+	// KEYs
 	case 0xFF4C: if (gb->boot_rom_enabled) gb->memory.key0 = val & 0x04; break;
 	case 0xFF4D: gb->memory.key1 = (gb->memory.key1 & 0x80) | (val & 0x01); break;
+
+	// DMA
+	case 0xFF51: gb->hdma.src = (gb->hdma.src & 0x00FF) | ((uint16_t)val << 8); break;
+	case 0xFF52: gb->hdma.src = (gb->hdma.src & 0xFF00) | (val & 0xF0); break;
+	case 0xFF53: gb->hdma.dst = (gb->hdma.dst & 0x00FF) | ((uint16_t)(val & 0x1F) << 8); break;
+	case 0xFF54: gb->hdma.dst = (gb->hdma.dst & 0xFF00) | (val & 0xF0); break;
+	case 0xFF55:
+		if (gb->memory.key0 & 0x04) break;
+		hdma_write_ff55(gb, val);
+		break;
 	}
 }
 
@@ -440,6 +469,13 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 				check_lyc(&gb->ppu);
 			break;
 		}
+		case 0xFF4A: gb->ppu.wy = val; break;
+		case 0xFF4B: gb->ppu.wx = val; break;
+		case 0xFF47: gb->ppu.bgp = val; break;
+		case 0xFF48: gb->ppu.obp0 = val; break;
+		case 0xFF49: gb->ppu.obp1 = val; break;
+
+		// DMA
 		case 0xFF46: {
 			gb->ppu.dma = val;
 			gb->dma.src = (uint16_t)val << 8;
@@ -447,11 +483,6 @@ static void bus_write8 (void *ctx, uint16_t addr, uint8_t val)
 			gb->dma.delay = 2;
 			break;
 		}
-		case 0xFF4A: gb->ppu.wy = val; break;
-		case 0xFF4B: gb->ppu.wx = val; break;
-		case 0xFF47: gb->ppu.bgp = val; break;
-		case 0xFF48: gb->ppu.obp0 = val; break;
-		case 0xFF49: gb->ppu.obp1 = val; break;
 
 		case 0xFF50: gb->boot_rom_disable_pending = 1; break;
 

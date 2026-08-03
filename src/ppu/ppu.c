@@ -111,6 +111,7 @@ static void update_stat (PPU *ppu, PPU_Mode new_mode)
 
 	if (new_mode == HBLANK) {
 		ppu->mode0_cycles = DRAWING_HBLANK_DOTS - ppu->mode3_cycles;
+		hdma_hblank_step((GB *)ppu->bus->ctx);
 	}
 	if (new_mode == OAM_SCAN) {
 		ppu->x = 0;
@@ -138,9 +139,13 @@ static uint32_t cgb_decode_color (const uint8_t *pal_ram, uint8_t pal_num, uint8
 	int i = (pal_num << 3) + (color_id << 1);
 	uint16_t rgb555 = pal_ram[i] | ((uint16_t)pal_ram[i + 1] << 8);
 
-	uint8_t r = (rgb555 & 0x1F) << 3;
-	uint8_t g = ((rgb555 >> 5) & 0x1F) << 3;
-	uint8_t b = ((rgb555 >> 10) & 0x1F) << 3;
+	uint8_t r5 = rgb555 & 0x1F;
+	uint8_t g5 = (rgb555 >> 5) & 0x1F;
+	uint8_t b5 = (rgb555 >> 10) & 0x1F;
+
+	uint8_t r = (r5 << 3) | (r5 >> 2);
+	uint8_t g = (g5 << 3) | (g5 >> 2);
+	uint8_t b = (b5 << 3) | (b5 >> 2);
 
 	return 0xFF000000u | ((uint32_t)r << 16) | ((uint32_t)g << 8) | b;
 }
@@ -211,12 +216,12 @@ static void draw_pixel (PPU *ppu)
 
 	uint8_t bg_enabled = ppu->lcdc & BG_WIN_PRIO;
 	int cgb_active = cgb_colors_active(ppu, gb);
-	if (cgb_active && !bg_enabled) bgpx.color = 0;
+	if (!cgb_active && !bg_enabled) bgpx.color = 0;
 
 	if (ppu->sp.num_fifo > 0) {
 		SpritePixel sp = get_sp_pixel(ppu);
 		final_pixel = solve_priority(ppu, gb, sp, bgpx);
-	} else if (cgb_active && !bg_enabled) {
+	} else if (!cgb_active && !bg_enabled) {
 		final_pixel = PALETTES[ppu->palette][0];
 	} else {
 		final_pixel = decode_bg_color(ppu, gb, bgpx);

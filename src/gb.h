@@ -7,6 +7,7 @@
 #include "model.h"
 #include "cpu/cpu.h"
 #include "bus/bus.h"
+#include "dma/dma.h"
 #include "ppu/ppu.h"
 #include "apu/apu.h"
 #include "timer/timer.h"
@@ -51,13 +52,6 @@ typedef struct Memory {
 	uint8_t obj_palette_ram[64];
 } Memory;
 
-typedef struct DMA {
-	uint8_t active;
-	uint16_t src;
-	uint8_t index;
-	uint8_t delay;
-} DMA;
-
 typedef struct GB {
 	OpcodeTable opcodes;
 
@@ -79,6 +73,7 @@ typedef struct GB {
 	Joypad joypad;
 	Serial serial;
 	DMA dma;
+	HDMA hdma;
 
 	uint8_t boot_rom_enabled;
 	uint8_t boot_rom_disable_pending;
