@@ -226,15 +226,14 @@ static void draw_pixel (PPU *ppu)
 	uint32_t final_pixel;
 
 	uint8_t bg_enabled = ppu->lcdc & BG_WIN_PRIO;
-	int cgb_active = cgb_colors_active(ppu, gb);
-	if (!cgb_active && !bg_enabled) bgpx.color = 0;
+	if (!cgb_colors_active(ppu, gb) && !bg_enabled) bgpx.color = 0;
 
 	if (ppu->sp.num_fifo > 0) {
 		SpritePixel sp = get_sp_pixel(ppu);
 		final_pixel = solve_priority(ppu, gb, sp, bgpx);
 	} else if (!bg_enabled && ppu->model == DMG) {
 		final_pixel = PALETTES[ppu->palette][0];
-	} else if (!bg_enabled && !cgb_active) {
+	} else if (!bg_enabled && (gb->memory.key0 & 0x04)) {
 		bgpx.attr &= ~0x07;
 		bgpx.color = 0;
 		final_pixel = decode_bg_color(ppu, gb, bgpx);
