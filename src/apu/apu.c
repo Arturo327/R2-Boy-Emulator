@@ -57,10 +57,12 @@ static void apu_power_off (APU *apu)
 	memset(&apu->ch3, 0, sizeof(apu->ch3));
 	memset(&apu->ch4, 0, sizeof(apu->ch4));
 
-	apu->ch1.ch.length_counter = len1;
-	apu->ch2.length_counter = len2;
-	apu->ch3.length_counter = len3;
-	apu->ch4.ch.length_counter = len4;
+	if (apu->model == DMG) {
+		apu->ch1.ch.length_counter = len1;
+		apu->ch2.length_counter = len2;
+		apu->ch3.length_counter = len3;
+		apu->ch4.ch.length_counter = len4;
+	}
 
 	apu->nr10 = apu->nr11 = apu->nr12 = apu->nr13 = apu->nr14 = 0;
 	apu->nr21 = apu->nr22 = apu->nr23 = apu->nr24 = 0;
@@ -80,6 +82,12 @@ static void push_sample (APU *apu, Sample s)
 static int ch3_wave_window (APU *apu, uint8_t *byte)
 {
 	if (!apu->ch3.enabled) return 0;
+
+	if (apu->model == CGB) {
+		*byte = apu->ch3.position >> 1;
+		return 1;
+	}
+
 	if (apu->ch3.freq_timer != 0) return 0;
 	*byte = ((apu->ch3.position + 1) & 31) >> 1;
 	return 1;
@@ -464,10 +472,10 @@ void apu_write_reg (APU *apu, uint16_t addr, uint8_t val)
 	if (!apu->enabled) {
 		switch (addr) {
 
-		case 0xFF11: apu->ch1.ch.length_counter = 64 - (val & 0x3F); break;
-		case 0xFF16: apu->ch2.length_counter = 64 - (val & 0x3F); break;
-		case 0xFF1B: apu->ch3.length_counter = 256 - val; break;
-		case 0xFF20: apu->ch4.ch.length_counter = 64 - (val & 0x3F); break;
+		case 0xFF11: if (apu->model == DMG) apu->ch1.ch.length_counter = 64 - (val & 0x3F); break;
+		case 0xFF16: if (apu->model == DMG) apu->ch2.length_counter = 64 - (val & 0x3F); break;
+		case 0xFF1B: if (apu->model == DMG) apu->ch3.length_counter = 256 - val; break;
+		case 0xFF20: if (apu->model == DMG) apu->ch4.ch.length_counter = 64 - (val & 0x3F); break;
 		case 0xFF26: {
 			if (val & 0x80) {
 				apu->enabled = 1;
