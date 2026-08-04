@@ -122,7 +122,7 @@ static void update_stat (PPU *ppu, PPU_Mode new_mode)
 		reset_drawing(ppu);
 	}
 
-	if (new_mode == VBLANK)
+	if (new_mode == VBLANK && ppu->model != CGB)
 		update_stat_line_ex(ppu, 1);
 	else
 		update_stat_line(ppu);
@@ -455,7 +455,10 @@ static int handle_hblank (PPU *ppu)
 	if (ppu->dots == ppu->mode0_cycles - 4) {
 		ppu->ly++;
 		check_lyc_delayed(ppu);
-		if (ppu->ly != DRAWING_LINES) ppu->oam_pre_block = 1;
+		if (ppu->ly != DRAWING_LINES)
+			ppu->oam_pre_block = 1;
+		else if (ppu->model == CGB)
+			update_stat_line_ex(ppu, 1);
 	}
 
 	if (ppu->first_line) {

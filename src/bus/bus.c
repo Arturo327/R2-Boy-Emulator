@@ -234,7 +234,10 @@ static void write_cgb_regs (GB *gb, uint16_t addr, uint8_t val)
 
 	// KEYs
 	case 0xFF4C: if (gb->boot_rom_enabled) gb->memory.key0 = val & 0x04; break;
-	case 0xFF4D: gb->memory.key1 = (gb->memory.key1 & 0x80) | (val & 0x01); break;
+	case 0xFF4D:
+		if (gb->memory.key0 & 0x04) break;
+		gb->memory.key1 = (gb->memory.key1 & 0x80) | (val & 0x01);
+		break;
 
 	// DMA
 	case 0xFF51: gb->hdma.src = (gb->hdma.src & 0x00FF) | ((uint16_t)val << 8); break;

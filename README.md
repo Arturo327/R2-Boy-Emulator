@@ -375,7 +375,7 @@ R2-Boy currently passes:
 
 In DMG mode, it fails the Blargg's CGB specific ROMs `cgb_sound` and `interrupt_time` exactly like a real DMG.
 
-In CGB mode, it stills fails some CGB specific test ROMs like Blargg's `cgb_sound` and Mooneye's `vblank_stat_intr-C`.
+In CGB mode, it stills fails some CGB specific test ROMs like Blargg's `cgb_sound`.
 
 ---
 
