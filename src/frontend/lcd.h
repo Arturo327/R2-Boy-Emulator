@@ -12,7 +12,7 @@ typedef struct LCD {
 	SDL_Texture *texture;
 } LCD;
 
-int init_screen (LCD *lcd, const char *game_title);
+int init_screen (LCD *lcd, const char *game_title, uint8_t win_scale);
 void cleanup_screen (LCD *lcd);
 void update_screen (LCD *lcd, uint32_t *framebuffer, uint8_t rumble);
 

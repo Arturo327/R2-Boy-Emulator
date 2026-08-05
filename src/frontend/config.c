@@ -69,6 +69,7 @@ const SettingMeta SETTINGS[SET_COUNT] = {
 	[SET_TURBO_SPEED]	= { "Turbo Speed",	SETTING_INT,  2, 16,	1 },
 	[SET_TURBO_HOLD]	= { "Turbo Hold Mode",	SETTING_BOOL, 0, 1,	1 },
 	[SET_MODEL]		= { "Emulated Model",	SETTING_ENUM, 0, 2,	1 },
+	[SET_WIN_SCALE]		= { "Window Scale",	SETTING_INT,  1, 8,	1 },
 };
 
 static int clampi (int v, int lo, int hi)
@@ -89,6 +90,7 @@ int get_setting_value (Config *cfg, SettingId id)
 	case SET_TURBO_SPEED:	return cfg->turbo_speed;
 	case SET_TURBO_HOLD:	return cfg->turbo_hold ? 1 : 0;
 	case SET_MODEL:		return (int) cfg->model;
+	case SET_WIN_SCALE:	return cfg->win_scale;
 	default:		return 0;
 	}
 }
@@ -107,6 +109,7 @@ void set_setting_value (Config *cfg, SettingId id, int value)
 	case SET_TURBO_SPEED:	cfg->turbo_speed = (uint8_t) value; break;
 	case SET_TURBO_HOLD:	cfg->turbo_hold = (uint8_t) value; break;
 	case SET_MODEL:		cfg->model = (Model)value; break;
+	case SET_WIN_SCALE:	cfg->win_scale = (uint8_t) value; break;
 	default: break;
 	}
 }
@@ -127,6 +130,7 @@ void format_setting_value (Config *cfg, SettingId id, char *buf, size_t n)
 	default:
 		if (id == SET_VOLUME) snprintf(buf, n, "%d%%", v);
 		else if (id == SET_TURBO_SPEED) snprintf(buf, n, "x%d", v);
+		else if (id == SET_WIN_SCALE) snprintf(buf, n, "x%d", v);
 		else snprintf(buf, n, "%d", v);
 		break;
 	}
@@ -171,6 +175,7 @@ void init_config_defaults (Config *cfg)
 	cfg->turbo_speed = 3;
 	cfg->turbo_hold = 1;
 	cfg->model = DMG;
+	cfg->win_scale = 4;
 }
 
 int find_conflicting_kb_action (const Keymap *k, Keybind kb, Action exclude)
@@ -593,6 +598,13 @@ static void load_video (Config *cfg, const char *s)
 	char value[32];
 	if (sscanf(s, " %31[^= ] = %31s", field, value) != 2) return;
 
+	if (!strcmp(field, "window_scale")) {
+		int v = atoi(value);
+		if (v > 8) v = 8;
+		if (v < 1) v = 1;
+		cfg->win_scale = (uint8_t) v;
+	}
+
 	if (strcmp(field, "palette")) return;
 	for (int i = 0; i < PAL_COUNT; i++) {
 		const char *n = palette_name((DmgPalette)i);
@@ -738,6 +750,7 @@ static void write_cfg_file (Config *cfg, FILE *f)
 	fprintf(f, "muted = %d\n\n", atomic_load(&cfg->muted));
 
 	fprintf(f, "[video]\n");
+	fprintf(f, "window_scale = %d\n", cfg->win_scale);
 	fprintf(f, "palette = %s\n\n", palette_name(cfg->palette));
 
 	fprintf(f, "[input]\n");

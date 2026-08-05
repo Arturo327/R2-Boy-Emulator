@@ -80,6 +80,7 @@ typedef struct Config {
 	_Atomic uint8_t muted;
 	DmgPalette palette;
 	uint8_t use_acel;
+	uint8_t win_scale;
 } Config;
 
 typedef enum {
@@ -90,6 +91,7 @@ typedef enum {
 	SET_TURBO_SPEED,
 	SET_TURBO_HOLD,
 	SET_MODEL,
+	SET_WIN_SCALE,
 	SET_COUNT
 } SettingId;
 

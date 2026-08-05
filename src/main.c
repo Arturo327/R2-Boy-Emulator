@@ -507,7 +507,7 @@ static int init_emulator (GB *gb, Args args)
 		printf("BIOS (%s): %s\n", (cfg->model == CGB) ? "CGB" : "DMG", args.biosfile);
 	}
 
-	init(gb, args.romfile, args.biosfile, cfg->model);
+	init(gb, args.romfile, args.biosfile, cfg->model, cfg->win_scale);
 	if (!gb->running) {
 		cleanup(gb);
 		free(gb);

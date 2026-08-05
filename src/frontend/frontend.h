@@ -11,7 +11,7 @@
 
 typedef struct GB GB;
 
-int frontend_init (GB *gb, const char *game_title);
+int frontend_init (GB *gb, const char *game_title, uint8_t win_scale);
 void frontend_shutdown (GB *gb);
 int handle_events (GB *gb);
 

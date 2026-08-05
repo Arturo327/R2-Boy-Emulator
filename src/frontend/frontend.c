@@ -327,7 +327,7 @@ static void handle_gamepad_event (GB *gb, const SDL_Event *e)
 	}
 }
 
-int frontend_init (GB *gb, const char *game_title)
+int frontend_init (GB *gb, const char *game_title, uint8_t win_scale)
 {
 	SDL_SetHint(SDL_HINT_RENDER_VSYNC, "0");
 	if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_AUDIO
@@ -336,7 +336,7 @@ int frontend_init (GB *gb, const char *game_title)
 		return 0;
 	}
 
-	if (!init_screen(&gb->lcd, game_title)) {
+	if (!init_screen(&gb->lcd, game_title, win_scale)) {
 		gb->running = 0;
 		return 0;
 	}

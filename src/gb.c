@@ -213,14 +213,14 @@ static int init_core (GB *gb, const char *romfile, const char *biosfile, Model m
 	return 0;
 }
 
-void init (GB *gb, const char *romfile, const char *biosfile, Model model)
+void init (GB *gb, const char *romfile, const char *biosfile, Model model, uint8_t win_scale)
 {
 	if (init_core(gb, romfile, biosfile, model)) {
 		gb->running = 0;
 		return;
 	}
 
-	if (!frontend_init(gb, gb->memory.cart.title)) {
+	if (!frontend_init(gb, gb->memory.cart.title, win_scale)) {
 		gb->running = 0;
 		return;
 	}

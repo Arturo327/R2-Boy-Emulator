@@ -280,7 +280,8 @@ static void apu_trigger_ch3 (APU *apu)
 	}
 
 	uint16_t freq = apu->nr33 | ((apu->nr34 & 0x07) << 8);
-	apu->ch3.freq_timer = (2048 - freq) * 2 + 6;
+	uint8_t offset = (apu->model == DMG) ? 6 : 4;
+	apu->ch3.freq_timer = (2048 - freq) * 2 + offset;
 	apu->ch3.position = 0;
 }
 

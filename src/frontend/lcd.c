@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-int init_screen (LCD *lcd, const char *game_title)
+int init_screen (LCD *lcd, const char *game_title, uint8_t win_scale)
 {
 	char final_title[32];
 	snprintf(final_title, sizeof(final_title), "R2-Boy - %s", game_title ? game_title : "");
@@ -14,7 +14,7 @@ int init_screen (LCD *lcd, const char *game_title)
 		final_title,
 		SDL_WINDOWPOS_CENTERED,
 		SDL_WINDOWPOS_CENTERED,
-		160 * 4, 144 * 4,
+		160 * win_scale, 144 * win_scale,
 		SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI
 	);
 	if (!lcd->window) {

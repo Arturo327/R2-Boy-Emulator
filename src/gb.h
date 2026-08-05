@@ -95,7 +95,7 @@ typedef struct GB {
 } GB;
 
 void reset_gb (GB *gb);
-void init (GB *gb, const char *romfile, const char *biosfile, Model model);
+void init (GB *gb, const char *romfile, const char *biosfile, Model model, uint8_t win_scale);
 void init_test (GB *gb, const char *romfile, Model model);
 
 void cleanup (GB *gb);
