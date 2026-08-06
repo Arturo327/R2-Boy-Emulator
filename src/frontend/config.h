@@ -81,6 +81,8 @@ typedef struct Config {
 	DmgPalette palette;
 	uint8_t use_acel;
 	uint8_t win_scale;
+	char bios_dmg_path[256];
+	char bios_cgb_path[256];
 } Config;
 
 typedef enum {

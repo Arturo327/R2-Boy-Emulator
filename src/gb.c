@@ -301,9 +301,7 @@ static int handle_states (GB *gb)
 	}
 
 	if (gb->cpu.speed_switch_delay > 0) {
-		if (gb->cpu.speed_switch_delay > 4)
-			gb->cpu.speed_switch_delay -= 4;
-		else gb->cpu.speed_switch_delay = 0;
+		gb->cpu.speed_switch_delay--;
 		gb->clock += 4;
 		return 1;
 	}

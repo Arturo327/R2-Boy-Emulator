@@ -176,6 +176,8 @@ void init_config_defaults (Config *cfg)
 	cfg->turbo_hold = 1;
 	cfg->model = DMG;
 	cfg->win_scale = 4;
+	snprintf(cfg->bios_dmg_path, sizeof(cfg->bios_dmg_path), "%s", "roms/bios.bin");
+	snprintf(cfg->bios_cgb_path, sizeof(cfg->bios_cgb_path), "%s", "roms/cgb_bios.bin");
 }
 
 int find_conflicting_kb_action (const Keymap *k, Keybind kb, Action exclude)
@@ -653,6 +655,18 @@ static void load_turbo (Config *cfg, const char *s)
 		cfg->turbo_hold = (uint8_t)(value[0] == '1' || value[0] == 't' || value[0] == 'T');
 }
 
+static void load_paths (Config *cfg, const char *s)
+{
+	char field[32];
+	char value[255];
+	if (sscanf(s, " %31[^= ] = %255s", field, value) != 2) return;
+
+	if (!strcmp(field, "bios_dmg"))
+		snprintf(cfg->bios_dmg_path, sizeof(cfg->bios_dmg_path), "%s", value);
+	if (!strcmp(field, "bios_cgb"))
+		snprintf(cfg->bios_cgb_path, sizeof(cfg->bios_cgb_path), "%s", value);
+}
+
 static int action_ini_name (const char *name)
 {
 	if (!name || !*name) return -1;
@@ -734,6 +748,7 @@ void load_config (Config *cfg)
 		else if (!strcmp(section, "input"))	load_input (cfg, s);
 		else if (!strcmp(section, "turbo"))	load_turbo (cfg, s);
 		else if (!strcmp(section, "model"))	load_model (cfg, s);
+		else if (!strcmp(section, "paths"))	load_paths (cfg, s);
 	}
 	fclose(f);
 }
@@ -748,6 +763,10 @@ static void write_cfg_file (Config *cfg, FILE *f)
 	fprintf(f, "[audio]\n");
 	fprintf(f, "volume = %d\n", atomic_load(&cfg->volume));
 	fprintf(f, "muted = %d\n\n", atomic_load(&cfg->muted));
+
+	fprintf(f, "[paths]\n");
+	fprintf(f, "bios_dmg = %s\n", cfg->bios_dmg_path);
+	fprintf(f, "bios_cgb = %s\n\n", cfg->bios_cgb_path);
 
 	fprintf(f, "[video]\n");
 	fprintf(f, "window_scale = %d\n", cfg->win_scale);

@@ -206,10 +206,10 @@ static void calc_sp_delay (PPU *ppu)
 	int col = (sprite_x + ppu->scx) & 7;
 	int tile = ((sprite_x + ppu->scx) & 0xFF) >> 3;
 
-	if (ppu->sp.tiles_touched & (1 << tile)) {
+	if (ppu->sp.tiles_touched & (1u << tile)) {
 		ppu->sp.delay = 0;
 	} else {
-		ppu->sp.tiles_touched |= (1 << tile);
+		ppu->sp.tiles_touched |= (1u << tile);
 		int d = 5 - col;
 		ppu->sp.delay = (d > 0) ? (uint8_t)d : 0;
 	}
