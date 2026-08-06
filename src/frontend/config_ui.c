@@ -16,12 +16,14 @@
 typedef enum {
 	PAGE_CONTROLS = 0,
 	PAGE_SETTINGS,
+	PAGE_PATHS,
 	PAGE_COUNT
 } ConfigPage;
 
 typedef enum {
 	CAP_NONE = 0,
 	CAP_KEY,
+	CAP_TEXT,
 	CAP_PAD
 } CaptureMode;
 
@@ -42,6 +44,9 @@ typedef struct ConfigUI {
 
 	char status_msg[64];
 	int status_ttl;
+
+	char edit_buf[256];
+	int edit_len;
 
 	CaptureMode capturing;
 	int running;
@@ -172,18 +177,23 @@ static void config_draw_header (ConfigUI *ui)
 		draw_text(ui, stat, REMAP_WIN_W - 260, 16, dim);
 	}
 
-	draw_text(ui, "[Q] Controls", 20, 50,
+	draw_text(ui, "Controls", 20, 50,
 		(ui->page == PAGE_CONTROLS) ? active : dim);
-	draw_text(ui, "[E] Settings", 220, 50,
+	draw_text(ui, "Settings", 220, 50,
 		(ui->page == PAGE_SETTINGS) ? active : dim);
+	draw_text(ui, "Paths", 420, 50,
+		(ui->page == PAGE_PATHS) ? active : dim);
 
 	if (ui->page == PAGE_CONTROLS) {
 		draw_text(ui, "Action", 20, 78, dim);
 		draw_text(ui, "Keyboard", 320, 78, dim);
 		draw_text(ui, "Gamepad", 540, 78, dim);
-	} else {
+	} else if (ui->page == PAGE_SETTINGS) {
 		draw_text(ui, "Setting", 20, 78, dim);
 		draw_text(ui, "Value", 480, 78, dim);
+	} else {
+		draw_text(ui, "Path", 20, 78, dim);
+		draw_text(ui, "Value", 260, 78, dim);
 	}
 }
 
@@ -258,6 +268,37 @@ static void config_draw_settings (ConfigUI *ui)
 	}
 }
 
+static void config_draw_paths (ConfigUI *ui)
+{
+	SDL_Color normal = { 220, 220, 225, 255 };
+	SDL_Color sel_fg = { 15, 15, 20, 255 };
+	SDL_Color highlight = { 90, 150, 230, 255 };
+
+	const char *labels[2] = {"DMG BIOS", "CGB BIOS"};
+
+	for (int i = 0; i < 2; i++) {
+		int y = ROW_START_Y + i * ROW_H;
+		int selected = (i == ui->cursor[PAGE_PATHS]);
+
+		if (selected) {
+			SDL_Rect r = { 12, y - 4, REMAP_WIN_W - 24, ROW_H - 2 };
+			SDL_SetRenderDrawColor(ui->renderer, highlight.r, highlight.g, highlight.b, 255);
+			SDL_RenderFillRect(ui->renderer, &r);
+		}
+		SDL_Color fg = selected ? sel_fg : normal;
+
+		draw_text(ui, labels[i], 20, y, fg);
+
+		char vbuf[258];
+		if (selected && ui->capturing == CAP_TEXT)
+			snprintf(vbuf, sizeof(vbuf), "%s_", ui->edit_buf);
+		else
+			snprintf(vbuf, sizeof(vbuf), "%s", i ? ui->cfg.bios_cgb_path : ui->cfg.bios_dmg_path);
+		draw_text(ui, vbuf, 260, y, fg);
+	}
+
+}
+
 static void config_draw_footer (ConfigUI *ui)
 {
 	SDL_Color dim = { 170, 170, 180, 255 };
@@ -272,9 +313,13 @@ static void config_draw_footer (ConfigUI *ui)
 		draw_text(ui,
 			"Up/Down: select   Enter: bind key   Tab: bind gamepad   D: default",
 			20, y, dim);
-	} else {
+	} else if (ui->page == PAGE_SETTINGS) {
 		draw_text(ui,
 			"Up/Down: select   Left/Right or Enter: change value   D: default",
+			20, y, dim);
+	} else {
+		draw_text(ui,
+			"Up/Down: select   Enter: edit path   D: default",
 			20, y, dim);
 	}
 	draw_text(ui, "R: reset section   Q/E: switch page   S: save & exit   Esc: cancel / exit",
@@ -292,8 +337,10 @@ static void config_render (ConfigUI *ui)
 
 	if (ui->page == PAGE_CONTROLS)
 		config_draw_controls(ui);
-	else
+	else if (ui->page == PAGE_SETTINGS)
 		config_draw_settings(ui);
+	else
+		config_draw_paths(ui);
 
 	config_draw_footer(ui);
 
@@ -343,6 +390,43 @@ static void config_handle_key_capture (ConfigUI *ui, SDL_Event *e)
 
 	set_kb_binding(&ui->cfg.keymap, target, kb);
 	ui->capturing = CAP_NONE;
+}
+
+static void config_handle_text_capture (ConfigUI *ui, SDL_Event *e)
+{
+	if (e->type == SDL_QUIT) {
+		ui->running = 0;
+		return;
+	}
+
+	if (e->type == SDL_TEXTINPUT) {
+		size_t add_len = strlen(e->text.text);
+		if (ui->edit_len + add_len < sizeof(ui->edit_buf)) {
+			memcpy(ui->edit_buf + ui->edit_len, e->text.text, add_len);
+			ui->edit_len += (int)add_len;
+			ui->edit_buf[ui->edit_len] = 0;
+		}
+		return;
+	}
+
+	if (e->type != SDL_KEYDOWN) return;
+
+	SDL_Scancode sc = e->key.keysym.scancode;
+	if (sc == SDL_SCANCODE_ESCAPE) {
+		ui->capturing = CAP_NONE;
+		SDL_StopTextInput();
+		return;
+	}
+	if (sc == SDL_SCANCODE_BACKSPACE && ui->edit_len > 0) {
+		ui->edit_buf[--ui->edit_len] = 0;
+		return;
+	}
+	if (sc == SDL_SCANCODE_RETURN) {
+		char *field = ui->cursor[PAGE_PATHS] ? ui->cfg.bios_cgb_path : ui->cfg.bios_dmg_path;
+		snprintf(field, 256, "%s", ui->edit_buf);
+		ui->capturing = CAP_NONE;
+		SDL_StopTextInput();
+	}
 }
 
 static void config_handle_pad_capture (ConfigUI *ui, SDL_Event *e)
@@ -432,6 +516,29 @@ static void config_settings_key (ConfigUI *ui, SDL_Scancode sc)
 	}
 }
 
+static void config_paths_key (ConfigUI *ui, SDL_Scancode sc)
+{
+	int row = ui->cursor[PAGE_PATHS];
+
+	switch (sc)
+	{
+	case SDL_SCANCODE_RETURN: {
+		char *field = row ? ui->cfg.bios_cgb_path : ui->cfg.bios_dmg_path;
+		snprintf(ui->edit_buf, sizeof(ui->edit_buf), "%s", field);
+		ui->edit_len = (int)strlen(ui->edit_buf);
+		ui->capturing = CAP_TEXT;
+		SDL_StartTextInput();
+		break;
+	}
+	case SDL_SCANCODE_D:
+		char *field = row ? ui->cfg.bios_cgb_path : ui->cfg.bios_dmg_path;
+		snprintf(field, 256, "%s", row ? "roms/cgb_bios.bin" : "roms/bios.bin");
+		break;
+	default:
+		break;
+	}
+}
+
 static void config_reset_section (ConfigUI *ui)
 {
 	if (ui->page == PAGE_CONTROLS) {
@@ -441,16 +548,23 @@ static void config_reset_section (ConfigUI *ui)
 			set_pad_binding(&ui->cfg.padmap, (Action) i,
 				pad_binding(&ui->default_padmap_cache, (Action) i));
 		}
-	} else {
+	} else if (ui->page == PAGE_SETTINGS) {
 		for (int i = 0; i < SET_COUNT; i++)
 			set_setting_value(&ui->cfg, (SettingId) i, default_setting_value((SettingId) i));
+	} else {
+		char *field = ui->cfg.bios_dmg_path;
+		snprintf(field, 256, "%s", "roms/bios.bin");
+		field = ui->cfg.bios_cgb_path;
+		snprintf(field, 256, "%s", "roms/cgb_bios.bin");
 	}
 }
 
 static void config_handle_keydown (ConfigUI *ui, SDL_KeyboardEvent *key)
 {
 	SDL_Scancode sc = key->keysym.scancode;
-	int rows = (ui->page == PAGE_CONTROLS) ? ACT_COUNT : SET_COUNT;
+	int rows = ACT_COUNT;
+	if (ui->page == PAGE_SETTINGS) rows = SET_COUNT;
+	else if (ui->page == PAGE_PATHS) rows = 2;
 
 	switch (sc)
 	{
@@ -482,8 +596,10 @@ static void config_handle_keydown (ConfigUI *ui, SDL_KeyboardEvent *key)
 
 	if (ui->page == PAGE_CONTROLS)
 		config_controls_key(ui, sc);
-	else
+	else if (ui->page == PAGE_CONTROLS)
 		config_settings_key(ui, sc);
+	else
+		config_paths_key(ui, sc);
 }
 
 static void config_handle_events (ConfigUI *ui, Gamepad *pad)
@@ -515,6 +631,10 @@ static void config_handle_events (ConfigUI *ui, Gamepad *pad)
 		}
 		if (ui->capturing == CAP_PAD) {
 			config_handle_pad_capture(ui, &e);
+			continue;
+		}
+		if (ui->capturing == CAP_TEXT) {
+			config_handle_text_capture(ui, &e);
 			continue;
 		}
 
