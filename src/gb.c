@@ -78,8 +78,22 @@ static void reset_rest (GB *gb)
 static void init_cgb_palette_ram (GB *gb)
 {
 	if (gb->model != CGB) return;
-	memset(gb->memory.bg_palette_ram, 0xFF, sizeof(gb->memory.bg_palette_ram));
-	memset(gb->memory.obj_palette_ram, 0xFF, sizeof(gb->memory.obj_palette_ram));
+	uint8_t *bg = gb->memory.bg_palette_ram;
+	uint8_t *sp = gb->memory.obj_palette_ram;
+	memset(bg, 0xFF, sizeof(gb->memory.bg_palette_ram));
+	memset(sp, 0xFF, sizeof(gb->memory.obj_palette_ram));
+
+	uint16_t colors[] = {
+		0xFF, 0x7F,
+		0xB5, 0x56,
+		0x4A, 0x29,
+		0x00, 0x00
+	};
+	for (int i = 0; i < 8; i++) {
+		bg[i] = colors[i];
+		sp[i] = colors[i];
+		sp[8 + i] = colors[i];
+	}
 }
 
 static void detect_dmg_mode (GB *gb)

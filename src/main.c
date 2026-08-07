@@ -86,7 +86,7 @@ static inline void print_err (const char *prog)
 static inline void print_usage (const char *prog)
 {
 	printf("%s\n", VERSION);
-	printf("Nintendo Game Boy (DMG) Emulator\n\n");
+	printf("Nintendo Game Boy & Game Boy Color Emulator\n\n");
 
 	printf("USAGE:\n");
 	printf("    %s [OPTIONS] <game.gb>\n\n", prog);
@@ -104,7 +104,8 @@ static inline void print_usage (const char *prog)
 
 	printf("    -b, --bios <BIOS_FILE>\n");
 	printf("        Use the specified Game Boy Boot ROM.\n");
-	printf("        Defaults: DMG: roms/bios.bin; CGB: roms/cgb_bios.bin\n");
+	printf("        Defaults come from config.ini [paths], configurable in the config UI\n");
+	printf("        Initially, DMG: roms/bios.bin; CGB: roms/cgb_bios.bin\n");
 	printf("        If the file cannot be loaded, the emulator boots without a Boot ROM.\n\n");
 
 	printf("    --link-host <PORT>\n");

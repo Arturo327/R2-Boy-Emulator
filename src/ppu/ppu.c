@@ -81,9 +81,13 @@ static void reset_drawing (PPU *ppu)
 
 	int a = ppu->scx & 7;
 	ppu->bg.discard_px = a;
-	if (a == 0) ppu->bg.discard = 0;
-	else if (a <= 4) ppu->bg.discard = 4;
-	else ppu->bg.discard = 8;
+	if (ppu->model == DMG) {
+		if (a == 0) ppu->bg.discard = 0;
+		else if (a <= 4) ppu->bg.discard = 4;
+		else ppu->bg.discard = 8;
+	} else {
+		ppu->bg.discard = a;
+	}
 
 	ppu->bg.startup_tiles = 2;
 	ppu->bg.num_fifo = 0;
@@ -208,11 +212,17 @@ static void calc_sp_delay (PPU *ppu)
 
 	if (ppu->sp.tiles_touched & (1u << tile)) {
 		ppu->sp.delay = 0;
-	} else {
-		ppu->sp.tiles_touched |= (1u << tile);
-		int d = 5 - col;
-		ppu->sp.delay = (d > 0) ? (uint8_t)d : 0;
+		return;
 	}
+	ppu->sp.tiles_touched |= (1u << tile);
+
+	if (!sprite_x) {
+		ppu->sp.delay = 5;
+		return;
+	}
+
+	int d = 5 - col;
+	ppu->sp.delay = (d > 0) ? (uint8_t)d : 0;
 }
 
 static void draw_pixel (PPU *ppu)

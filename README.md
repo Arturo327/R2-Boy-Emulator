@@ -1,4 +1,4 @@
-# R2-Boy - Game Boy Emulator
+# R2-Boy - Game Boy & Game Boy Color Emulator
 
 <figure align="center">
   <img src="screenshots/pokemon.gif" alt="R2-Boy running Pokémon Red" width="640">
@@ -21,6 +21,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 ### Emulation
 
 - DMG (Original Game Boy) emulation
+- CGB (Game Boy Color) emulation
 - CPU M-Cycle accurate instruction emulation
 - HALT bug
 - Memory bus emulation
@@ -30,6 +31,7 @@ A Nintendo Game Boy (DMG-01) emulator written in C for educational purposes focu
 - PPU (Pixel Processing Unit) emulation
 - APU (Audio Processing Unit) emulation
 - OAM DMA emulation
+- VRAM DMA emulation
 - Game Boy Printer emulation
 
 ### Cartridge
@@ -173,7 +175,7 @@ For MBC7 cartridges with an accelerometer, R2-Boy uses the controller's accelero
 
 ## Palettes
 
-R2-Boy ships six built-in DMG color palettes. The default reproduces the warm greenish tint of the original DMG LCD; the others mimic the Game Boy Pocket, the BGB emulator, a "chocolate" tint, and a cooler green pocket variant. Switch at startup with `--palette <NAME>` or at runtime by pressing `P` (the current palette is printed to stderr). The choice is persisted across runs in the config file.
+In DMG mode, R2-Boy ships six built-in DMG color palettes. The default reproduces the warm greenish tint of the original DMG LCD; the others mimic the Game Boy Pocket, the BGB emulator, a "chocolate" tint, and a cooler green pocket variant. Switch at startup with `--palette <NAME>` or at runtime by pressing `P` (the current palette is printed to stderr). The choice is persisted across runs in the config file.
 
 | Name | Style |
 | :--- | :--- |
@@ -268,9 +270,11 @@ R2-Boy supports the Game Boy boot ROM, just use the option:
 ./build/r2boy --bios <biosfile> game.gb
 ```
 
-If you don't use the option, it will use the default path `roms/bios.bin` for DMG and `roms/cgb_bios.bin` for CGB.
+If you don't use the option, it will use the default path `roms/bios.bin` for DMG and `roms/cgb_bios.bin` for CGB, also configurable in the config UI and saved to `~/.config/r2boy/config.ini`.
 
 If no boot ROM is available, R2-Boy initializes the hardware registers to the same state produced by the original Game Boy boot ROMs (DMG-ABC for DMG and CGB-ABCDE for CGB revisions), allowing commercial games to start correctly.
+
+When running DMG-only ROMs in CGB mode and not using a boot ROM, R2-Boy initializes the palette RAM to monochrome colors.
 
 ---
 
