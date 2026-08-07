@@ -10,6 +10,8 @@
 
 void init_ppu (PPU *ppu, Model model);
 void init_ppu_reg (PPU *ppu);
+void ppu_start_stop_freeze (PPU *ppu);
+
 void shutdown_screen (PPU *ppu);
 int ppu_shutdown_step (PPU *ppu);
 

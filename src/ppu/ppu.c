@@ -31,6 +31,21 @@ void init_ppu (PPU *ppu, Model model)
 	ppu->model = model;
 }
 
+void ppu_start_stop_freeze (PPU *ppu)
+{
+	if (!(ppu->lcdc & PPU_ENABLE)) {
+		ppu->stop_freeze = STOP_FREEZE_NONE;
+		return;
+	}
+
+	if (ppu->mode == OAM_SCAN)
+		ppu->stop_freeze = STOP_FREEZE_BG_ONLY;
+	else if (ppu->mode == DRAWING)
+		ppu->stop_freeze = STOP_FREEZE_NONE;
+	else
+		ppu->stop_freeze = STOP_FREEZE_BLACK;
+}
+
 static void update_stat_line_ex (PPU *ppu, int force_mode2)
 {
 	int line = 0;
@@ -233,9 +248,16 @@ static void draw_pixel (PPU *ppu)
 
 	GB *gb = (GB *)ppu->bus->ctx;
 	BgPixel bgpx = bg_fifo_pop(ppu);
-	uint32_t final_pixel;
 
+	if (ppu->stop_freeze == STOP_FREEZE_BLACK) {
+		ppu->framebuffer[ppu->line_base + ppu->x] = 0xFF000000;
+		ppu->x++;
+		return;
+	}
+
+	uint32_t final_pixel;
 	uint8_t bg_enabled = ppu->lcdc & BG_WIN_PRIO;
+
 	if (!cgb_colors_active(ppu, gb) && !bg_enabled) bgpx.color = 0;
 
 	if (ppu->sp.num_fifo > 0) {
@@ -264,7 +286,8 @@ static inline void begin_sprite_delay (PPU *ppu)
 
 static int handle_sprites (PPU *ppu)
 {
-	if (!ppu->sp.sprite_active && !ppu->sp.sprite_waiting && (ppu->lcdc & SP_ENABLE))
+	int allow_new = ((ppu->lcdc & SP_ENABLE) && ppu->stop_freeze != STOP_FREEZE_BG_ONLY);
+	if (!ppu->sp.sprite_active && !ppu->sp.sprite_waiting && allow_new)
 		start_sprites(ppu);
 
 	if (ppu->sp.sprite_waiting && ppu->bg.num_fifo > 0) {
@@ -275,7 +298,7 @@ static int handle_sprites (PPU *ppu)
 	if (ppu->sp.sprite_active) {
 		sprite_fetch(ppu);
 
-		if (!ppu->sp.sprite_active && !ppu->sp.sprite_waiting && (ppu->lcdc & SP_ENABLE))
+		if (!ppu->sp.sprite_active && !ppu->sp.sprite_waiting && allow_new)
 			start_sprites(ppu);
 
 		if (ppu->sp.sprite_waiting) {

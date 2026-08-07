@@ -316,6 +316,9 @@ static int handle_states (GB *gb)
 
 	if (gb->cpu.speed_switch_delay > 0) {
 		gb->cpu.speed_switch_delay--;
+		ppu_step(&gb->ppu);
+		if (gb->cpu.speed_switch_delay == 0)
+			gb->ppu.stop_freeze = STOP_FREEZE_NONE;
 		gb->clock += 4;
 		return 1;
 	}

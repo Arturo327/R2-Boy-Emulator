@@ -26,6 +26,12 @@ typedef enum {
 	DRAWING
 } PPU_Mode;
 
+typedef enum {
+	STOP_FREEZE_NONE = 0,
+	STOP_FREEZE_BLACK,
+	STOP_FREEZE_BG_ONLY
+} StopFreeze;
+
 typedef struct Sprite {
 	uint8_t y;
 	uint8_t x;
@@ -103,6 +109,7 @@ typedef struct PPU {
 	uint8_t ready;
 	uint8_t lcd_was_off;
 	uint8_t stop_glitch_pending;
+	StopFreeze stop_freeze;
 
 	uint8_t shutdown_pending;
 	uint8_t shutdown_frame;

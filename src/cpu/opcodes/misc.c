@@ -24,6 +24,7 @@ static void stop (GB *gb) {				// 0x10
 		gb->cpu.pc++;
 		div_reset(gb);
 		gb->cpu.speed_switch_delay = 2050;
+		ppu_start_stop_freeze(&gb->ppu);
 		return;
 	}
 
