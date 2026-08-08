@@ -28,7 +28,9 @@ static void stop (GB *gb) {				// 0x10
 		return;
 	}
 
-	if (gb->ppu.lcdc & 0x80)
+	uint8_t lcd_on = gb->ppu.lcdc & PPU_ENABLE;
+	uint8_t glitch = (gb->model == DMG) ? !lcd_on : lcd_on;
+	if (glitch)
 		gb->ppu.stop_glitch_pending = 1;
 
 	uint8_t pending = gb->interrupts.IE & gb->interrupts.IF & 0x1F;

@@ -337,6 +337,8 @@ static void handle_cpu_step (GB *gb)
 
 	dma_step(gb);
 
+	if (gb->cpu.speed_switch_delay) return;
+
 	uint16_t old_div = gb->timer.div;
 	if (timer_step(&gb->timer))
 		gb->interrupts.IF |= 0x04;
@@ -350,7 +352,7 @@ void gb_step (GB *gb)
 	if (handle_states(gb)) return;
 
 	handle_cpu_step(gb);
-	if (gb->memory.key1 & 0x80)
+	if (!gb->cpu.speed_switch_delay && (gb->memory.key1 & 0x80))
 		handle_cpu_step(gb);
 
 	if (gb->hdma.stall > 4) gb->hdma.stall -= 4;

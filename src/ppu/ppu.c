@@ -437,12 +437,13 @@ static void turn_lcd_on (PPU *ppu)
 
 static void stop_glitch (PPU *ppu)
 {
+	uint8_t lcd_on = ppu->lcdc & PPU_ENABLE;
 	if (ppu->model == DMG) {
-		if (!(ppu->lcdc & PPU_ENABLE))
-			burn_line(ppu, 70);
+		if (lcd_on) return;
+		burn_line(ppu, 70);
 	} else {
-		if ((ppu->lcdc & PPU_ENABLE) && ppu->mode != VBLANK)
-			color_screen(ppu, 0xFF000000);
+		if (!lcd_on || ppu->mode == DRAWING) return;
+		color_screen(ppu, 0xFF000000);
 	}
 	ppu->ready = 1;
 }
