@@ -76,6 +76,10 @@ R2-Boy works correctly and runs every DMG compatible game I tested.
 
 This project is under active development. I am currently working on CGB (Game Boy Color) compatibility.
 
+Currently missing CGB functions:
+- Interfared Comunication Port
+- CGB fast serial mode
+
 ---
 
 ## Quick Start
