@@ -70,7 +70,8 @@ void cpu_step (CPU *cpu)
 		}
 		if (cpu->halted) return;
 
-		if (cpu->bus->interrupts->ei_pending) {
+		uint8_t ei_delay = cpu->bus->interrupts->ei_pending;
+		if (ei_delay) {
 			cpu->bus->interrupts->ei_pending = 0;
 			cpu->bus->interrupts->IME = 1;
 		}
@@ -86,6 +87,13 @@ void cpu_step (CPU *cpu)
 		}
 
 		decode_instr(gb, opcode);
+
+		if (ei_delay && cpu->halted &&
+				(cpu->bus->interrupts->IE & cpu->bus->interrupts->IF & 0x1F)) {
+			cpu->halted = 0;
+			cpu->pc--;
+		}
+
 		return;
 	}
 
