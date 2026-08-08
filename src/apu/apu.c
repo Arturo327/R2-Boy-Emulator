@@ -429,8 +429,8 @@ void apu_div_reset (APU *apu, uint8_t old_div)
 
 uint8_t apu_read_reg (APU *apu, uint16_t addr)
 {
-	switch (addr) {
-
+	switch (addr)
+	{
 	case 0xFF10: return apu->nr10 | 0x80;
 	case 0xFF11: return apu->nr11 | 0x3F;
 	case 0xFF12: return apu->nr12;
@@ -468,30 +468,35 @@ uint8_t apu_read_reg (APU *apu, uint16_t addr)
 	}
 }
 
+static void apu_off_write (APU *apu, uint16_t addr, uint8_t val)
+{
+	switch (addr)
+	{
+	case 0xFF11: if (apu->model == DMG) apu->ch1.ch.length_counter = 64 - (val & 0x3F); break;
+	case 0xFF16: if (apu->model == DMG) apu->ch2.length_counter = 64 - (val & 0x3F); break;
+	case 0xFF1B: if (apu->model == DMG) apu->ch3.length_counter = 256 - val; break;
+	case 0xFF20: if (apu->model == DMG) apu->ch4.ch.length_counter = 64 - (val & 0x3F); break;
+	case 0xFF26: {
+		if (val & 0x80) {
+			apu->enabled = 1;
+			apu->frame_seq_step = 7;
+			apu->frame_seq_counter = 0;
+		}
+		break;
+	}
+	default: break;
+	}
+}
+
 void apu_write_reg (APU *apu, uint16_t addr, uint8_t val)
 {
 	if (!apu->enabled) {
-		switch (addr) {
-
-		case 0xFF11: if (apu->model == DMG) apu->ch1.ch.length_counter = 64 - (val & 0x3F); break;
-		case 0xFF16: if (apu->model == DMG) apu->ch2.length_counter = 64 - (val & 0x3F); break;
-		case 0xFF1B: if (apu->model == DMG) apu->ch3.length_counter = 256 - val; break;
-		case 0xFF20: if (apu->model == DMG) apu->ch4.ch.length_counter = 64 - (val & 0x3F); break;
-		case 0xFF26: {
-			if (val & 0x80) {
-				apu->enabled = 1;
-				apu->frame_seq_step = 7;
-				apu->frame_seq_counter = 0;
-			}
-			break;
-		}
-		default: break;
-		}
+		apu_off_write(apu, addr, val);
 		return;
 	}
 
-	switch (addr) {
-
+	switch (addr)
+	{
 	case 0xFF10: {
 		uint8_t prev = apu->nr10;
 		apu->nr10 = val;

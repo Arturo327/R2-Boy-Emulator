@@ -65,15 +65,17 @@ uint8_t hdma_read_ff55 (GB *gb)
 
 void hdma_write_ff55 (GB *gb, uint8_t val)
 {
+	gb->hdma.length = ((uint16_t)(val & 0x7F) + 1) << 4;
+
 	if (gb->hdma.active && !(val & 0x80)) {
 		gb->hdma.active = 0;
 		return;
 	}
 
-	gb->hdma.length = ((uint16_t)(val & 0x7F) + 1) << 4;
-
 	if (val & 0x80) {
 		gb->hdma.active = 1;
+		if ((!(gb->ppu.lcdc & PPU_ENABLE) || gb->ppu.mode == HBLANK) && hdma_copy_block(gb))
+			gb->hdma.stall = HDMA_BLOCK_STALL_DOTS;
 		return;
 	}
 
